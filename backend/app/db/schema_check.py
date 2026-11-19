@@ -66,6 +66,10 @@ REQUIRED_TABLES = (
     "chat_messages",
     "notifications",
     "wompi_events_processed",
+    "site_content",
+    "catalog_items",
+    "catalog_item_schools",
+    "login_attempts",
 )
 
 

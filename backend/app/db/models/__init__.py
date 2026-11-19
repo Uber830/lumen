@@ -64,13 +64,17 @@ from app.db.models.learning import (
 from app.db.models.notifications import Notification, NotificationPreference
 from app.db.models.sessions import (
     EmailVerificationToken,
+    LoginAttempt,
     PasswordResetToken,
     RefreshToken,
 )
+from app.db.models.site import CatalogItem, CatalogItemSchool, SiteContent
 
 __all__ = [
     "AcademicPeriod",
     "Base",
+    "CatalogItem",
+    "CatalogItemSchool",
     "ChatConversation",
     "ChatMember",
     "ChatMessage",
@@ -92,6 +96,7 @@ __all__ = [
     "IcfesScore",
     "IcfesSimulation",
     "IcfesSimulationQuestion",
+    "LoginAttempt",
     "Notification",
     "NotificationPreference",
     "Plan",
@@ -102,6 +107,7 @@ __all__ = [
     "EmailVerificationToken",
     "School",
     "SchoolMembership",
+    "SiteContent",
     "StudentEnrollment",
     "Subject",
     "Subscription",

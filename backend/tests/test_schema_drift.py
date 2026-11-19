@@ -31,6 +31,7 @@ MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
 # parser below does not see.
 COLUMNS_ADDED_BY_ALTER = {
     "profiles": {"avatar_url"},
+    "users": {"locked_until"},
     "schools": {
         "display_name",
         "logo_url",
