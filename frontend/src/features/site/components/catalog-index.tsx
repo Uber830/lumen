@@ -49,7 +49,7 @@ export function CatalogIndex({
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">{catalog.title}</caption>
             <thead>
-              <tr className="bg-ink text-white">
+              <tr className="bg-[var(--head-bg)] text-[var(--head-fg)]">
                 {catalog.columns.map((column) => (
                   <th
                     key={column.id}

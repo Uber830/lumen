@@ -18,9 +18,9 @@ export const CONTAINER = "mx-auto w-full max-w-[1220px] px-5 sm:px-8";
 
 /** The class of a button, by variant. */
 const BUTTON_VARIANTS: Record<SiteActionVariant, string> = {
-  solid: "bg-ink text-white hover:bg-[#1c2230]",
+  solid: "bg-ink text-[var(--on-ink)] hover:bg-[var(--ink-hover)]",
   outline: "border border-line-2 bg-transparent text-ink hover:border-ink hover:bg-paper",
-  accent: "bg-brand text-white hover:bg-[#1239bd]",
+  accent: "bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]",
 };
 
 /**
@@ -102,8 +102,8 @@ export function SiteLogo({ className = "" }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect width="30" height="30" fill="currentColor" />
-      <circle cx="15" cy="15" r="4.2" fill="#FCFCFD" />
-      <g stroke="#FCFCFD" strokeWidth="1.4" strokeLinecap="square">
+      <circle cx="15" cy="15" r="4.2" className="fill-[var(--bg)]" />
+      <g className="stroke-[var(--bg)]" strokeWidth="1.4" strokeLinecap="square">
         <path d="M15 2.6v3.4M15 24v3.4M2.6 15h3.4M24 15h3.4" />
         <path d="M6.1 6.1l2.4 2.4M21.5 21.5l2.4 2.4M23.9 6.1l-2.4 2.4M8.5 21.5l-2.4 2.4" />
       </g>
@@ -125,10 +125,10 @@ const STATE_LABELS: Record<CatalogState, string> = {
 };
 
 const STATE_CLASSES: Record<CatalogState, string> = {
-  published: "border-[#1f7a4d]/40 bg-[#1f7a4d]/10 text-[#145c39]",
-  review: "border-[#8a5a00]/40 bg-[#8a5a00]/10 text-[#6d4700]",
+  published: "border-[var(--ok-line)] bg-[var(--ok-bg)] text-[var(--ok-fg)]",
+  review: "border-[var(--warn-line)] bg-[var(--warn-bg)] text-[var(--warn-fg)]",
   draft: "border-line-2 bg-paper-2 text-ink-2",
-  archived: "border-[#a13b32]/40 bg-[#a13b32]/10 text-[#8a2f27]",
+  archived: "border-[var(--bad-line)] bg-[var(--bad-bg)] text-[var(--bad-fg)]",
 };
 
 export function StateChip({ state }: { state: CatalogState }) {
