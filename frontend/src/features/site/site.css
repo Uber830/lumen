@@ -1,0 +1,76 @@
+/*
+ * El Índice — the design system of the public site.
+ * -------------------------------------------------------------------------
+ * The tokens live in a scope class instead of `:root` on purpose: the
+ * application panel has its own palette (indigo, rounded corners) and
+ * the public site has its own (paper, square corners). Scoping keeps
+ * the two apart without a second set of global variables.
+ *
+ * The Tailwind theme maps these to utilities (`bg-paper`, `text-ink`,
+ * `border-line`, `bg-brand`...) in src/styles.css.
+ */
+
+.idx-site {
+  /* superficies */
+  --bg: #fcfcfd;
+  --paper: #f3f4f7;
+  --paper-2: #eaecf1;
+  /* tinta */
+  --ink: #0a0d13;
+  --ink-2: #565e6e;
+  --ink-3: #8b93a3;
+  /* líneas */
+  --line: #dfe3ea;
+  --line-2: #c6ccd8;
+  /* acento */
+  --accent: #1a4cf0;
+  --accent-soft: rgba(26, 76, 240, 0.08);
+  --accent-line: rgba(26, 76, 240, 0.32);
+  /* forma y ritmo */
+  --maxw: 1220px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  position: relative;
+  min-height: 100%;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-synthesis-weight: none;
+}
+
+/*
+ * The notebook grid: a fixed, very faint ruling over the whole page.
+ * It never intercepts the pointer and it sits under the content.
+ */
+.idx-site::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(180deg, transparent 0 39px, rgba(10, 13, 19, 0.028) 39px 40px),
+    repeating-linear-gradient(90deg, transparent 0 79px, rgba(10, 13, 19, 0.022) 79px 80px);
+}
+
+/*
+ * Motion is decoration here, so it is never forced: the reader who
+ * asked for less motion gets none.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .idx-site *,
+  .idx-site *::before,
+  .idx-site *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
