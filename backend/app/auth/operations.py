@@ -37,7 +37,6 @@ from app.core.tokens import (
 )
 from app.db.enums import SchoolRole
 from app.db.models import (
-    EmailVerificationToken,
     PasswordResetToken,
     PlatformRole,
     Profile,
@@ -49,8 +48,6 @@ from app.db.models import (
 
 # How long a password-reset token stays valid.
 PASSWORD_RESET_TTL = timedelta(hours=1)
-# How long an email-verification token stays valid.
-EMAIL_VERIFICATION_TTL = timedelta(days=2)
 # How long an activation link stays valid. It lives longer than a
 # password-reset link: the admin shares it with a person who may take a
 # day to open their mailbox.
@@ -239,81 +236,37 @@ async def update_profile(
 
 
 # ---------------------------------------------------------------------------
-# Registration
+# Accounts
 # ---------------------------------------------------------------------------
-
-
-async def _reuse_pending_signup_user(
-    session: AsyncSession,
-    existing: User,
-    *,
-    password: str,
-) -> User:
-    """Return an existing user that is safe to reuse during a signup retry.
-
-    A signup is two steps: create the account, then bootstrap the
-    school. If the second step fails, the account is left behind. When
-    the user retries, they land back here with the same email. We let
-    them through only when it is unmistakably the same person resuming
-    their own incomplete signup:
-
-    - the password matches the stored hash, and
-    - the account has no active school membership yet (so no completed
-      signup is being hijacked).
-
-    Any other case keeps the original "email already exists" behaviour,
-    so this does not become an account-takeover vector.
-    """
-    if not existing.password_hash or not verify_password(password, existing.password_hash):
-        raise ConflictError("A user with that email already exists.")
-
-    membership_result = await session.execute(
-        select(SchoolMembership)
-        .where(
-            SchoolMembership.user_id == existing.id,
-            SchoolMembership.revoked_at.is_(None),
-        )
-        .limit(1)
-    )
-    if membership_result.scalar_one_or_none() is not None:
-        # The account already finished signup and has a school.
-        raise ConflictError("A user with that email already exists.")
-
-    return existing
 
 
 async def create_user(
     session: AsyncSession,
     *,
     email: str,
-    password: str,
     full_name: str,
+    password: str | None = None,
 ) -> User:
     """Create a user and their profile.
 
-    Idempotent for the signup retry case: if the email already belongs
-    to an account that matches the given password and has no school
-    membership yet, the existing user is returned instead of raising.
-    This lets a signup that failed at the school-bootstrap step be
-    retried without leaving the account stranded.
+    Nobody signs up on their own: the accounts are created by the
+    platform team, either with a password or pending, waiting for the
+    activation link that lets the person set one.
 
-    Raises ConflictError when the email is already registered to an
-    account with a different password or one that already has a school.
+    Raises ConflictError when the email is already registered.
     """
     normalized = email.strip().lower()
 
     existing = await find_user_by_email(session, normalized)
     if existing is not None:
-        return await _reuse_pending_signup_user(
-            session,
-            existing,
-            password=password,
-        )
+        raise ConflictError("A user with that email already exists.")
 
     user = User(
         id=uuid.uuid4(),
         email=normalized,
-        password_hash=hash_password(password),
+        # A pending account has no password yet: it sets one through
+        # the activation link.
+        password_hash=hash_password(password) if password else "",
         full_name=full_name,
         email_verified=False,
     )
@@ -332,56 +285,6 @@ async def create_user(
         await session.rollback()
         raise ConflictError("A user with that email already exists.") from exc
 
-    return user
-
-
-async def issue_email_verification_token(
-    session: AsyncSession,
-    user_id: uuid.UUID,
-) -> str:
-    """Create an email-verification token and return its plaintext value.
-
-    Only the hash is stored. The plaintext is handed to the caller so
-    it can be emailed out.
-    """
-    token, token_hash = generate_refresh_token()
-    session.add(
-        EmailVerificationToken(
-            id=uuid.uuid4(),
-            user_id=user_id,
-            token_hash=token_hash,
-            expires_at=datetime.now(UTC) + EMAIL_VERIFICATION_TTL,
-        )
-    )
-    await session.flush()
-    return token
-
-
-async def verify_email(session: AsyncSession, token: str) -> User:
-    """Consume an email-verification token and mark the user verified.
-
-    Raises AuthenticationError when the token is unknown, already used
-    or expired.
-    """
-    token_hash = hash_refresh_token(token)
-    result = await session.execute(
-        select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash)
-    )
-    row = result.scalar_one_or_none()
-    if row is None:
-        raise AuthenticationError("Invalid or expired verification token.")
-    if row.used_at is not None:
-        raise AuthenticationError("This verification token was already used.")
-    if row.expires_at < datetime.now(UTC):
-        raise AuthenticationError("Invalid or expired verification token.")
-
-    row.used_at = datetime.now(UTC)
-
-    user = await get_user(session, row.user_id)
-    if user is None:
-        raise NotFoundError("User not found.")
-    user.email_verified = True
-    await session.flush()
     return user
 
 
@@ -715,7 +618,6 @@ def is_school_admin(membership: SchoolMembership | None) -> bool:
 
 __all__ = [
     "ACTIVATION_LINK_TTL",
-    "EMAIL_VERIFICATION_TTL",
     "PASSWORD_RESET_TTL",
     "IssuedSession",
     "UserSession",
@@ -726,7 +628,6 @@ __all__ = [
     "get_user",
     "has_school_membership",
     "is_school_admin",
-    "issue_email_verification_token",
     "issue_password_reset_token",
     "issue_session",
     "load_session_context",
@@ -737,5 +638,4 @@ __all__ = [
     "rotate_refresh_token",
     "set_initial_password",
     "update_profile",
-    "verify_email",
 ]

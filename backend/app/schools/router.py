@@ -1,11 +1,8 @@
-"""Schools router: the signup bootstrap and the school profile.
+"""Schools router: the profile of the caller's own school.
 
-`POST /v1/schools/bootstrap` is the Python port of the
-`bootstrap_school` SQL function. The frontend's signup flow calls it
-with the school details, the admin details and the chosen plan.
-
-The operation is idempotent: calling it twice with the same admin
-returns the school created by the first call instead of a duplicate.
+The schools themselves are created by the platform team, from the
+platform module (`app.platform`). A school only manages its own
+profile from here.
 """
 
 from __future__ import annotations
@@ -14,25 +11,20 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import supabase_storage
 from app.core.context import RequestContext
-from app.core.errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
+from app.core.errors import ConflictError, ForbiddenError, ValidationError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
 from app.schools.operations import (
-    DEFAULT_TRIAL_DAYS,
-    BootstrapError,
-    bootstrap_school,
     get_school,
     update_school,
 )
 from app.schools.schemas import (
     MAX_GALLERY_IMAGES,
-    BootstrapResponse,
     SchoolGalleryImage,
     SchoolOut,
     SchoolUpdateRequest,
@@ -54,64 +46,6 @@ def _require_school_admin(context: RequestContext) -> uuid.UUID:
             code="insufficient_role",
         )
     return membership.school_id
-
-
-class BootstrapRequest(BaseModel):
-    """Body for POST /v1/schools/bootstrap."""
-
-    school_name: str = Field(min_length=2, max_length=120)
-    short_code: str = Field(min_length=2, max_length=16)
-    plan_code: str = Field(min_length=1, max_length=64)
-    trial_days: int = Field(default=DEFAULT_TRIAL_DAYS, ge=1, le=365)
-
-    @field_validator("school_name", "short_code", "plan_code")
-    @classmethod
-    def _strip(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("must not be blank")
-        return value
-
-
-@router.post("/bootstrap", status_code=status.HTTP_201_CREATED)
-async def bootstrap(
-    body: BootstrapRequest,
-    context: Annotated[RequestContext, Depends(get_context)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> BootstrapResponse:
-    """Create a school for the caller, with its trial subscription.
-
-    The caller becomes the school's `school_admin`. Calling it again
-    returns the school created by the first call.
-    """
-    try:
-        result = await bootstrap_school(
-            session,
-            user_id=context.user_id,
-            school_name=body.school_name,
-            short_code=body.short_code,
-            plan_code=body.plan_code,
-            trial_days=body.trial_days,
-        )
-    except BootstrapError as exc:
-        await session.rollback()
-        # The business errors keep the SQLSTATE codes the frontend
-        # already knows how to translate.
-        if exc.code == "23505":
-            raise ConflictError(exc.message, code="duplicate_school") from exc
-        if exc.code == "P0002":
-            raise NotFoundError(exc.message, code="plan_not_found") from exc
-        raise ValidationError(exc.message, code="invalid_input") from exc
-
-    await session.commit()
-
-    return BootstrapResponse(
-        school_id=result.school_id,
-        membership_id=result.membership_id,
-        subscription_id=result.subscription_id,
-        entitlement_id=result.entitlement_id,
-        already_existed=result.already_existed,
-    )
 
 
 def _school_out(school: object) -> SchoolOut:
@@ -249,4 +183,4 @@ async def upload_my_school_image(
     return _school_out(school)
 
 
-__all__ = ["BootstrapRequest", "router"]
+__all__ = ["router"]

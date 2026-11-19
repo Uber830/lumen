@@ -14,7 +14,7 @@
 // session does not interrupt the user.
 // =============================================================================
 
-const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8010").replace(/\/$/, "");
 
 /** The error the API returns. */
 export class ApiError extends Error {

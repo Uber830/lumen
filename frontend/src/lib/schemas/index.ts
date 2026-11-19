@@ -7,4 +7,3 @@ export * from "@/lib/schemas/student-enrollment";
 export * from "@/lib/schemas/content";
 export * from "@/lib/schemas/task";
 export * from "@/lib/schemas/chat";
-export * from "@/lib/schemas/signup";

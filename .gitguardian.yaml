@@ -1,0 +1,19 @@
+# =============================================================================
+# GitGuardian configuration.
+# -----------------------------------------------------------------------------
+# The development password of the seeded accounts ("lumen-dev") is not a
+# secret: it is documented in the README and only works against the local
+# database. The tests use it as a fixture, so the generic-password detector
+# is silenced for them.
+#
+# The file has to live in the default branch: GitGuardian reads the
+# configuration from there, so a pull request cannot weaken its own scan.
+# =============================================================================
+
+ignore:
+  - path: frontend/src/features/site/components/login-page.test.tsx
+    detectors:
+      - name: Generic Password
+  - path: frontend/tests/e2e/site.spec.ts
+    detectors:
+      - name: Generic Password

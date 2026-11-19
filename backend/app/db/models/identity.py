@@ -62,6 +62,12 @@ class User(Base):
         default=False,
         server_default=text("false"),
     )
+    # While set, the account is locked and signing in answers 423. A
+    # null value means the account is not locked.
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()
 

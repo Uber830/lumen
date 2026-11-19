@@ -104,7 +104,7 @@ function RootShell({ children }: { children: ReactNode }) {
     // add to the tag (a grammar extension, for example) before React
     // hydrates. It silences that warning only on this element; the
     // rest of the tree is still checked.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <head>
         {/* Set the theme before first paint to avoid a flash of the
             wrong mode. Must run before the body renders. */}

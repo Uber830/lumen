@@ -1,156 +1,199 @@
 # Lumen frontend
 
-The user-facing app for Lumen. TypeScript + React 19 + Vite, with
-TanStack Start for file-based routing and TanStack Query for the
-server-state cache.
+La app de Lumen: TypeScript + React 19 + Vite, con TanStack Start para las
+rutas por archivo y TanStack Query para la caché de estado de servidor.
 
-**All the data goes through the FastAPI backend** in `../backend/`.
-The browser does not talk to the database directly: the backend owns
-the authentication, the authorization and every business rule. The
-only exception is Supabase Storage and Realtime, which stay on
-Supabase and are reached with a short-lived token the backend mints.
+**Todos los datos pasan por el backend FastAPI** que está en `../backend/`.
+El navegador no habla con la base de datos: el backend es el dueño de la
+autenticación, la autorización y cada regla de negocio. La única excepción
+son Supabase Storage y Realtime, que siguen en Supabase y se alcanzan con un
+token corto que acuña el backend.
 
-## Stack
+- [Arranque rápido](#arranque-rápido)
+- [Layout](#layout)
+- [Rutas](#rutas)
+- [La sesión](#la-sesión)
+- [El sitio público](#el-sitio-público)
+- [Pruebas](#pruebas)
+- [Convenciones](#convenciones)
 
-- React 19 + TypeScript
-- TanStack Start (file-based routing)
-- TanStack Query (server-state cache)
-- Tailwind CSS 4
-- Vitest (unit) + Playwright (e2e)
-- ESLint + Prettier
+---
 
-## Local development
-
-The backend has to be running: the frontend talks to it for
-everything.
+## Arranque rápido
 
 ```sh
-# 1. The backend
-cd ../backend
-uv sync --extra dev
-uv run uvicorn app.main:app --reload --port 8000
+# 1. El backend tiene que estar levantado (ver ../backend/README.md)
+cd ../backend && uv run lumen-api       # http://localhost:8010
 
-# 2. The frontend
+# 2. La configuración del frontend
 cd ../frontend
-npm install       # install dependencies
-npm run dev       # start Vite dev server on http://localhost:8080
+cp .env.example .env                     # VITE_API_URL=http://localhost:8010
+
+# 3. Las dependencias y el servidor
+npm ci
+npm run dev                              # http://localhost:5174
 ```
 
-```sh
-npm run test      # run Vitest unit tests
-npm run typecheck # run tsc --noEmit
-npm run lint      # run ESLint
-npm run build     # produce a production bundle in .output/
-npm run test:e2e  # run Playwright (requires the dev server running)
-```
+Si el puerto 5174 está ocupado, Vite toma el 5175; el backend permite los dos
+orígenes. Si prefieres que falle en vez de moverse, el puerto está en
+`vite.config.ts`.
 
-Environment variables live in `frontend/.env`. Copy
-`frontend/.env.example` and fill in:
+### Variables de entorno
 
-- `VITE_API_URL` — the backend's base URL (`http://localhost:8000`).
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` — only for
-  Storage and Realtime.
+Viven en `frontend/.env` (está en `.gitignore`; se crea a partir de
+`frontend/.env.example`). Todas son públicas: acaban en el bundle, así que
+aquí no va nada secreto.
 
-## The session
+| Variable | Para qué |
+| --- | --- |
+| `VITE_API_URL` | la URL base del backend. Por defecto `http://localhost:8010` |
+| `VITE_SITE_URL` | la URL canónica del sitio público (Open Graph, canonical) |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | solo Storage y Realtime; se pueden dejar vacías en local |
+| `VITE_WOMPI_PUBLIC_KEY` | el checkout de Wompi; vacío en local |
 
-The session lives in an httpOnly cookie that the backend sets. The
-page's JavaScript cannot read it, so an XSS cannot steal it.
+Si `VITE_API_URL` no está, el cliente usa `http://localhost:8010` como
+respaldo. Si apunta a otro puerto, el frontend no carga datos y la consola
+muestra errores de red.
 
-That shapes the code:
-
-- **Signing in and out happen in the browser** (`lib/auth/browser.ts`),
-  because the API's cookie has to land on the browser. The frontend's
-  server then reads it during SSR.
-- **Reading the session happens on the server**
-  (`lib/auth/functions.ts`), through `createServerFn`. The route
-  guards call it in `beforeLoad`.
-- **The API calls go through `lib/api/client.ts`**, which sends
-  `credentials: "include"`. On a 401 it refreshes the session once
-  and retries, so a fifteen-minute token does not interrupt the user.
+---
 
 ## Layout
 
 ```
-public/                 Static assets served as-is
+public/                 recursos estáticos (favicon, manifiesto, imagen OG)
+scripts/                los generadores de iconos e imagen de compartir
 src/
-  components/           Reusable UI (app-shell, icfes/*, ui/*, chat-panel, ui-kit, ...)
-  features/             Feature-scoped hooks (academics, notifications)
+  components/           UI reutilizable (app-shell, icfes/*, ui/*, chat-panel, …)
+  features/             lógica por módulo
+    site/               el sitio público: landing y acceso
+      components/       una pieza por sección
+      site.css          los tokens y la retícula del diseño «El Índice»
+      types.ts          el contrato del contenido que llega de la API
+      use-site-content.ts  la única llamada al endpoint del sitio
   hooks/                use-mobile, use-plan
   lib/
-    api/                The API client and the response types
-    auth/               The session: browser auth, server functions, guards
-    billing/             useEntitlement, useStartCheckout, plan catalog
-    grades/              useStudentGrades
-    icfes/               useStartIcfesAttempt, useFinalizeIcfesAttempt
-    schemas/             zod schemas (form validation)
-    storage/             upload helpers and the content/tasks/chat hooks
-    supabase/            The Storage and Realtime client
-    users/               useInviteUser, useBulkInviteUsers, parseCsvInvitations
-  routes/               File-based routes (each .tsx is a route)
-  routeTree.gen.ts      Auto-generated by the TanStack Router plugin
-  router.tsx            Router factory
-  server.ts             SSR error wrapper
-  start.ts              TanStack Start middleware
-  styles.css            Tailwind entry
-  types/                The shared domain types
-tests/                  Vitest unit tests + Playwright e2e (tests/e2e/)
+    api/                el cliente de la API y los tipos de respuesta
+    auth/               la sesión: auth del navegador, funciones de servidor, guardas
+    billing/            useEntitlement, useStartCheckout, catálogo de planes
+    grades/             useStudentGrades
+    icfes/             useStartIcfesAttempt, useFinalizeIcfesAttempt
+    schemas/            esquemas zod (validación de formularios)
+    storage/            subida de archivos y los hooks de contenido/tareas/chat
+    supabase/           el cliente de Storage y Realtime
+    users/              useInviteUser, useBulkInviteUsers, parseCsvInvitations
+  routes/               rutas por archivo (cada .tsx es una ruta)
+  routeTree.gen.ts      lo genera el plugin de TanStack Router
+  router.tsx            la fábrica del router
+  server.ts             el envoltorio de errores del SSR
+  start.ts              el middleware de TanStack Start
+  styles.css            la entrada de Tailwind
+  types/                los tipos del dominio
+tests/                  pruebas unitarias (Vitest) y e2e (Playwright)
 ```
 
-`routeTree.gen.ts` is auto-generated and must not be edited by hand.
-It is regenerated by `npm run dev` and `npm run build`.
+`routeTree.gen.ts` se genera solo y no se edita a mano: lo regeneran
+`npm run dev` y `npm run build`.
 
-## Routes
+---
 
-TanStack Start uses **file-based routing**: every `.tsx` file in
-`src/routes/` defines a route. File names map to URL paths with dots
-becoming slashes (`admin.docentes.tsx` -> `/admin/docentes`).
+## Rutas
 
-The role prefixes are organised as parent + children:
+TanStack Start usa **rutas por archivo**: cada `.tsx` de `src/routes/` es una
+ruta, y los puntos del nombre se convierten en barras
+(`admin.docentes.tsx` → `/admin/docentes`).
 
-```text
-admin.tsx                      (layout: auth guard + AppShell + Outlet)
-admin.index.tsx                (default admin dashboard)
-admin.docentes.tsx             (teacher management page)
-admin.planes.tsx               (Wompi checkout page)
-...
-docente.tsx + docente.<area>.tsx
-estudiante.tsx + estudiante.<area>.tsx
-super.tsx + super.<area>.tsx
+```
+index.tsx                     la landing pública
+login.tsx                     la pantalla de acceso
+admin.tsx + admin.<área>.tsx  el panel del administrador de colegio
+docente.tsx + docente.<área>.tsx
+estudiante.tsx + estudiante.<área>.tsx
+super.tsx + super.<área>.tsx  el panel de plataforma
+activar.tsx                   poner la contraseña con el enlace de activación
+perfil.tsx + perfil.index.tsx el perfil del usuario
 ```
 
-The role-prefix layout file (`admin.tsx`, `docente.tsx`, etc.) calls
-`getCurrentSession` in `beforeLoad` and verifies the role before
-rendering anything. See `src/lib/auth/guards.ts` for the helpers and
-`src/routes/admin.tsx` for the canonical pattern.
+Los prefijos de rol son un archivo padre + sus hijos. El archivo padre
+(`admin.tsx`, `docente.tsx`…) llama a `getCurrentSession` en `beforeLoad` y
+comprueba el rol antes de renderizar nada. El patrón canónico está en
+`src/routes/admin.tsx` y las guardas en `src/lib/auth/guards.ts`.
 
-## Storage and Realtime
+---
 
-They stay on Supabase, and their RLS policies call `auth.uid()`.
-The bridge is a short-lived token the backend mints
-(`POST /v1/auth/supabase-token`), whose `sub` is the caller's id: with
-it, every storage and realtime policy works unchanged.
+## La sesión
 
-`src/lib/supabase/client.ts` is the only module that talks to
-Supabase from the browser. The token is not an authentication token:
-the API does not accept it, and it lasts an hour.
+La sesión vive en una cookie httpOnly que pone el backend. El JavaScript de
+la página no la puede leer, así que un XSS no se la puede llevar. Eso da
+forma al código:
 
-## Conventions
+- **Entrar y salir pasan por el navegador** (`lib/auth/browser.ts`), porque la
+  cookie tiene que llegar al navegador. El servidor del frontend la lee
+  después, durante el SSR.
+- **Leer la sesión pasa por el servidor** (`lib/auth/functions.ts`), con
+  `createServerFn`. Las guardas de ruta lo llaman en `beforeLoad`.
+- **Las llamadas a la API pasan por `lib/api/client.ts`**, que manda
+  `credentials: "include"`. Ante un 401 refresca la sesión una vez y repite la
+  petición, para que un token de quince minutos no interrumpa al usuario.
 
-- `__root.tsx` is the application shell wrapping every page. Always
-  keep its `<Outlet />` and `<Scripts />` rendered.
-- TanStack Router supports dynamic segments with the bare `$` prefix
-  (`$id.tsx`, `$.tsx` (splat)). The project does not currently use
-  either.
-- If a page needs a confirmation dialog, follow the existing
-  `<dialog>` + `useState` patterns in `src/routes/admin.docentes.tsx`
-  and `src/routes/admin.planes.tsx` rather than introducing a new
-  dependency.
-- New role-trees should follow the parent + children pattern; avoid
-  nesting beyond the depth the role actually needs.
-- The API returns snake_case and the components use camelCase. The
-  conversion happens once, in `lib/auth/functions.ts` (`SessionContext`)
-  and in the hooks that need numbers (`lib/grades/student.ts`). Do not
-  scatter it across the components.
-- The response types live in `lib/api/types.ts` and mirror the
-  backend's Pydantic schemas. When a response changes, the backend's
-  OpenAPI document (`/openapi.json`) changes with it.
+El login del sitio público (`/login`) es la pantalla nueva de acceso: valida
+el correo en el cliente, manda `remember_me`, aplica el rate limit con cuenta
+atrás y redirige según el rol (`/super`, `/admin`, `/docente`, `/estudiante`).
+El parámetro `?next=` se respeta solo si es una ruta interna.
+
+---
+
+## El sitio público
+
+La landing (`/`) y el acceso (`/login`) tienen su propia dirección visual,
+**«El Índice»**, y no comparten nada con el panel: tokens propios en
+`features/site/site.css` (ámbito `.idx-site`), iconos SVG en línea y fuentes
+auto-alojadas.
+
+Nada del texto de la landing está en el frontend: todo llega de
+`GET /v1/public/site` a través de `use-site-content.ts`, una sola llamada que
+alimenta toda la página. Los componentes del panel usan los tokens globales
+de Tailwind; los del sitio, los suyos.
+
+La guía de estilo está en [`../docs/site-style-guide.md`](../docs/site-style-guide.md).
+
+---
+
+## Pruebas
+
+```sh
+npm run test        # Vitest (unitarias)
+npm run test:e2e    # Playwright (levanta el dev server solo)
+npm run typecheck   # tsc --noEmit
+npm run lint        # ESLint
+npm run build       # bundle de producción en .output/
+```
+
+Las e2e arrancan su propio servidor de desarrollo en el puerto 5174 (o el
+`PORT` que se le pase). En una máquina sin las librerías de Chromium puede
+harte falta:
+
+```sh
+LD_LIBRARY_PATH=/ruta/a/las/librerias npx playwright test
+```
+
+---
+
+## Convenciones
+
+- `__root.tsx` es la cáscara de la aplicación y envuelve cada página. Siempre
+  con su `<Outlet />` y sus `<Scripts />`.
+- TanStack Router admite segmentos dinámicos con el prefijo `$` (`$id.tsx`,
+  `$.tsx`). El proyecto no los usa todavía.
+- Si una página necesita un diálogo de confirmación, sigue los patrones
+  `<dialog>` + `useState` de `src/routes/admin.docentes.tsx` y
+  `src/routes/admin.planes.tsx` en vez de meter una dependencia nueva.
+- Los árboles de rol siguen el patrón padre + hijos; no anides más de lo que
+  el rol necesita.
+- La API devuelve snake_case y los componentes usan camelCase. La conversión
+  ocurre una sola vez, en `lib/auth/functions.ts` (`SessionContext`) y en los
+  hooks que necesitan números (`lib/grades/student.ts`). No la repartas por
+  los componentes.
+- Los tipos de respuesta viven en `lib/api/types.ts` y reflejan los esquemas
+  Pydantic del backend. Cuando cambia una respuesta, el documento OpenAPI
+  (`/openapi.json`) cambia con ella.
+- Sin librerías nuevas: lo que el proyecto no usa, no se añade.

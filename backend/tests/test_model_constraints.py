@@ -21,7 +21,12 @@ from sqlalchemy import UniqueConstraint
 
 from app.db.models import Base
 
-MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
+# The migrations are applied in order: the inherited ones first, then
+# the ones this project owns.
+MIGRATION_DIRS = (
+    Path(__file__).resolve().parents[2] / "supabase" / "migrations",
+    Path(__file__).resolve().parents[1] / "migrations",
+)
 
 # The migrations declare the unique constraints with a `constraint ...
 # unique (...)` clause. The parser looks for those.
@@ -64,31 +69,32 @@ def _migration_unique_constraints() -> dict[str, dict[str, tuple[str, ...]]]:
     """Extract {table: {constraint_name: (columns, ...)}} from the migrations."""
     constraints: dict[str, dict[str, tuple[str, ...]]] = {}
 
-    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        sql = path.read_text(encoding="utf-8")
+    for directory in MIGRATION_DIRS:
+        for path in sorted(directory.glob("*.sql")):
+            sql = path.read_text(encoding="utf-8")
 
-        # Track the table the statements apply to.
-        current_table: str | None = None
-        for line in sql.split("\n"):
-            table_match = re.match(
-                r"\s*(?:create table (?:if not exists )?)?(?:public\.)?(\w+)\s*\(",
-                line,
-                re.IGNORECASE,
-            )
-            if table_match and "constraint" not in line.lower():
-                candidate = table_match.group(1)
-                if candidate not in ("select", "where", "values", "on"):
-                    current_table = candidate
-
-            constraint_match = _UNIQUE_CLAUSE_RE.search(line)
-            if constraint_match and current_table:
-                name = constraint_match.group(1)
-                columns = tuple(
-                    column.strip()
-                    for column in constraint_match.group(2).split(",")
-                    if column.strip()
+            # Track the table the statements apply to.
+            current_table: str | None = None
+            for line in sql.split("\n"):
+                table_match = re.match(
+                    r"\s*(?:create table (?:if not exists )?)?(?:public\.)?(\w+)\s*\(",
+                    line,
+                    re.IGNORECASE,
                 )
-                constraints.setdefault(current_table, {})[name] = columns
+                if table_match and "constraint" not in line.lower():
+                    candidate = table_match.group(1)
+                    if candidate not in ("select", "where", "values", "on"):
+                        current_table = candidate
+
+                constraint_match = _UNIQUE_CLAUSE_RE.search(line)
+                if constraint_match and current_table:
+                    name = constraint_match.group(1)
+                    columns = tuple(
+                        column.strip()
+                        for column in constraint_match.group(2).split(",")
+                        if column.strip()
+                    )
+                    constraints.setdefault(current_table, {})[name] = columns
 
     return constraints
 
@@ -112,8 +118,8 @@ def _model_unique_constraints() -> dict[str, dict[str, tuple[str, ...]]]:
 
 @pytest.fixture(scope="module")
 def migration_constraints() -> dict[str, dict[str, tuple[str, ...]]]:
-    if not MIGRATIONS_DIR.is_dir():
-        pytest.skip(f"migrations directory not found at {MIGRATIONS_DIR}")
+    if not all(directory.is_dir() for directory in MIGRATION_DIRS):
+        pytest.skip(f"migrations directories not found at {MIGRATION_DIRS}")
     return _migration_unique_constraints()
 
 

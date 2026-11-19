@@ -139,8 +139,32 @@ class EmailVerificationToken(Base):
     created_at: Mapped[datetime] = created_at()
 
 
+class LoginAttempt(Base):
+    """A sign-in attempt, successful or not.
+
+    The email is never stored: only the HMAC of it, so the table can
+    be read by whoever audits the sign-ins without turning it into a
+    list of customers. The rows feed the rate limit and the trail.
+    """
+
+    __tablename__ = "login_attempts"
+    __table_args__ = ({"schema": "public"},)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    email_hash: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "success", "invalid_credentials" or "locked".
+    outcome: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = created_at()
+
+
 __all__ = [
     "EmailVerificationToken",
+    "LoginAttempt",
     "PasswordResetToken",
     "RefreshToken",
 ]

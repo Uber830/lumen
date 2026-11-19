@@ -11,20 +11,6 @@ from pydantic import BaseModel, Field, field_validator
 MAX_GALLERY_IMAGES = 5
 
 
-class BootstrapResponse(BaseModel):
-    """The result of bootstrapping a school.
-
-    The field names match the columns the old `bootstrap_school` RPC
-    returned, so the frontend's translation code keeps working.
-    """
-
-    school_id: UUID
-    membership_id: UUID | None = None
-    subscription_id: UUID | None = None
-    entitlement_id: UUID | None = None
-    already_existed: bool = False
-
-
 class SchoolGalleryImage(BaseModel):
     """One picture of the school's gallery."""
 
@@ -89,7 +75,6 @@ class SchoolUpdateRequest(BaseModel):
 
 __all__ = [
     "MAX_GALLERY_IMAGES",
-    "BootstrapResponse",
     "SchoolGalleryImage",
     "SchoolOut",
     "SchoolUpdateRequest",

@@ -296,7 +296,7 @@ def cleanup_users(engine):
     `@example.com` domain for their email addresses, and the schools
     they create carry a name that starts with a known prefix.
     """
-    from app.db.models import Plan, School, User
+    from app.db.models import LoginAttempt, Plan, School, User
 
     async def _delete() -> None:
         async with AsyncSession(bind=engine, expire_on_commit=False) as session:
@@ -328,6 +328,9 @@ def cleanup_users(engine):
                 await session.execute(delete(School).where(School.id.in_(school_ids)))
 
             await session.execute(delete(User).where(User.email.like("%@example.com")))
+            # The trail of the sign-ins: the rows of one test would
+            # rate-limit the next one.
+            await session.execute(delete(LoginAttempt))
             # The plan catalog is reference data the tests seed
             # themselves.
             await session.execute(delete(Plan).where(Plan.code.like("p-%")))
@@ -352,6 +355,70 @@ def client(test_app) -> Iterator[Any]:
     """A TestClient bound to the app."""
     with TestClient(test_app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def make_user(engine):
+    """Create a user with a password, straight in the database.
+
+    Nobody signs up on their own anymore, so the tests do not go
+    through an endpoint that would create accounts.
+    """
+    from tests.support import create_test_user
+
+    def _create(
+        email: str,
+        password: str = "a good password",
+        full_name: str = "Test User",
+    ) -> str:
+        return create_test_user(
+            engine,
+            email=email,
+            password=password,
+            full_name=full_name,
+        )
+
+    return _create
+
+
+@pytest.fixture
+def platform_admin(engine) -> dict[str, str]:
+    """An Authorization header for a platform admin.
+
+    The platform team is the one that creates the schools, so the tests
+    of that flow need a caller with the platform role.
+    """
+    import asyncio
+
+    from app.db.enums import PlatformRoleKind
+    from app.db.models import PlatformRole
+    from tests.support import create_test_user
+
+    email = "platform@example.com"
+    user_id = create_test_user(
+        engine,
+        email=email,
+        password="a good password",
+        full_name="Platform Admin",
+    )
+
+    async def _grant() -> None:
+        async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+            session.add(
+                PlatformRole(
+                    user_id=UUID(user_id),
+                    role=PlatformRoleKind.PLATFORM_ADMIN,
+                )
+            )
+            await session.commit()
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_grant())
+    finally:
+        loop.close()
+
+    return {"Authorization": f"Bearer {mint_token(user_id, email)}"}
 
 
 @pytest.fixture

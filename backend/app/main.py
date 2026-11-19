@@ -3,7 +3,7 @@
 The app is registered with uvicorn via the entry in pyproject.toml:
     lumen-api = "app.main:run"
 or directly via:
-    uvicorn app.main:app --host 0.0.0.0 --port 8000
+    uvicorn app.main:app --host 0.0.0.0 --port 8010
 """
 
 from __future__ import annotations
@@ -34,7 +34,9 @@ from app.icfes.comparisons import router as icfes_comparisons_router
 from app.icfes.router import router as icfes_router
 from app.notifications.router import router as notifications_router
 from app.plans.router import router as plans_router
+from app.platform.router import router as platform_router
 from app.schools.router import router as schools_router
+from app.site.router import router as site_router
 from app.subscriptions.router import router as subscriptions_router
 from app.subscriptions.webhooks import router as webhooks_router
 from app.tasks.router import router as tasks_router
@@ -123,7 +125,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
         """Map domain errors to their HTTP representation."""
-        return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.to_payload(),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(OperationalError)
     async def handle_database_unavailable(_: Request, exc: OperationalError) -> JSONResponse:
@@ -147,6 +153,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
+    app.include_router(site_router)
     app.include_router(auth_router)
     app.include_router(academics_router)
     app.include_router(content_router)
@@ -158,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router)
     app.include_router(plans_router)
     app.include_router(schools_router)
+    app.include_router(platform_router)
     app.include_router(users_router)
     app.include_router(subscriptions_router)
     app.include_router(webhooks_router)

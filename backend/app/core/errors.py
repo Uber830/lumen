@@ -39,6 +39,7 @@ class AppError(Exception):
         code: str | None = None,
         status_code: int | None = None,
         extra: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(detail)
         self.detail = detail
@@ -47,6 +48,8 @@ class AppError(Exception):
         if status_code is not None:
             self.status_code = status_code
         self.extra = extra or {}
+        # Headers the response must carry, such as `Retry-After`.
+        self.headers = headers or {}
 
     def to_payload(self) -> dict[str, Any]:
         """The JSON body sent to the client."""
@@ -60,6 +63,29 @@ class AuthenticationError(AppError):
 
     status_code = 401
     code = "unauthorized"
+
+
+class AccountLockedError(AppError):
+    """The account exists but is locked.
+
+    It is only raised once the password has been verified: answering
+    "this account is locked" to a wrong password would tell whoever is
+    guessing that the email belongs to a real account.
+    """
+
+    status_code = 423
+    code = "account_locked"
+
+
+class RateLimitedError(AppError):
+    """Too many attempts.
+
+    The response carries `Retry-After`, so the caller knows how long
+    to wait without guessing.
+    """
+
+    status_code = 429
+    code = "rate_limited"
 
 
 class PermissionError_(AppError):
@@ -116,12 +142,14 @@ class ServiceUnavailableError(AppError):
 
 
 __all__ = [
+    "AccountLockedError",
     "AppError",
     "AuthenticationError",
     "ConflictError",
     "ForbiddenError",
     "NotFoundError",
     "PermissionError_",
+    "RateLimitedError",
     "ServiceUnavailableError",
     "UpstreamError",
     "ValidationError",

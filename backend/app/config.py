@@ -59,14 +59,18 @@ class Settings(BaseSettings):
     # -----------------------------------------------------------------------
     # CORS
     # -----------------------------------------------------------------------
-    # Comma-separated list of allowed origins. The frontend dev server
-    # defaults to http://localhost:8080 (Lovable preset) and the standard
-    # Vite port is 5173; both are allowed out of the box for development.
+    # Comma-separated list of allowed origins.
+    #
+    # 5174 is the port of the Lumen dev server (see frontend/vite.config.ts);
+    # 5175 is what Vite takes when 5174 is busy. 8080 and 5173 are kept for
+    # the tools that default to them.
     #
     # `NoDecode` stops pydantic-settings from trying to JSON-parse the
     # environment variable; the validator below splits the raw string.
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
+            "http://localhost:5174",
+            "http://localhost:5175",
             "http://localhost:8080",
             "http://localhost:5173",
         ]
@@ -134,6 +138,18 @@ class Settings(BaseSettings):
     argon2_time_cost: int = Field(default=3, ge=1, le=10)
     argon2_memory_cost: int = Field(default=65_536, ge=8_192, le=1_048_576)
     argon2_parallelism: int = Field(default=4, ge=1, le=16)
+
+    # -----------------------------------------------------------------------
+    # Sign-in protection
+    # -----------------------------------------------------------------------
+    # How many failed attempts are allowed in the rate limit window,
+    # per email and per address. The window and the threshold are
+    # separate so the limit can be tuned without a redeploy.
+    login_rate_limit_attempts: int = Field(default=5, ge=1, le=100)
+    login_rate_limit_window_seconds: int = Field(default=60, ge=10, le=3600)
+    # How many failed attempts lock the account, and for how long.
+    login_lock_threshold: int = Field(default=10, ge=1, le=100)
+    login_lock_minutes: int = Field(default=15, ge=1, le=1440)
 
     # -----------------------------------------------------------------------
     # Wompi

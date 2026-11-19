@@ -12,8 +12,12 @@
 #   ./scripts/dev-db.sh reset   # drop it and start over
 #   ./scripts/dev-db.sh down    # remove it
 #
-# The schema comes from supabase/migrations/, the same migrations the
-# real project uses. The seed data comes from supabase/seed.sql.
+# The schema comes from two folders, applied in order:
+#
+#   supabase/migrations/   the schema inherited from the original project
+#   backend/migrations/    the schema owned by this project
+#
+# The seed data comes from supabase/seed.sql and backend/seeds/.
 #
 # The container is defined in docker-compose.yml; this script only
 # manages its schema. The connection string it prints is the one to put
@@ -55,10 +59,13 @@ wait_for_postgres() {
 }
 
 start_container() {
-  if [ "$USE_COMPOSE" = "true" ]; then
-    docker compose -f "$COMPOSE_FILE" up -d db >/dev/null
-  elif docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+  if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+    # The container is already there, whether compose or a `docker run`
+    # created it. Starting the one that exists avoids the name clash
+    # that compose reports when it tries to create a second one.
     docker start "$CONTAINER" >/dev/null 2>&1 || true
+  elif [ "$USE_COMPOSE" = "true" ]; then
+    docker compose -f "$COMPOSE_FILE" up -d db >/dev/null
   else
     docker run -d --name "$CONTAINER" \
       -e POSTGRES_USER=postgres \
@@ -95,17 +102,19 @@ create_database() {
   docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
     < "$ROOT/supabase/local-shim.sql" >/dev/null
 
-  for migration in "$ROOT"/supabase/migrations/*.sql; do
+  for migration in "$ROOT"/supabase/migrations/*.sql "$ROOT"/backend/migrations/*.sql; do
+    [ -e "$migration" ] || continue
     echo "  applying $(basename "$migration")"
     docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
       < "$migration" >/dev/null
   done
 
-  if [ -f "$ROOT/supabase/seed.sql" ]; then
-    echo "  applying seed.sql"
+  for seed in "$ROOT/supabase/seed.sql" "$ROOT"/backend/seeds/*.sql; do
+    [ -e "$seed" ] || continue
+    echo "  applying $(basename "$seed")"
     docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
-      < "$ROOT/supabase/seed.sql" >/dev/null
-  fi
+      < "$seed" >/dev/null
+  done
 }
 
 case "${1:-up}" in

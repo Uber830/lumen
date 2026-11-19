@@ -167,7 +167,6 @@ export type { StudentEnrollmentFormValues } from "@/lib/schemas/student-enrollme
 export type { ContentItemFormValues } from "@/lib/schemas/content";
 export type { TaskFormValues, TaskSubmissionFormValues } from "@/lib/schemas/task";
 export type { ChatMessageFormValues, ChatConversationFormValues } from "@/lib/schemas/chat";
-export type { SignupFormValues } from "@/lib/schemas/signup";
 
 // Enum value types are derived from the API types directly, so they
 // stay in sync with the backend without a parallel zod enum.

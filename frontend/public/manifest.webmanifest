@@ -1,0 +1,28 @@
+{
+  "name": "Lumen — El material de la editorial, indexado por colegio",
+  "short_name": "Lumen",
+  "description": "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
+  "lang": "es-CO",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FCFCFD",
+  "theme_color": "#0A0D13",
+  "icons": [
+    {
+      "src": "/favicon-lumen.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/favicon-lumen-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-lumen-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

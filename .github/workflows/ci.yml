@@ -58,8 +58,9 @@ jobs:
           --health-retries 10
 
     env:
-      # The SQL migrations under supabase/migrations/ own the schema.
-      # They are applied below, before the tests run.
+      # The SQL migrations own the schema: the inherited ones under
+      # supabase/migrations/ and this project's under backend/migrations/.
+      # They are applied below, in that order, before the tests run.
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/lumen_test
       JWT_SECRET: ci-jwt-secret-with-enough-entropy-for-hs256
       SUPABASE_JWT_SECRET: ci-supabase-project-secret-1234567890
@@ -85,10 +86,12 @@ jobs:
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
             -v ON_ERROR_STOP=1 -q -f supabase/local-shim.sql
-          for migration in $(ls supabase/migrations/*.sql | sort); do
-            echo "applying $migration"
-            psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
-              -v ON_ERROR_STOP=1 -q -f "$migration"
+          for directory in supabase/migrations backend/migrations; do
+            for migration in $(ls "$directory"/*.sql | sort); do
+              echo "applying $migration"
+              psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
+                -v ON_ERROR_STOP=1 -q -f "$migration"
+            done
           done
 
       - name: Format

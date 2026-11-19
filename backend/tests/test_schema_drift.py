@@ -25,12 +25,18 @@ import pytest
 
 from app.db.models import Base
 
-MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
+# The migrations are applied in order: the inherited ones first, then
+# the ones this project owns.
+MIGRATION_DIRS = (
+    Path(__file__).resolve().parents[2] / "supabase" / "migrations",
+    Path(__file__).resolve().parents[1] / "migrations",
+)
 
 # Columns added by an `alter table` statement, which the create-table
 # parser below does not see.
 COLUMNS_ADDED_BY_ALTER = {
     "profiles": {"avatar_url"},
+    "users": {"locked_until"},
     "schools": {
         "display_name",
         "logo_url",
@@ -52,21 +58,22 @@ def _parse_migration_columns() -> dict[str, set[str]]:
     """Extract {table: {column, ...}} from every create-table statement."""
     tables: dict[str, set[str]] = {}
 
-    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        sql = path.read_text(encoding="utf-8")
-        for match in _CREATE_TABLE_RE.finditer(sql):
-            table_name, body = match.group(1), match.group(2)
-            columns = tables.setdefault(table_name, set())
-            for raw_line in body.split("\n"):
-                line = raw_line.strip()
-                if not line or line.startswith("--"):
-                    continue
-                # Table-level constraints start with `constraint`.
-                if line.lower().startswith("constraint"):
-                    continue
-                column_match = re.match(r"(\w+)\s+[a-z]", line, re.IGNORECASE)
-                if column_match:
-                    columns.add(column_match.group(1))
+    for directory in MIGRATION_DIRS:
+        for path in sorted(directory.glob("*.sql")):
+            sql = path.read_text(encoding="utf-8")
+            for match in _CREATE_TABLE_RE.finditer(sql):
+                table_name, body = match.group(1), match.group(2)
+                columns = tables.setdefault(table_name, set())
+                for raw_line in body.split("\n"):
+                    line = raw_line.strip()
+                    if not line or line.startswith("--"):
+                        continue
+                    # Table-level constraints start with `constraint`.
+                    if line.lower().startswith("constraint"):
+                        continue
+                    column_match = re.match(r"(\w+)\s+[a-z]", line, re.IGNORECASE)
+                    if column_match:
+                        columns.add(column_match.group(1))
 
     return tables
 
@@ -81,8 +88,8 @@ def _orm_columns() -> dict[str, set[str]]:
 
 @pytest.fixture(scope="module")
 def migration_tables() -> dict[str, set[str]]:
-    if not MIGRATIONS_DIR.is_dir():
-        pytest.skip(f"migrations directory not found at {MIGRATIONS_DIR}")
+    if not all(directory.is_dir() for directory in MIGRATION_DIRS):
+        pytest.skip(f"migrations directories not found at {MIGRATION_DIRS}")
     return _parse_migration_columns()
 
 

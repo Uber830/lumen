@@ -17,7 +17,6 @@ import { Route as EstudianteRouteImport } from './routes/estudiante'
 import { Route as IcfesBloqueadoRouteImport } from './routes/icfes-bloqueado'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PerfilRouteImport } from './routes/perfil'
-import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as SuperRouteImport } from './routes/super'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAdministradoresRouteImport } from './routes/admin.administradores'
@@ -88,11 +87,6 @@ const LoginRoute = LoginRouteImport.update({
 const PerfilRoute = PerfilRouteImport.update({
   id: '/perfil',
   path: '/perfil',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegistroRoute = RegistroRouteImport.update({
-  id: '/registro',
-  path: '/registro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuperRoute = SuperRouteImport.update({
@@ -260,7 +254,6 @@ export interface FileRoutesByFullPath {
   '/icfes-bloqueado': typeof IcfesBloqueadoRoute
   '/login': typeof LoginRoute
   '/perfil': typeof PerfilRouteWithChildren
-  '/registro': typeof RegistroRoute
   '/super': typeof SuperRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
@@ -298,7 +291,6 @@ export interface FileRoutesByTo {
   '/activar': typeof ActivarRoute
   '/icfes-bloqueado': typeof IcfesBloqueadoRoute
   '/login': typeof LoginRoute
-  '/registro': typeof RegistroRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
   '/admin/cursos': typeof AdminCursosRoute
@@ -340,7 +332,6 @@ export interface FileRoutesById {
   '/icfes-bloqueado': typeof IcfesBloqueadoRoute
   '/login': typeof LoginRoute
   '/perfil': typeof PerfilRouteWithChildren
-  '/registro': typeof RegistroRoute
   '/super': typeof SuperRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
@@ -384,7 +375,6 @@ export interface FileRouteTypes {
     | '/icfes-bloqueado'
     | '/login'
     | '/perfil'
-    | '/registro'
     | '/super'
     | '/admin/administradores'
     | '/admin/asignaciones'
@@ -422,7 +412,6 @@ export interface FileRouteTypes {
     | '/activar'
     | '/icfes-bloqueado'
     | '/login'
-    | '/registro'
     | '/admin/administradores'
     | '/admin/asignaciones'
     | '/admin/cursos'
@@ -463,7 +452,6 @@ export interface FileRouteTypes {
     | '/icfes-bloqueado'
     | '/login'
     | '/perfil'
-    | '/registro'
     | '/super'
     | '/admin/administradores'
     | '/admin/asignaciones'
@@ -506,7 +494,6 @@ export interface RootRouteChildren {
   IcfesBloqueadoRoute: typeof IcfesBloqueadoRoute
   LoginRoute: typeof LoginRoute
   PerfilRoute: typeof PerfilRouteWithChildren
-  RegistroRoute: typeof RegistroRoute
   SuperRoute: typeof SuperRouteWithChildren
 }
 
@@ -566,13 +553,6 @@ declare module '@tanstack/react-router' {
       path: '/perfil'
       fullPath: '/perfil'
       preLoaderRoute: typeof PerfilRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/registro': {
-      id: '/registro'
-      path: '/registro'
-      fullPath: '/registro'
-      preLoaderRoute: typeof RegistroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/super': {
@@ -908,7 +888,6 @@ const rootRouteChildren: RootRouteChildren = {
   IcfesBloqueadoRoute: IcfesBloqueadoRoute,
   LoginRoute: LoginRoute,
   PerfilRoute: PerfilRouteWithChildren,
-  RegistroRoute: RegistroRoute,
   SuperRoute: SuperRouteWithChildren,
 }
 export const routeTree = rootRouteImport

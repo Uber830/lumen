@@ -212,3 +212,4 @@ insert into public.student_enrollments (
    '00000000-0000-0000-0000-000000000103',
    'active', '2026-10-20T04:26:28.305905+00:00')
 on conflict (id) do nothing;
+

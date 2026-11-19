@@ -1,12 +1,14 @@
 """Migration tests.
 
-The SQL migrations under `supabase/migrations/` are the single owner of
-the schema. These tests apply them to a fresh Postgres and check that
-the result is a schema the backend can use:
+The SQL migrations are the single owner of the schema: the ones inherited
+from the original project live under `supabase/migrations/`, and the ones
+owned by this project live under `backend/migrations/`. These tests apply
+them to a fresh Postgres and check that the result is a schema the backend
+can use:
 
 - every table in `REQUIRED_TABLES` exists;
 - the identity foreign keys point at `public.users`, which is what
-  made `POST /v1/auth/register` answer 500 when the identity table
+  made `POST /v1/auth/login` answer 500 when the identity table
   still lived in an Alembic revision nobody applied.
 
 The tests need the `lumen-test-db` container. They are skipped when
@@ -24,7 +26,12 @@ import pytest
 from app.db.schema_check import REQUIRED_TABLES
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-MIGRATIONS_DIR = BACKEND_DIR.parent / "supabase" / "migrations"
+# The migrations are applied in order: the inherited ones first, then
+# the ones this project owns.
+MIGRATION_DIRS = (
+    BACKEND_DIR.parent / "supabase" / "migrations",
+    BACKEND_DIR / "migrations",
+)
 SHIM = BACKEND_DIR.parent / "supabase" / "local-shim.sql"
 
 CONTAINER = "lumen-test-db"
@@ -116,11 +123,12 @@ def migrated_database() -> Generator[None, None, None]:
 
     _run_sql(SHIM.read_text(encoding="utf-8"), database=DATABASE)
 
-    for migration in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        try:
-            _run_sql(migration.read_text(encoding="utf-8"), database=DATABASE)
-        except AssertionError as error:  # pragma: no cover - failure path
-            raise AssertionError(f"{migration.name} failed:\n{error}") from error
+    for directory in MIGRATION_DIRS:
+        for migration in sorted(directory.glob("*.sql")):
+            try:
+                _run_sql(migration.read_text(encoding="utf-8"), database=DATABASE)
+            except AssertionError as error:  # pragma: no cover - failure path
+                raise AssertionError(f"{migration.name} failed:\n{error}") from error
 
     yield
 
