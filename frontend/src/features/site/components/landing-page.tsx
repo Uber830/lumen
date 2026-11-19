@@ -8,6 +8,7 @@
 // thing a keyboard reaches.
 // =============================================================================
 
+import { CatalogIndex } from "./CatalogIndex";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { SiteHeroSection } from "./SiteHeroSection";
@@ -46,6 +47,7 @@ export function LandingPage() {
 
       <main id="contenido" className="relative z-10 flex-1">
         <SiteHeroSection />
+        <CatalogIndex />
       </main>
 
       <SiteFooter footer={content.footer} />
