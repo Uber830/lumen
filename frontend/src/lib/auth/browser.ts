@@ -23,12 +23,6 @@ export type SignInInput = {
   remember_me?: boolean;
 };
 
-export type RegisterInput = {
-  email: string;
-  password: string;
-  full_name: string;
-};
-
 /**
  * Sign in.
  *
@@ -41,23 +35,6 @@ export async function signIn(input: SignInInput): Promise<SessionInfo> {
     return response.session;
   } catch (error) {
     throw new Error(authErrorMessage(error, "No se pudo iniciar sesion."), {
-      cause: error,
-    });
-  }
-}
-
-/**
- * Create an account and sign in.
- *
- * The account starts unverified; the backend sends the verification
- * email when an email provider is configured.
- */
-export async function register(input: RegisterInput): Promise<SessionInfo> {
-  try {
-    const response = await api.post<AuthResponse>("/v1/auth/register", input);
-    return response.session;
-  } catch (error) {
-    throw new Error(authErrorMessage(error, "No se pudo crear la cuenta."), {
       cause: error,
     });
   }

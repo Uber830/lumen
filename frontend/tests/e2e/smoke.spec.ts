@@ -31,10 +31,12 @@ test.describe("smoke", () => {
     await expect(page.getByRole("button", { name: /Entrar/i })).toBeVisible();
   });
 
-  test("registration page renders the multi-step wizard", async ({ page }) => {
-    await page.goto("/registro");
+  test("the login does not offer a self-service registration", async ({ page }) => {
+    await page.goto("/login");
 
-    await expect(page.getByRole("heading", { name: /Registrá tu colegio/i })).toBeVisible();
-    await expect(page.getByText("Datos del colegio")).toBeVisible();
+    // The schools are onboarded by the platform team: the public site
+    // only invites to contact them.
+    await expect(page.getByRole("link", { name: /Regístrelo/i })).toHaveCount(0);
+    await expect(page.getByText(/Solicite su acceso/i)).toBeVisible();
   });
 });
