@@ -59,10 +59,13 @@ wait_for_postgres() {
 }
 
 start_container() {
-  if [ "$USE_COMPOSE" = "true" ]; then
-    docker compose -f "$COMPOSE_FILE" up -d db >/dev/null
-  elif docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+  if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+    # The container is already there, whether compose or a `docker run`
+    # created it. Starting the one that exists avoids the name clash
+    # that compose reports when it tries to create a second one.
     docker start "$CONTAINER" >/dev/null 2>&1 || true
+  elif [ "$USE_COMPOSE" = "true" ]; then
+    docker compose -f "$COMPOSE_FILE" up -d db >/dev/null
   else
     docker run -d --name "$CONTAINER" \
       -e POSTGRES_USER=postgres \
