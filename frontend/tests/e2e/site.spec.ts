@@ -2,8 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { siteFixture } from "../../src/test/site-fixture";
 
-// The password of the seeded accounts: a fixture of the test,
-// not a secret.
+// The password of the seeded accounts: a fixture of the test, not a secret.
 const SEED_LOGIN = "lumen-dev";
 
 /**
@@ -152,7 +151,7 @@ test.describe("login", () => {
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
     await page.getByLabel("Correo institucional").fill("ana@colegio.edu.co");
-    await page.getByLabel("Contraseña", { exact: true })SEED_LOGIN;
+    await page.getByLabel("Contraseña", { exact: true }).fill(SEED_LOGIN);
     await page.getByRole("button", { name: "Entrar" }).click();
 
     await expect(page.getByRole("alert")).toContainText("Demasiados intentos");
@@ -196,7 +195,7 @@ test.describe("login", () => {
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
     await page.getByLabel("Correo institucional").fill("ana@colegio.edu.co");
-    await page.getByLabel("Contraseña", { exact: true })SEED_LOGIN;
+    await page.getByLabel("Contraseña", { exact: true }).fill(SEED_LOGIN);
     await page.getByRole("button", { name: "Entrar" }).click();
 
     await expect(page).toHaveURL(/\/docente$/);
@@ -236,7 +235,7 @@ test.describe("login", () => {
     await page.goto("/login?next=https://evil.example/steal");
     await page.waitForLoadState("networkidle");
     await page.getByLabel("Correo institucional").fill("ana@colegio.edu.co");
-    await page.getByLabel("Contraseña", { exact: true })SEED_LOGIN;
+    await page.getByLabel("Contraseña", { exact: true }).fill(SEED_LOGIN);
     await page.getByRole("button", { name: "Entrar" }).click();
 
     await expect(page).toHaveURL(/\/docente$/);
