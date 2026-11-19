@@ -10,6 +10,7 @@
 
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
+import { SiteHeroSection } from "./SiteHeroSection";
 import { CONTAINER } from "./ui";
 import { useSiteContent } from "../use-site-content";
 
@@ -43,7 +44,9 @@ export function LandingPage() {
 
       <SiteHeader nav={content.nav} brand={content.footer.brand} contactEmail={contactEmail} />
 
-      <main id="contenido" className="relative z-10 flex-1" />
+      <main id="contenido" className="relative z-10 flex-1">
+        <SiteHeroSection />
+      </main>
 
       <SiteFooter footer={content.footer} />
     </div>
