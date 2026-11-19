@@ -2,6 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { LandingPage } from "@/features/site/components/landing-page";
 
+// The typeface of the title, preloaded: it is the first thing the
+// reader waits for.
+import spaceGroteskWoff2 from "@fontsource/space-grotesk/files/space-grotesk-latin-400-normal.woff2?url";
+
 const SITE_URL = (import.meta.env.VITE_SITE_URL ?? "https://lumen.co").replace(/\/$/, "");
 
 export const Route = createFileRoute("/")({
@@ -44,6 +48,13 @@ export const Route = createFileRoute("/")({
     links: [
       { rel: "canonical", href: SITE_URL },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      {
+        rel: "preload",
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous",
+        href: spaceGroteskWoff2,
+      },
       // The site has its own mark: the sun of El Índice.
       { rel: "icon", href: "/favicon-lumen.svg", type: "image/svg+xml" },
       { rel: "icon", href: "/favicon-lumen-32.png", type: "image/png", sizes: "32x32" },

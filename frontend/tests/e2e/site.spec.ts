@@ -36,9 +36,15 @@ test.describe("landing", () => {
       "El material de la editorial,",
     );
     await expect(page.getByRole("heading", { name: "Índice del catálogo" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Cómo llega el material al colegio" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Quién usa Lumen y hasta dónde" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Cobertura por tamaño de colegio" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Cómo llega el material al colegio" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Quién usa Lumen y hasta dónde" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Cobertura por tamaño de colegio" }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Preguntas frecuentes" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Veamos su colegio/ })).toBeVisible();
   });
