@@ -17,6 +17,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tests.support import sign_in
+
 pytestmark = pytest.mark.usefixtures("cleanup_users")
 
 
@@ -47,31 +49,40 @@ async def _seed_plans(engine) -> None:
         await session.commit()
 
 
-def _register_and_get_token(client, email: str) -> str:
-    """Register a user and return their access token."""
-    response = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Admin"},
-    )
-    assert response.status_code == 201, response.text
-    return response.json()["tokens"]["access_token"]
+async def _admin_with_school(client, engine, platform_admin, prefix: str) -> str:
+    """Create a school with its administrator, the way the platform does.
 
-
-async def _admin_with_school(client, engine, prefix: str) -> str:
-    """Register an admin and bootstrap their school. Returns the token."""
+    The platform team creates the school and the administrator's
+    account; the account is pending, and the activation link is what
+    lets the administrator set its password. Returns the token of the
+    signed-in administrator.
+    """
     await _seed_plans(engine)
-    token = _register_and_get_token(client, f"{prefix}-{uuid.uuid4().hex[:8]}@example.com")
+    email = f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
     response = client.post(
-        "/v1/schools/bootstrap",
-        headers={"Authorization": f"Bearer {token}"},
+        "/v1/platform/schools",
+        headers=platform_admin,
         json={
             "school_name": f"Colegio {uuid.uuid4().hex[:8]}",
             "short_code": f"{prefix.upper()}{uuid.uuid4().hex[:6].upper()}",
             "plan_code": "basico",
+            "admin_email": email,
+            "admin_name": "Admin",
         },
     )
     assert response.status_code == 201, response.text
-    return token
+
+    activated = client.post(
+        "/v1/auth/reset-password",
+        json={
+            "token": response.json()["activation_token"],
+            "password": "a good password",
+        },
+    )
+    assert activated.status_code == 200, activated.text
+
+    body = sign_in(client, email=email, password="a good password")
+    return body["tokens"]["access_token"]
 
 
 # ---------------------------------------------------------------------------
@@ -79,13 +90,13 @@ async def _admin_with_school(client, engine, prefix: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def test_the_session_carries_the_school_branding(client, engine):
+async def test_the_session_carries_the_school_branding(client, engine, platform_admin):
     """The session carries the colour and the logo of the school.
 
     Without them the app would start with the default theme and repaint
     a second later, when the school query answers.
     """
-    token = await _admin_with_school(client, engine, "brand")
+    token = await _admin_with_school(client, engine, platform_admin, "brand")
 
     updated = client.patch(
         "/v1/schools/me",
@@ -109,20 +120,22 @@ async def test_the_session_carries_the_school_branding(client, engine):
     assert school["id"] == me.json()["primary_school_id"]
 
 
-async def test_the_session_has_no_school_without_a_membership(client, engine):
+async def test_the_session_has_no_school_without_a_membership(client, engine, make_user):
     """A user without a school gets no branding, and the app is fine."""
-    await _seed_plans(engine)
-    token = _register_and_get_token(client, f"nosch-{uuid.uuid4().hex[:8]}@example.com")
+    email = f"nosch-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="Admin")
+    body = sign_in(client, email=email, password="a good password")
+    token = body["tokens"]["access_token"]
 
     me = client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert me.status_code == 200, me.text
     assert me.json()["school"] is None
 
 
-async def test_the_login_response_carries_the_branding_too(client, engine):
+async def test_the_login_response_carries_the_branding_too(client, engine, platform_admin):
     """The login response has the same shape, so the app can paint
     itself right after signing in."""
-    token = await _admin_with_school(client, engine, "login")
+    token = await _admin_with_school(client, engine, platform_admin, "login")
 
     client.patch(
         "/v1/schools/me",
@@ -130,21 +143,25 @@ async def test_the_login_response_carries_the_branding_too(client, engine):
         json={"primary_color": "oklch(0.55 0.14 155)"},
     )
 
+    # The administrator signs in again with the same credentials.
     email = f"relog-{uuid.uuid4().hex[:8]}@example.com"
-    # The same admin signs in again with the same credentials.
-    registered = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Admin"},
-    )
-    assert registered.status_code == 201, registered.text
-    new_token = registered.json()["tokens"]["access_token"]
-    client.post(
-        "/v1/schools/bootstrap",
-        headers={"Authorization": f"Bearer {new_token}"},
+    response = client.post(
+        "/v1/platform/schools",
+        headers=platform_admin,
         json={
             "school_name": f"Colegio {uuid.uuid4().hex[:8]}",
             "short_code": f"RL{uuid.uuid4().hex[:6].upper()}",
             "plan_code": "basico",
+            "admin_email": email,
+            "admin_name": "Admin",
+        },
+    )
+    assert response.status_code == 201, response.text
+    client.post(
+        "/v1/auth/reset-password",
+        json={
+            "token": response.json()["activation_token"],
+            "password": "a good password",
         },
     )
 
@@ -161,9 +178,9 @@ async def test_the_login_response_carries_the_branding_too(client, engine):
 # ---------------------------------------------------------------------------
 
 
-async def test_the_admin_writes_the_mission_and_the_vision(client, engine):
+async def test_the_admin_writes_the_mission_and_the_vision(client, engine, platform_admin):
     """The identity is saved and comes back in the school's profile."""
-    token = await _admin_with_school(client, engine, "ident")
+    token = await _admin_with_school(client, engine, platform_admin, "ident")
 
     response = client.patch(
         "/v1/schools/me",
@@ -183,9 +200,9 @@ async def test_the_admin_writes_the_mission_and_the_vision(client, engine):
     assert profile.json()["vision"] == body["vision"]
 
 
-async def test_an_empty_mission_clears_it(client, engine):
+async def test_an_empty_mission_clears_it(client, engine, platform_admin):
     """A blank mission clears the field instead of saving a blank."""
-    token = await _admin_with_school(client, engine, "clear")
+    token = await _admin_with_school(client, engine, platform_admin, "clear")
 
     client.patch(
         "/v1/schools/me",
@@ -201,9 +218,9 @@ async def test_an_empty_mission_clears_it(client, engine):
     assert response.json()["mission"] is None
 
 
-async def test_the_gallery_is_saved_and_cleared(client, engine):
+async def test_the_gallery_is_saved_and_cleared(client, engine, platform_admin):
     """The pictures of the gallery travel with the school."""
-    token = await _admin_with_school(client, engine, "gal")
+    token = await _admin_with_school(client, engine, platform_admin, "gal")
 
     gallery = [
         {"url": "https://example.test/1.png", "caption": "El patio"},
@@ -226,9 +243,9 @@ async def test_the_gallery_is_saved_and_cleared(client, engine):
     assert cleared.json()["gallery"] == []
 
 
-async def test_the_gallery_holds_at_most_five_pictures(client, engine):
+async def test_the_gallery_holds_at_most_five_pictures(client, engine, platform_admin):
     """A longer list is rejected: the dashboard shows them in one row."""
-    token = await _admin_with_school(client, engine, "many")
+    token = await _admin_with_school(client, engine, platform_admin, "many")
 
     gallery = [{"url": f"https://example.test/{i}.png"} for i in range(6)]
     response = client.patch(
@@ -271,7 +288,7 @@ async def test_a_teacher_cannot_write_the_identity(client, engine, seeded_school
 # ---------------------------------------------------------------------------
 
 
-async def test_the_banner_is_uploaded_and_saved(client, engine, monkeypatch):
+async def test_the_banner_is_uploaded_and_saved(client, engine, monkeypatch, platform_admin):
     """The cover of the dashboard is stored on the school."""
     from app.core import supabase_storage
 
@@ -280,7 +297,7 @@ async def test_the_banner_is_uploaded_and_saved(client, engine, monkeypatch):
 
     monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
 
-    token = await _admin_with_school(client, engine, "banner")
+    token = await _admin_with_school(client, engine, platform_admin, "banner")
 
     response = client.post(
         "/v1/schools/me/images",
@@ -292,7 +309,7 @@ async def test_the_banner_is_uploaded_and_saved(client, engine, monkeypatch):
     assert response.json()["banner_url"].startswith("https://example.test/banner-")
 
 
-async def test_a_gallery_picture_is_added_to_the_list(client, engine, monkeypatch):
+async def test_a_gallery_picture_is_added_to_the_list(client, engine, monkeypatch, platform_admin):
     """Each uploaded picture joins the gallery."""
     from app.core import supabase_storage
 
@@ -301,7 +318,7 @@ async def test_a_gallery_picture_is_added_to_the_list(client, engine, monkeypatc
 
     monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
 
-    token = await _admin_with_school(client, engine, "galu")
+    token = await _admin_with_school(client, engine, platform_admin, "galu")
 
     response = client.post(
         "/v1/schools/me/images",
@@ -315,7 +332,7 @@ async def test_a_gallery_picture_is_added_to_the_list(client, engine, monkeypatc
     assert gallery[0]["caption"] is None
 
 
-async def test_the_gallery_refuses_to_grow_past_five(client, engine, monkeypatch):
+async def test_the_gallery_refuses_to_grow_past_five(client, engine, monkeypatch, platform_admin):
     """The sixth picture is refused with a 409."""
     from app.core import supabase_storage
 
@@ -324,7 +341,7 @@ async def test_the_gallery_refuses_to_grow_past_five(client, engine, monkeypatch
 
     monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
 
-    token = await _admin_with_school(client, engine, "full")
+    token = await _admin_with_school(client, engine, platform_admin, "full")
 
     gallery = [{"url": f"https://example.test/{i}.png"} for i in range(5)]
     filled = client.patch(
@@ -343,9 +360,9 @@ async def test_the_gallery_refuses_to_grow_past_five(client, engine, monkeypatch
     assert response.status_code == 409, response.text
 
 
-async def test_an_unknown_image_kind_is_rejected(client, engine):
+async def test_an_unknown_image_kind_is_rejected(client, engine, platform_admin):
     """Only the banner and the gallery are accepted."""
-    token = await _admin_with_school(client, engine, "kind")
+    token = await _admin_with_school(client, engine, platform_admin, "kind")
 
     response = client.post(
         "/v1/schools/me/images",

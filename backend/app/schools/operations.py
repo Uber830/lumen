@@ -1,11 +1,14 @@
-"""School bootstrap: the signup orchestrator.
+"""School bootstrap: the operation that creates a school.
 
 This is the Python port of the `bootstrap_school` SQL function that
 lived in `supabase/migrations/20260813050000_bootstrap_school_rpc.sql`.
-The RPC existed because a newly signed-up user could not insert into
+The RPC existed because the user who signed up could not insert into
 `public.schools` directly: the RLS policy required `is_platform_admin`.
 With the logic in Python there is no such obstacle, so the function
 became a plain operation.
+
+Who calls it is the platform team, from `app.platform`: the schools
+are onboarded by the people who run the platform, not by the users.
 
 The behaviour is preserved exactly:
 
