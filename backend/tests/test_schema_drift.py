@@ -54,13 +54,25 @@ _CREATE_TABLE_RE = re.compile(
 )
 
 
+def _without_comments(sql: str) -> str:
+    """The SQL without its comment lines.
+
+    A commented-out statement is documentation, not schema: the
+    rollback block of a migration describes the tables it would
+    recreate, and those tables are not part of the schema.
+    """
+    return "\n".join(
+        line for line in sql.split("\n") if not line.lstrip().startswith("--")
+    )
+
+
 def _parse_migration_columns() -> dict[str, set[str]]:
     """Extract {table: {column, ...}} from every create-table statement."""
     tables: dict[str, set[str]] = {}
 
     for directory in MIGRATION_DIRS:
         for path in sorted(directory.glob("*.sql")):
-            sql = path.read_text(encoding="utf-8")
+            sql = _without_comments(path.read_text(encoding="utf-8"))
             for match in _CREATE_TABLE_RE.finditer(sql):
                 table_name, body = match.group(1), match.group(2)
                 columns = tables.setdefault(table_name, set())

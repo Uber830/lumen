@@ -70,6 +70,11 @@ REQUIRED_TABLES = (
     "site_content",
     "catalog_items",
     "catalog_item_schools",
+    "materials",
+    "material_files",
+    "material_schools",
+    "material_history",
+    "audit_log",
     "login_attempts",
 )
 
