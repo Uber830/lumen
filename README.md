@@ -97,14 +97,26 @@ npm run dev                 # http://localhost:5174
 
 ## Cuentas de desarrollo
 
-El seed carga usuarios con la contraseña **`lumen-dev`** para todos:
+El seed carga todas las cuentas con la contraseña **`lumen-dev`**:
 
-| Correo | Rol |
-| --- | --- |
-| `admin@cms.edu.co` | Administrador de colegio |
-| `super@platform.co` | Super Admin de plataforma |
-| `docente@cms.edu.co` | Docente |
-| `estudiante@cms.edu.co` | Estudiante |
+| Correo | Rol | Colegio |
+| --- | --- | --- |
+| `super@lumen.co` | Super Admin de plataforma | — |
+| `docente@lumen.co` | Docente | Shared ICFES Bank |
+| `estudiante@lumen.co` | Estudiante | Shared ICFES Bank |
+| `admin@cms.edu.co` | Administrador de colegio | — |
+| `admin1@cms.edu.co` … `admin6@cms.edu.co` | Administradores de colegio | — |
+| `uber@edu.com` | Administrador de colegio | Colegio San Juan |
+
+Las tres primeras son las que usa el módulo de contenido: el super admin
+carga, el docente y el estudiante consultan.
+
+> **Nota para el módulo de contenido de plataforma.** El endpoint heredado
+> `GET /v1/content/items` está anclado a un colegio: llama a
+> `require_any_membership()`, así que el super admin —que no pertenece a
+> ningún colegio— recibe un 403. El contenido de plataforma necesita un
+> endpoint propio, **no** anclado a una membresía escolar, con su propia
+> autorización.
 
 ---
 

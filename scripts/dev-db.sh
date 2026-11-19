@@ -82,8 +82,11 @@ create_database() {
   # DROP and CREATE go in separate psql calls on purpose: sent as one
   # multi-statement command they share a single transaction, and
   # DROP DATABASE cannot run inside a transaction block.
+  #
+  # FORCE ends the sessions still connected to the database, so the
+  # schema can be rebuilt while the API is running.
   docker exec "$CONTAINER" psql -U postgres -d postgres -q \
-    -c "DROP DATABASE IF EXISTS ${DB}" >/dev/null
+    -c "DROP DATABASE IF EXISTS ${DB} WITH (FORCE)" >/dev/null
   docker exec "$CONTAINER" psql -U postgres -d postgres -q \
     -c "CREATE DATABASE ${DB}" >/dev/null
 

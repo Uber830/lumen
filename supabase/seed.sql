@@ -141,3 +141,74 @@ insert into public.course_subjects (
    '00000000-0000-0000-0000-000000000011',
    '2026-10-20T04:26:28.305905+00:00')
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- The accounts of the three roles that drive Lumen
+--
+-- The data inherited from EduSuite only had school admins. Lumen needs a
+-- super admin (the one who uploads the platform content), a teacher and a
+-- student, because those are the three roles the content module connects.
+--
+-- All three use the same development password as the rest of the seed.
+--
+--   super@lumen.co       super admin de plataforma
+--   docente@lumen.co     docente del colegio compartido
+--   estudiante@lumen.co  estudiante del colegio compartido
+-- ---------------------------------------------------------------------------
+insert into public.users (id, email, password_hash, full_name, email_verified, created_at) values
+  ('00000000-0000-0000-0000-000000000101', 'super@lumen.co',
+   :'dev_password_hash', 'Super Lumen', true, '2026-10-20T04:26:28.305905+00:00'),
+  ('00000000-0000-0000-0000-000000000102', 'docente@lumen.co',
+   :'dev_password_hash', 'Docente Lumen', true, '2026-10-20T04:26:28.305905+00:00'),
+  ('00000000-0000-0000-0000-000000000103', 'estudiante@lumen.co',
+   :'dev_password_hash', 'Estudiante Lumen', true, '2026-10-20T04:26:28.305905+00:00')
+on conflict (id) do nothing;
+
+insert into public.profiles (id, full_name, locale) values
+  ('00000000-0000-0000-0000-000000000101', 'Super Lumen', 'es-CO'),
+  ('00000000-0000-0000-0000-000000000102', 'Docente Lumen', 'es-CO'),
+  ('00000000-0000-0000-0000-000000000103', 'Estudiante Lumen', 'es-CO')
+on conflict (id) do nothing;
+
+-- The super admin is not a member of any school: the platform role is
+-- what gives it access, and it spans every school.
+insert into public.platform_roles (user_id, role, granted_at) values
+  ('00000000-0000-0000-0000-000000000101', 'platform_admin',
+   '2026-10-20T04:26:28.305905+00:00')
+on conflict (user_id) do nothing;
+
+insert into public.school_memberships (
+  id, school_id, user_id, role, is_primary, joined_at
+) values
+  ('00000000-0000-0000-0000-000000000130',
+   '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000102',
+   'teacher', true, '2026-10-20T04:26:28.305905+00:00'),
+  ('00000000-0000-0000-0000-000000000131',
+   '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000103',
+   'student', true, '2026-10-20T04:26:28.305905+00:00')
+on conflict (id) do nothing;
+
+-- The teacher is assigned to the shared course subject and the student
+-- is enrolled in its course. Those two rows are what let them read the
+-- material of the subject.
+insert into public.teacher_assignments (
+  id, school_id, course_subject_id, teacher_id, assigned_at
+) values
+  ('00000000-0000-0000-0000-000000000140',
+   '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000012',
+   '00000000-0000-0000-0000-000000000102',
+   '2026-10-20T04:26:28.305905+00:00')
+on conflict (id) do nothing;
+
+insert into public.student_enrollments (
+  id, school_id, course_id, student_id, status, enrolled_at
+) values
+  ('00000000-0000-0000-0000-000000000150',
+   '00000000-0000-0000-0000-000000000001',
+   '00000000-0000-0000-0000-000000000010',
+   '00000000-0000-0000-0000-000000000103',
+   'active', '2026-10-20T04:26:28.305905+00:00')
+on conflict (id) do nothing;
