@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = process.env.PORT ?? "8080";
+// The same port the dev server uses (see vite.config.ts). The e2e
+// job of the continuous integration waits for this one.
+const PORT = process.env.PORT ?? "5174";
 const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
@@ -26,7 +28,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "npm run dev",
+    command: `npm run dev -- --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",
