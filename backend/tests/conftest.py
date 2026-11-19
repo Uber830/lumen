@@ -296,7 +296,7 @@ def cleanup_users(engine):
     `@example.com` domain for their email addresses, and the schools
     they create carry a name that starts with a known prefix.
     """
-    from app.db.models import Plan, School, User
+    from app.db.models import LoginAttempt, Plan, School, User
 
     async def _delete() -> None:
         async with AsyncSession(bind=engine, expire_on_commit=False) as session:
@@ -328,6 +328,9 @@ def cleanup_users(engine):
                 await session.execute(delete(School).where(School.id.in_(school_ids)))
 
             await session.execute(delete(User).where(User.email.like("%@example.com")))
+            # The trail of the sign-ins: the rows of one test would
+            # rate-limit the next one.
+            await session.execute(delete(LoginAttempt))
             # The plan catalog is reference data the tests seed
             # themselves.
             await session.execute(delete(Plan).where(Plan.code.like("p-%")))

@@ -18,7 +18,7 @@ import hmac
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import LoginAttempt, User
@@ -67,15 +67,17 @@ async def count_failures(
 ) -> int:
     """How many failed attempts happened in the window.
 
-    The attempts of the email *or* of the address count: a limit that
-    only looked at the email would be defeated by changing the
-    address, and one that only looked at the address would let anyone
-    lock a stranger's account.
+    The pair counts: the same email from the same address. Counting
+    the address alone would punish a school behind a single NAT, where
+    every teacher shares one address; counting the email alone would
+    let a guesser walk away from the limit by changing the address.
     """
     since = datetime.now(UTC) - window
     conditions = [LoginAttempt.email_hash == email_hash]
     if ip_address:
         conditions.append(LoginAttempt.ip_address == ip_address)
+    else:
+        conditions.append(LoginAttempt.ip_address.is_(None))
 
     result = await session.execute(
         select(func.count())
@@ -83,7 +85,7 @@ async def count_failures(
         .where(
             LoginAttempt.created_at >= since,
             LoginAttempt.outcome != OUTCOME_SUCCESS,
-            or_(*conditions),
+            and_(*conditions),
         )
     )
     return int(result.scalar_one())
