@@ -59,14 +59,18 @@ class Settings(BaseSettings):
     # -----------------------------------------------------------------------
     # CORS
     # -----------------------------------------------------------------------
-    # Comma-separated list of allowed origins. The frontend dev server
-    # defaults to http://localhost:8080 (Lovable preset) and the standard
-    # Vite port is 5173; both are allowed out of the box for development.
+    # Comma-separated list of allowed origins.
+    #
+    # 5174 is the port of the Lumen dev server (see frontend/vite.config.ts);
+    # 5175 is what Vite takes when 5174 is busy. 8080 and 5173 are kept for
+    # the tools that default to them.
     #
     # `NoDecode` stops pydantic-settings from trying to JSON-parse the
     # environment variable; the validator below splits the raw string.
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
+            "http://localhost:5174",
+            "http://localhost:5175",
             "http://localhost:8080",
             "http://localhost:5173",
         ]

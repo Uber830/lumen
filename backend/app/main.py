@@ -3,7 +3,7 @@
 The app is registered with uvicorn via the entry in pyproject.toml:
     lumen-api = "app.main:run"
 or directly via:
-    uvicorn app.main:app --host 0.0.0.0 --port 8000
+    uvicorn app.main:app --host 0.0.0.0 --port 8010
 """
 
 from __future__ import annotations
