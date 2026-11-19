@@ -14,7 +14,7 @@ import { CONTAINER, SectionKicker, SiteButton } from "./ui";
 
 export function SiteHeroSection({ hero, stats }: { hero: SiteHero; stats: SiteStat[] }) {
   return (
-    <section className="border-b border-line">
+    <section id="hero" className="border-b border-line">
       <div className={`${CONTAINER} pt-14 pb-16 sm:pt-20 sm:pb-24`}>
         <SectionKicker text={hero.kicker} />
 
