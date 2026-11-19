@@ -1,27 +1,23 @@
 -- =========================================================================
--- The public site: editable content, the editorial catalog and the
--- login audit trail.
+-- The public site: editable content and the login audit trail.
 -- -------------------------------------------------------------------------
--- Three things live here:
+-- Two things live here:
 --
 --   site_content             the copy of the landing, editable by the
 --                            platform team without a redeploy. One row
 --                            per page ("landing").
---   catalog_items            the editorial catalog: the material the
---                            platform team publishes, and the schools
---                            it is enabled for.
 --   login_attempts           every sign-in attempt, for the audit trail
 --                            and for the rate limit.
 --
--- The schools of the catalog are stored as display names, not as
--- foreign keys to `public.schools`: publishing a client name is an
--- explicit act of the platform team, never a side effect of enabling
--- access for a real tenant.
+-- The editorial catalog used to live here as `catalog_items` and
+-- `catalog_item_schools`. It moved to its own model (materials,
+-- material_files, material_schools) in
+-- `20261119010000_editorial_catalog.sql`, which transforms the rows of
+-- the old tables and drops them. The catalog is not created here
+-- anymore: a fresh database gets it straight in its final shape.
 --
 -- Rollback:
 --   drop table if exists public.login_attempts;
---   drop table if exists public.catalog_item_schools;
---   drop table if exists public.catalog_items;
 --   drop table if exists public.site_content;
 --   alter table public.users drop column if exists locked_until;
 -- =========================================================================
@@ -43,53 +39,6 @@ drop trigger if exists site_content_set_updated_at on public.site_content;
 create trigger site_content_set_updated_at
   before update on public.site_content
   for each row execute function public.set_updated_at();
-
--- ---------------------------------------------------------------------------
--- The editorial catalog
--- ---------------------------------------------------------------------------
-create table if not exists public.catalog_items (
-  id         uuid primary key default gen_random_uuid(),
-  ref        text not null,
-  title      text not null,
-  meta       text,
-  area       text not null,
-  state      text not null,
-  position   integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint catalog_items_ref_uq unique (ref),
-  constraint catalog_items_state_check
-    check (state in ('published', 'review', 'draft', 'archived'))
-);
-
-comment on table public.catalog_items is
-  'The material the platform team publishes to the editorial catalog.';
-
-create index if not exists catalog_items_position_idx
-  on public.catalog_items (position);
-
-create index if not exists catalog_items_state_idx
-  on public.catalog_items (state);
-
-drop trigger if exists catalog_items_set_updated_at on public.catalog_items;
-create trigger catalog_items_set_updated_at
-  before update on public.catalog_items
-  for each row execute function public.set_updated_at();
-
-create table if not exists public.catalog_item_schools (
-  id              uuid primary key default gen_random_uuid(),
-  catalog_item_id uuid not null references public.catalog_items(id) on delete cascade,
-  -- The published name of the school. It is a name, not a reference:
-  -- what the site shows is decided by the platform team.
-  school_name     text not null,
-  position        integer not null default 0
-);
-
-comment on table public.catalog_item_schools is
-  'The schools with access to a catalog item, as they are published.';
-
-create index if not exists catalog_item_schools_item_idx
-  on public.catalog_item_schools (catalog_item_id);
 
 -- ---------------------------------------------------------------------------
 -- The login audit trail
@@ -122,8 +71,6 @@ create index if not exists login_attempts_created_idx
 -- is not affected by the policies.
 -- ---------------------------------------------------------------------------
 alter table public.site_content enable row level security;
-alter table public.catalog_items enable row level security;
-alter table public.catalog_item_schools enable row level security;
 alter table public.login_attempts enable row level security;
 
 -- ---------------------------------------------------------------------------

@@ -77,14 +77,12 @@ from app.db.models.sessions import (
     PasswordResetToken,
     RefreshToken,
 )
-from app.db.models.site import CatalogItem, CatalogItemSchool, SiteContent
+from app.db.models.site import SiteContent
 
 __all__ = [
     "AcademicPeriod",
     "AuditLog",
     "Base",
-    "CatalogItem",
-    "CatalogItemSchool",
     "ChatConversation",
     "ChatMember",
     "ChatMessage",
