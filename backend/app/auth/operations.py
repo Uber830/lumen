@@ -328,6 +328,10 @@ async def authenticate(
         user.password_hash = hash_password(password)
         await session.flush()
 
+    # The account was used just now.
+    user.last_login_at = datetime.now(UTC)
+    await session.flush()
+
     return user
 
 

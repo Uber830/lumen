@@ -201,7 +201,7 @@ async def seeded_school(engine) -> AsyncIterator[UUID]:
     own connection: a fixture-scoped transaction would be invisible to
     it. They are removed at the end of the test.
     """
-    from app.db.enums import SchoolRole
+    from app.db.enums import SchoolAdminRole, SchoolRole
     from app.db.models import School, SchoolMembership, User
 
     school_id = uuid.uuid4()
@@ -235,6 +235,7 @@ async def seeded_school(engine) -> AsyncIterator[UUID]:
                 school_id=school_id,
                 user_id=user_id,
                 role=SchoolRole.SCHOOL_ADMIN,
+                admin_role=SchoolAdminRole.PRINCIPAL,
                 is_primary=True,
                 joined_at=datetime.now(UTC),
             )

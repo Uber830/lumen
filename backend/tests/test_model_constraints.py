@@ -53,6 +53,8 @@ _TABLES_WITH_NAMED_CONSTRAINTS = {
     "icfes_attempts",
     "icfes_scores",
     "icfes_simulation_questions",
+    "material_courses",
+    "material_schools",
     "notification_preferences",
     "plans",
     "school_memberships",

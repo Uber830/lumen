@@ -158,6 +158,19 @@ class IcfesSimulation(Base):
         default=False,
         server_default=text("false"),
     )
+    # The material of the catalog this simulation comes from, when the
+    # platform team enabled it for the school.
+    material_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.materials.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # The average score of the school. It is null until the simulation
+    # is corrected.
+    average_score: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
+    # programado, en_correccion or cerrado.
+    status: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()
 

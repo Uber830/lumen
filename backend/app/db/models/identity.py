@@ -29,6 +29,7 @@ from app.db.base import Base, created_at, updated_at
 from app.db.enums import (
     PlanInterval,
     PlatformRoleKind,
+    SchoolAdminRole,
     SchoolRole,
     SchoolStatus,
     pg_enum,
@@ -68,6 +69,11 @@ class User(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    # When the account was used for the last time.
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()
 
@@ -79,6 +85,10 @@ class User(Base):
     memberships: Mapped[list[SchoolMembership]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
+        # The membership has two foreign keys to the user: the one that
+        # says who it belongs to and the one that says who invited it.
+        # The relationship is the first one.
+        foreign_keys="SchoolMembership.user_id",
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
@@ -243,6 +253,22 @@ class SchoolMembership(Base):
         pg_enum(SchoolRole, "school_role"),
         nullable=False,
     )
+    # The rank of an administrator: principal or secundario. It is
+    # null for teachers and students.
+    admin_role: Mapped[SchoolAdminRole | None] = mapped_column(
+        pg_enum(SchoolAdminRole, "school_admin_role"),
+        nullable=True,
+    )
+    # The administrator who invited this one, and when.
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    invited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     is_primary: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -260,11 +286,66 @@ class SchoolMembership(Base):
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()
 
-    user: Mapped[User] = relationship(back_populates="memberships")
+    user: Mapped[User] = relationship(
+        back_populates="memberships",
+        foreign_keys="SchoolMembership.user_id",
+    )
+    # The administrator who invited this one, when there was one.
+    inviter: Mapped[User | None] = relationship(
+        foreign_keys="SchoolMembership.invited_by",
+    )
     school: Mapped[School] = relationship()
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<SchoolMembership {self.role} school={self.school_id}>"
+
+
+class SchoolSettings(Base):
+    """The preferences of a school: notifications and enrolment.
+
+    One row per school. The identity of the school lives in `schools`;
+    what the school wants to be told about lives here, so that the two
+    concerns do not get mixed.
+    """
+
+    __tablename__ = "school_settings"
+    __table_args__ = ({"schema": "public"},)
+
+    school_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.schools.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    notify_new_material: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+    notify_period_reminders: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+    notify_channel: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        default="inapp",
+        server_default=text("'inapp'"),
+    )
+    enrollment_open: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+    enrollment_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<SchoolSettings school={self.school_id}>"
 
 
 class Plan(Base):
@@ -329,5 +410,6 @@ __all__ = [
     "Profile",
     "School",
     "SchoolMembership",
+    "SchoolSettings",
     "User",
 ]

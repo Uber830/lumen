@@ -7,6 +7,7 @@ on.
 The modules are grouped by domain:
 
 - `identity`   — users, profiles, platform roles, schools, memberships, plans.
+- `materials`  — the editorial catalog and the schools it is enabled for.
 - `academics`  — periods, courses, subjects, assignments, enrollments.
 - `learning`   — content, tasks, submissions, grades.
 - `chat`       — conversations, members, messages.
@@ -52,6 +53,7 @@ from app.db.models.identity import (
     Profile,
     School,
     SchoolMembership,
+    SchoolSettings,
     User,
 )
 from app.db.models.learning import (
@@ -61,6 +63,7 @@ from app.db.models.learning import (
     Task,
     TaskSubmission,
 )
+from app.db.models.materials import Material, MaterialCourse, MaterialSchool
 from app.db.models.notifications import Notification, NotificationPreference
 from app.db.models.sessions import (
     EmailVerificationToken,
@@ -97,6 +100,9 @@ __all__ = [
     "IcfesSimulation",
     "IcfesSimulationQuestion",
     "LoginAttempt",
+    "Material",
+    "MaterialCourse",
+    "MaterialSchool",
     "Notification",
     "NotificationPreference",
     "Plan",
@@ -107,6 +113,7 @@ __all__ = [
     "EmailVerificationToken",
     "School",
     "SchoolMembership",
+    "SchoolSettings",
     "SiteContent",
     "StudentEnrollment",
     "Subject",

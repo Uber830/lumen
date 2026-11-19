@@ -36,7 +36,7 @@ MIGRATION_DIRS = (
 # parser below does not see.
 COLUMNS_ADDED_BY_ALTER = {
     "profiles": {"avatar_url"},
-    "users": {"locked_until"},
+    "users": {"locked_until", "last_login_at"},
     "schools": {
         "display_name",
         "logo_url",
@@ -46,6 +46,9 @@ COLUMNS_ADDED_BY_ALTER = {
         "banner_url",
         "gallery",
     },
+    "school_memberships": {"admin_role", "invited_by", "invited_at"},
+    "academic_periods": {"closed_at", "delivery_modality"},
+    "icfes_simulations": {"material_id", "average_score", "status"},
 }
 
 _CREATE_TABLE_RE = re.compile(

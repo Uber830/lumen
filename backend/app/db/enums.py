@@ -42,6 +42,31 @@ class SchoolRole(StrEnum):
     STUDENT = "student"
 
 
+class SchoolAdminRole(StrEnum):
+    """The rank of a school administrator.
+
+    Mirrors the `school_admin_role` enum. The principal runs the
+    school: it closes the academic periods, invites the rest of the
+    team and changes the identity of the school. The secundario helps
+    with the community and the academic structure.
+    """
+
+    PRINCIPAL = "principal"
+    SECUNDARIO = "secundario"
+
+
+class DeliveryModality(StrEnum):
+    """How the teaching of a period is given.
+
+    Mirrors the `delivery_modality` enum. It is not the length of the
+    cycle, which lives in `academic_period_modality`.
+    """
+
+    PRESENCIAL = "presencial"
+    VIRTUAL = "virtual"
+    HIBRIDA = "hibrida"
+
+
 class PlatformRoleKind(StrEnum):
     """Global roles that are not tied to a school.
 
@@ -209,6 +234,7 @@ __all__ = [
     "BillingInterval",
     "ChatConversationKind",
     "ContentKind",
+    "DeliveryModality",
     "EnrollmentStatus",
     "EvaluationAttemptStatus",
     "EvaluationKind",
@@ -216,6 +242,7 @@ __all__ = [
     "NotificationKind",
     "PlanInterval",
     "PlatformRoleKind",
+    "SchoolAdminRole",
     "SchoolRole",
     "SchoolStatus",
     "SubscriptionStatus",
