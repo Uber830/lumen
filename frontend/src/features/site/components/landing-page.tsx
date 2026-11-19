@@ -10,6 +10,7 @@
 
 import { CatalogIndex } from "./CatalogIndex";
 import { CoverageSection } from "./CoverageSection";
+import { FaqSection } from "./FaqSection";
 import { ProcessSection } from "./ProcessSection";
 import { RolesSection } from "./RolesSection";
 import { SiteFooter } from "./SiteFooter";
@@ -54,6 +55,7 @@ export function LandingPage() {
         <ProcessSection />
         <RolesSection />
         <CoverageSection />
+        <FaqSection />
       </main>
 
       <SiteFooter footer={content.footer} />
