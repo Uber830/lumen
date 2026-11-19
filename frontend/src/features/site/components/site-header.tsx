@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { SiteNav } from "../types";
+import { SiteThemeToggle } from "./site-theme-toggle";
 import { CONTAINER, SiteButton, SiteLogo } from "./ui";
 
 export function SiteHeader({
@@ -65,6 +66,7 @@ export function SiteHeader({
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <SiteThemeToggle compact />
           <SiteButton href="/login" variant="outline" className="px-4 py-2.5">
             {nav.login_label}
           </SiteButton>
@@ -104,6 +106,7 @@ export function SiteHeader({
             </a>
           ))}
           <div className="flex flex-col gap-2 pt-4">
+            <SiteThemeToggle />
             <SiteButton href="/login" variant="outline">
               {nav.login_label}
             </SiteButton>

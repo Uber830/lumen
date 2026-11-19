@@ -19,6 +19,7 @@ import { ApiError } from "@/lib/api/client";
 import { signIn } from "@/lib/auth/browser";
 import type { SessionInfo } from "@/lib/api/types";
 import { isValidEmail } from "../destination";
+import { SiteThemeToggle } from "./site-theme-toggle";
 import { CheckMark, SiteLogo, SpecPanel } from "./ui";
 
 /** The rows of the miniature index. Illustrative data, on purpose. */
@@ -98,13 +99,16 @@ export function LoginPage({
         {/* --- The left column: what is waiting for you --- */}
         <aside className="flex flex-col justify-between border-b border-line bg-paper px-5 py-10 sm:px-10 lg:border-r lg:border-b-0 lg:py-14">
           <div>
-            <a
-              href="/"
-              className="inline-flex items-center gap-2.5 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              <SiteLogo className="text-ink" />
-              <span className="text-[17px] font-bold tracking-[-0.02em]">Lumen</span>
-            </a>
+            <div className="flex items-center justify-between gap-4">
+              <a
+                href="/"
+                className="inline-flex items-center gap-2.5 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              >
+                <SiteLogo className="text-ink" />
+                <span className="text-[17px] font-bold tracking-[-0.02em]">Lumen</span>
+              </a>
+              <SiteThemeToggle compact />
+            </div>
 
             <p className="mt-12 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-3">
               IDX-000 / Acceso
@@ -123,7 +127,7 @@ export function LoginPage({
                   Ejemplo del índice de material habilitado por colegio
                 </caption>
                 <thead>
-                  <tr className="bg-ink text-white">
+                  <tr className="bg-[var(--head-bg)] text-[var(--head-fg)]">
                     <th
                       scope="col"
                       className="px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em]"
@@ -150,7 +154,7 @@ export function LoginPage({
                       <td className="px-3 py-2.5 text-[13px] text-ink">{row.school}</td>
                       <td className="px-3 py-2.5 font-mono text-[12px] text-ink-3">{row.plan}</td>
                       <td className="px-3 py-2.5">
-                        <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.1em] text-[#145c39]">
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--ok-fg)]">
                           <CheckMark />
                           {row.state}
                         </span>
@@ -245,7 +249,7 @@ export function LoginPage({
                     checked={rememberMe}
                     disabled={sending}
                     onChange={(event) => setRememberMe(event.target.checked)}
-                    className="size-4 rounded-idx border border-line-2 accent-[#1A4CF0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    className="size-4 rounded-idx border border-line-2 accent-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                   />
                   Recordarme en este equipo
                 </label>
@@ -262,11 +266,11 @@ export function LoginPage({
                   id={errorId}
                   role="alert"
                   aria-live="polite"
-                  className="mt-5 border border-[#a13b32]/40 bg-[#a13b32]/8 px-4 py-3"
+                  className="mt-5 border border-[var(--bad-line)] bg-[var(--bad-bg)] px-4 py-3"
                 >
-                  <p className="text-[14px] leading-relaxed text-[#8a2f27]">{message}</p>
+                  <p className="text-[14px] leading-relaxed text-[var(--bad-fg)]">{message}</p>
                   {state.kind === "rate-limited" && (
-                    <p className="mt-1 font-mono text-[12px] text-[#8a2f27]">
+                    <p className="mt-1 font-mono text-[12px] text-[var(--bad-fg)]">
                       {state.secondsLeft > 0
                         ? `Intente de nuevo en ${formatSeconds(state.secondsLeft)}.`
                         : "Ya puede intentarlo de nuevo."}
@@ -276,7 +280,7 @@ export function LoginPage({
                     <button
                       type="button"
                       onClick={() => setState({ kind: "rest" })}
-                      className="mt-2 font-mono text-[12px] uppercase tracking-[0.12em] text-[#8a2f27] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                      className="mt-2 font-mono text-[12px] uppercase tracking-[0.12em] text-[var(--bad-fg)] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                     >
                       Reintentar
                     </button>
@@ -289,7 +293,7 @@ export function LoginPage({
                 disabled={
                   !emailValid || sending || (state.kind === "rate-limited" && state.secondsLeft > 0)
                 }
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-idx bg-ink px-5 py-3.5 font-mono text-[12px] uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#1c2230] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-idx bg-ink px-5 py-3.5 font-mono text-[12px] uppercase tracking-[0.14em] text-[var(--on-ink)] transition-colors hover:bg-[var(--ink-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sending ? "Entrando…" : "Entrar"}
               </button>
@@ -308,15 +312,17 @@ export function LoginPage({
               </p>
             </SpecPanel>
 
-            <p className="mt-8 text-[14px] text-ink-2">
-              ¿Busca el sitio institucional?{" "}
-              <a
-                href="/"
-                className="text-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              >
-                Volver al inicio
-              </a>
-            </p>
+            <div className="mt-8 flex flex-col gap-2 text-[14px] text-ink-2">
+              <p>
+                ¿Busca el sitio institucional?{" "}
+                <a
+                  href="/"
+                  className="text-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  Volver al inicio
+                </a>
+              </p>
+            </div>
           </div>
         </main>
       </div>
