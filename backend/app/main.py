@@ -35,6 +35,7 @@ from app.icfes.router import router as icfes_router
 from app.notifications.router import router as notifications_router
 from app.plans.router import router as plans_router
 from app.schools.router import router as schools_router
+from app.site.router import router as site_router
 from app.subscriptions.router import router as subscriptions_router
 from app.subscriptions.webhooks import router as webhooks_router
 from app.tasks.router import router as tasks_router
@@ -147,6 +148,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
+    app.include_router(site_router)
     app.include_router(auth_router)
     app.include_router(academics_router)
     app.include_router(content_router)
