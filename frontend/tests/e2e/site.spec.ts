@@ -82,6 +82,25 @@ test.describe("landing", () => {
     expect(overflow).toBe(0);
   });
 
+  test("follows the theme of the reader", async ({ page }) => {
+    await page.goto("/");
+
+    const toggle = page.getByRole("button", { name: /Tema:/ });
+    await expect(toggle).toBeVisible();
+
+    // System → light → dark.
+    await toggle.click();
+    await toggle.click();
+
+    await expect(page.locator("html")).toHaveClass(/dark/);
+
+    const background = await page.evaluate(() => {
+      const site = document.querySelector(".idx-site");
+      return site ? getComputedStyle(site).backgroundColor : "";
+    });
+    expect(background).toBe("rgb(11, 14, 20)");
+  });
+
   test("is reachable with the keyboard from the skip link", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
