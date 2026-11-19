@@ -143,12 +143,14 @@ async def bootstrap_school(
         await session.flush()
 
         # The admin membership. is_primary = true so the session picks
-        # this school as primary.
+        # this school as primary, and admin_role makes it the
+        # principal: the school is created with somebody who runs it.
         membership = SchoolMembership(
             id=uuid.uuid4(),
             school_id=school.id,
             user_id=user_id,
             role="school_admin",
+            admin_role="principal",
             is_primary=True,
             joined_at=now,
         )

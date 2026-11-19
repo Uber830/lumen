@@ -57,6 +57,7 @@ from app.auth.schemas import (
 )
 from app.config import get_settings
 from app.core import supabase_storage
+from app.core.admin_permissions import permissions_for
 from app.core.context import RequestContext
 from app.core.errors import (
     AccountLockedError,
@@ -65,6 +66,8 @@ from app.core.errors import (
     RateLimitedError,
 )
 from app.core.supabase_tokens import SUPABASE_TOKEN_TTL
+from app.db.enums import SchoolRole
+from app.db.models import SchoolMembership
 from app.db.session import get_db
 from app.deps import get_context
 
@@ -79,6 +82,21 @@ def _client_context(request: Request) -> tuple[str | None, str | None]:
     forwarded = request.headers.get("x-forwarded-for")
     ip_address = forwarded.split(",")[0].strip() if forwarded else None
     return user_agent, ip_address
+
+
+def _permissions_of(memberships: list[SchoolMembership]) -> list[str]:
+    """The permissions of the caller's rank in its primary school.
+
+    A teacher or a student gets an empty list: the panel of the school
+    is not theirs.
+    """
+    if not memberships:
+        return []
+    primary = next((m for m in memberships if m.is_primary), None)
+    membership = primary or memberships[0]
+    if membership.role != SchoolRole.SCHOOL_ADMIN:
+        return []
+    return permissions_for(membership.admin_role)
 
 
 def _session_info(context: UserSession) -> SessionInfo:
@@ -104,6 +122,7 @@ def _session_info(context: UserSession) -> SessionInfo:
                 "id": membership.id,
                 "school_id": membership.school_id,
                 "role": membership.role.value,
+                "admin_role": membership.admin_role.value if membership.admin_role else None,
                 "is_primary": membership.is_primary,
                 "joined_at": membership.joined_at,
             }
@@ -125,6 +144,10 @@ def _session_info(context: UserSession) -> SessionInfo:
             if context.school is not None
             else None
         ),
+        # The permissions travel with the session: the panel shows and
+        # disables what the rank may and may not do. A caller that is
+        # not an administrator of its school gets none.
+        permissions=_permissions_of(context.memberships),
     )
 
 

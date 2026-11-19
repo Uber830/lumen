@@ -89,6 +89,9 @@ class MembershipInfo(BaseModel):
     id: UUID
     school_id: UUID
     role: str
+    # The rank of an administrator: principal or secundario. It is
+    # None for teachers and students.
+    admin_role: str | None = None
     is_primary: bool
     joined_at: datetime
 
@@ -160,6 +163,10 @@ class SessionInfo(BaseModel):
     primary_school_id: UUID | None = None
     # The branding of the primary school, when the caller belongs to one.
     school: SchoolBranding | None = None
+    # The permissions of the caller in its primary school. The
+    # frontend receives them and never decides on its own what the
+    # rank may do.
+    permissions: list[str] = Field(default_factory=list)
 
 
 class AuthResponse(BaseModel):

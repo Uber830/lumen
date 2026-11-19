@@ -206,6 +206,27 @@ que devuelve el enlace de activación del administrador.
 | GET/POST/PATCH/DELETE | `/v1/evaluations` | las evaluaciones y sus intentos |
 | GET/POST/PATCH/DELETE | `/v1/chat/conversations` | el chat |
 
+### Colegio
+
+La API del administrador de colegio. El prefijo es el del proyecto
+(`/v1/...`), no el `/api/school` del documento de diseño. **El colegio
+del llamador se deduce siempre de la sesión**: el cliente nunca envía
+un `school_id`, y un llamador de otro colegio recibe un 404.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/school/me` | el contexto del administrador: su colegio, su rango y sus permisos |
+
+`GET /v1/school/me` devuelve `permissions: string[]`: la lista de lo que
+el rango del administrador puede hacer. **El frontend no decide
+permisos: los recibe.** Un administrador principal tiene la lista
+completa; uno secundario no tiene `periods.close`, `admins.manage`,
+`customization.write` ni `reports.read`.
+
+La marca del colegio es solo lo visible: el nombre, el escudo y el
+color. La misión, la visión, la portada y la galería se eliminaron del
+producto (y del esquema).
+
 ### Notificaciones
 
 | Method | Path | Purpose |

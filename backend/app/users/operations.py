@@ -125,6 +125,9 @@ async def create_invited_user(
                 school_id=school_id,
                 user_id=user.id,
                 role=role,
+                # An invited administrator joins as secundario: the
+                # principal of the school is the one who promotes them.
+                admin_role="secundario" if role == SchoolRole.SCHOOL_ADMIN else None,
                 is_primary=is_primary,
                 joined_at=datetime.now(UTC),
             )
