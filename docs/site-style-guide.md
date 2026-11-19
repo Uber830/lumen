@@ -80,6 +80,11 @@ publicar un cliente sea siempre un acto explícito. La pantalla de acceso
 muestra filas de ejemplo (`Colegio Alfa`, `Colegio Beta`…), nunca clientes
 reales.
 
+**El acceso no tiene puerta de registro.** Nadie se registra solo: el colegio
+habla con el equipo de plataforma y el equipo da de alta el colegio desde
+`POST /v1/platform/schools`, con un enlace de activación para el
+administrador. La pantalla de acceso ofrece, como mucho, escribir al equipo.
+
 ## Los iconos
 
 SVG en línea, sin emoji. El logo es un `<svg aria-hidden="true">` y la marca
