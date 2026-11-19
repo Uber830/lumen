@@ -193,14 +193,29 @@ function Catalogo() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="sr-only">
+                  Material del catálogo editorial con los colegios que pueden verlo.
+                </caption>
                 <thead className="table-head-band">
                   <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                    <th className="px-5 py-3 font-semibold">Material</th>
-                    <th className="px-5 py-3 font-semibold">Tipo</th>
-                    <th className="px-5 py-3 font-semibold">Área</th>
-                    <th className="px-5 py-3 font-semibold">Colegios con acceso</th>
-                    <th className="px-5 py-3 font-semibold">Estado</th>
-                    <th className="px-5 py-3 text-right font-semibold">Actualizado</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Material
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Tipo
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Área
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Colegios con acceso
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Estado
+                    </th>
+                    <th scope="col" className="px-5 py-3 text-right font-semibold">
+                      Actualizado
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

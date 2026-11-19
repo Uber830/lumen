@@ -111,13 +111,24 @@ function Soporte() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="sr-only">Eventos de la auditoría de la plataforma.</caption>
                 <thead className="table-head-band">
                   <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                    <th className="px-5 py-3 font-semibold">Evento</th>
-                    <th className="px-5 py-3 font-semibold">Colegio</th>
-                    <th className="px-5 py-3 font-semibold">Actor</th>
-                    <th className="px-5 py-3 font-semibold">Nivel</th>
-                    <th className="px-5 py-3 text-right font-semibold">Fecha</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Evento
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Colegio
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Actor
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Nivel
+                    </th>
+                    <th scope="col" className="px-5 py-3 text-right font-semibold">
+                      Fecha
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

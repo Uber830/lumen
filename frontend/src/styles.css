@@ -231,6 +231,15 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+   * The focus is always visible: the reader has to know where the
+   * keyboard is. The outline uses the brand, the same as the site.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
 }
 
 @utility surface-card {

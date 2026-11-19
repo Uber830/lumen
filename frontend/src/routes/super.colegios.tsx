@@ -112,14 +112,29 @@ function Colegios() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
+                <caption className="sr-only">
+                  Colegios de la red y su cobertura del catálogo.
+                </caption>
                 <thead className="table-head-band">
                   <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                    <th className="px-5 py-3 font-semibold">Colegio</th>
-                    <th className="px-5 py-3 font-semibold">Plan</th>
-                    <th className="px-5 py-3 font-semibold">Estudiantes</th>
-                    <th className="px-5 py-3 font-semibold">Docentes</th>
-                    <th className="px-5 py-3 font-semibold">Cobertura</th>
-                    <th className="px-5 py-3 font-semibold">Estado</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Colegio
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Plan
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Estudiantes
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Docentes
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Cobertura
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Estado
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
