@@ -136,6 +136,18 @@ class Settings(BaseSettings):
     argon2_parallelism: int = Field(default=4, ge=1, le=16)
 
     # -----------------------------------------------------------------------
+    # Sign-in protection
+    # -----------------------------------------------------------------------
+    # How many failed attempts are allowed in the rate limit window,
+    # per email and per address. The window and the threshold are
+    # separate so the limit can be tuned without a redeploy.
+    login_rate_limit_attempts: int = Field(default=5, ge=1, le=100)
+    login_rate_limit_window_seconds: int = Field(default=60, ge=10, le=3600)
+    # How many failed attempts lock the account, and for how long.
+    login_lock_threshold: int = Field(default=10, ge=1, le=100)
+    login_lock_minutes: int = Field(default=15, ge=1, le=1440)
+
+    # -----------------------------------------------------------------------
     # Wompi
     # -----------------------------------------------------------------------
     wompi_environment: Literal["sandbox", "production"] = "sandbox"

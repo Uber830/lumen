@@ -25,9 +25,17 @@ def set_auth_cookies(
     *,
     access_token: str,
     refresh_token: str,
+    remember_me: bool = False,
     settings: Settings | None = None,
 ) -> None:
-    """Store the tokens in the browser's cookies."""
+    """Store the tokens in the browser's cookies.
+
+    `remember_me` decides how long the browser keeps them, not how long
+    the server honours them: the refresh token expires on its own
+    schedule either way. Without it the cookies are session cookies and
+    disappear when the browser closes; with it they survive the
+    restart, up to the expiry the server already set.
+    """
     cfg = settings or get_settings()
     secure = cfg.is_production
     # An empty domain means a host-only cookie, which is the default.
@@ -36,7 +44,7 @@ def set_auth_cookies(
     response.set_cookie(
         key="lumen_access",
         value=access_token,
-        max_age=cfg.access_token_ttl_seconds,
+        max_age=cfg.access_token_ttl_seconds if remember_me else None,
         httponly=True,
         samesite="lax",
         secure=secure,
@@ -46,7 +54,7 @@ def set_auth_cookies(
     response.set_cookie(
         key="lumen_refresh",
         value=refresh_token,
-        max_age=cfg.refresh_token_ttl_seconds,
+        max_age=cfg.refresh_token_ttl_seconds if remember_me else None,
         httponly=True,
         samesite="lax",
         secure=secure,

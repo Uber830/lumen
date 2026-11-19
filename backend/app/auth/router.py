@@ -12,12 +12,23 @@ transport, not the contract.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import operations
+from app.auth.attempts import (
+    OUTCOME_INVALID,
+    OUTCOME_LOCKED,
+    OUTCOME_SUCCESS,
+    count_failures,
+    hash_email,
+    is_locked,
+    lock_account,
+    record_attempt,
+)
 from app.auth.cookies import clear_auth_cookies, set_auth_cookies
 from app.auth.dependencies import REFRESH_COOKIE
 from app.auth.operations import (
@@ -49,9 +60,15 @@ from app.auth.schemas import (
     UpdateProfileRequest,
     VerifyEmailRequest,
 )
+from app.config import get_settings
 from app.core import supabase_storage
 from app.core.context import RequestContext
-from app.core.errors import AuthenticationError, NotFoundError
+from app.core.errors import (
+    AccountLockedError,
+    AuthenticationError,
+    NotFoundError,
+    RateLimitedError,
+)
 from app.core.supabase_tokens import SUPABASE_TOKEN_TTL
 from app.db.session import get_db
 from app.deps import get_context
@@ -217,10 +234,76 @@ async def login(
 
     The response carries the access token, the refresh token and the
     session context (profile, memberships, platform role).
-    """
-    user = await authenticate(session, email=body.email, password=body.password)
 
+    Three things guard the door: the rate limit, the lock of the
+    account and the message. The message is the same for a wrong
+    password and for an email that does not exist, so this endpoint
+    cannot be used to find out who has an account.
+    """
+    settings = get_settings()
     user_agent, ip_address = _client_context(request)
+    email_hash = hash_email(body.email, settings.jwt_secret.get_secret_value())
+
+    # The rate limit comes first: it has to stop the work, not just
+    # the answer.
+    failures = await count_failures(
+        session,
+        email_hash=email_hash,
+        ip_address=ip_address,
+        window=timedelta(seconds=settings.login_rate_limit_window_seconds),
+    )
+    if failures >= settings.login_rate_limit_attempts:
+        await record_attempt(
+            session,
+            email_hash=email_hash,
+            ip_address=ip_address,
+            outcome=OUTCOME_INVALID,
+        )
+        await session.commit()
+        retry_after = settings.login_rate_limit_window_seconds
+        raise RateLimitedError(
+            "Demasiados intentos.",
+            extra={"retry_after": retry_after},
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    try:
+        user = await authenticate(session, email=body.email, password=body.password)
+    except AuthenticationError:
+        await record_attempt(
+            session,
+            email_hash=email_hash,
+            ip_address=ip_address,
+            outcome=OUTCOME_INVALID,
+        )
+        await _lock_if_needed(
+            session, email=body.email, email_hash=email_hash, ip_address=ip_address
+        )
+        await session.commit()
+        raise AuthenticationError(
+            "El correo o la contraseña no coinciden.",
+            code="invalid_credentials",
+        ) from None
+
+    # The lock is checked after the password: answering "locked" to a
+    # wrong password would confirm that the account exists.
+    if is_locked(user):
+        await record_attempt(
+            session,
+            email_hash=email_hash,
+            ip_address=ip_address,
+            outcome=OUTCOME_LOCKED,
+        )
+        await session.commit()
+        raise AccountLockedError("La cuenta está bloqueada.")
+
+    await record_attempt(
+        session,
+        email_hash=email_hash,
+        ip_address=ip_address,
+        outcome=OUTCOME_SUCCESS,
+    )
+
     issued = await issue_session(
         session,
         user,
@@ -233,6 +316,7 @@ async def login(
         response,
         access_token=issued.access_token.access_token,
         refresh_token=issued.refresh_token,
+        remember_me=body.remember_me,
     )
 
     context = await load_session_context(session, user.id)
@@ -241,6 +325,29 @@ async def login(
         session=_session_info(context),
         supabase_token=_mint_supabase_token(user),
     )
+
+
+async def _lock_if_needed(
+    session: AsyncSession,
+    *,
+    email: str,
+    email_hash: str,
+    ip_address: str | None,
+) -> None:
+    """Lock an account that failed too many times."""
+    settings = get_settings()
+    user = await find_user_by_email(session, email)
+    if user is None or is_locked(user):
+        return
+
+    failures = await count_failures(
+        session,
+        email_hash=email_hash,
+        ip_address=ip_address,
+        window=timedelta(minutes=settings.login_lock_minutes),
+    )
+    if failures >= settings.login_lock_threshold:
+        await lock_account(session, user, minutes=settings.login_lock_minutes)
 
 
 @router.post("/refresh")

@@ -124,7 +124,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
         """Map domain errors to their HTTP representation."""
-        return JSONResponse(status_code=exc.status_code, content=exc.to_payload())
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.to_payload(),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(OperationalError)
     async def handle_database_unavailable(_: Request, exc: OperationalError) -> JSONResponse:

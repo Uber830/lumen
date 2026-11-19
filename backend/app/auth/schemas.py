@@ -56,6 +56,9 @@ class LoginRequest(BaseModel):
 
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+    # Keep the session in this browser. It does not make the refresh
+    # token last longer: it only stops the browser from forgetting it.
+    remember_me: bool = False
 
 
 class RefreshRequest(BaseModel):
