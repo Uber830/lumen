@@ -1,8 +1,9 @@
 # The Alembic versions directory
 
-**The SQL migrations under `supabase/migrations/` are the single owner
-of the schema.** They are applied with `supabase db push`, and they
-are what a Supabase project expects.
+**The SQL migrations are the single owner of the schema.** They live in
+`supabase/migrations/` (inherited from the original project) and in
+`backend/migrations/` (owned by this project), and they are applied in
+that order with `psql`.
 
 This directory is a scratch space for Alembic's *autogenerate*, which
 diffs the SQLAlchemy models against a live database and writes the
@@ -16,17 +17,17 @@ export DATABASE_URL="postgresql+psycopg://..."
 uv run alembic revision --autogenerate -m "describe the change"
 
 # Read alembic/versions/<generated>.py, translate it into a SQL file
-# under supabase/migrations/, and delete the generated revision.
+# under backend/migrations/, and delete the generated revision.
 ```
 
 The generated revision is never applied. The SQL migration is.
 
 Two reasons for the split:
 
-- `supabase db push` is how a Supabase project is updated. Keeping one
-  tool means one order and no ambiguity about what ran when.
-- The platform's own tooling (the SQL editor, the schema diff in the
-  dashboard) assumes the schema lives in `supabase/migrations/`.
+- The migrations are plain SQL, so they apply to any Postgres. Keeping
+  one format means one order and no ambiguity about what ran when.
+- The database is reached through the ORM, but the schema stays in
+  SQL: that is what the models are checked against.
 
 Alembic still earns its place: `alembic revision --autogenerate` is
 how the models are checked against a live database, and it is what

@@ -58,9 +58,10 @@ docker compose up -d db      # levanta el contenedor
 ```
 
 `dev-db.sh up` aplica `supabase/local-shim.sql` (los objetos de plataforma
-que asumen las migraciones), las 29 migraciones de `supabase/migrations/` en
-orden y `supabase/seed.sql`. La cadena de conexión que imprime es la que va
-en `backend/.env`:
+que asumen las migraciones), las migraciones de `supabase/migrations/` y
+después las de `backend/migrations/`, y carga `supabase/seed.sql` junto con
+`backend/seeds/`. La cadena de conexión que imprime es la que va en
+`backend/.env`:
 
 ```
 postgresql://postgres:postgres@127.0.0.1:55440/lumen_dev
@@ -132,22 +133,26 @@ backend/          API FastAPI
     users/        usuarios y membresías
     icfes/        banco de preguntas y simulacros
     plans/        planes y suscripciones (Wompi)
-  alembic/        entorno Alembic (el esquema vive en supabase/migrations)
+  migrations/     migraciones SQL propias del proyecto
+  seeds/          datos semilla propios del proyecto
+  alembic/        entorno Alembic (el esquema vive en las migraciones SQL)
   tests/          pytest
 frontend/         app React (TanStack Start)
   src/routes/     rutas por rol
   src/features/   lógica por módulo
   src/lib/        cliente API, auth, tema, storage
 supabase/
-  migrations/     dueño único del esquema SQL
-  seed.sql        datos de desarrollo
+  migrations/     migraciones heredadas del proyecto original
+  seed.sql        datos de desarrollo heredados
   local-shim.sql  objetos de plataforma para Postgres sin Supabase
 scripts/dev-db.sh ciclo de vida de la base local
 docker-compose.yml servicio Postgres
 ```
 
-**El esquema SQL es propiedad de `supabase/migrations/`.** No se edita a mano
-la base: se escribe una migración y se corre `./scripts/dev-db.sh reset`.
+**El esquema SQL es propiedad de las migraciones**: las heredadas en
+`supabase/migrations/` y las de este proyecto en `backend/migrations/`, que se
+aplican en ese orden. No se edita a mano la base: se escribe una migración y
+se corre `./scripts/dev-db.sh reset`.
 
 ---
 
@@ -200,6 +205,24 @@ enumerador de cuentas. Además:
 Los tres valores se ajustan por entorno: `LOGIN_RATE_LIMIT_ATTEMPTS`,
 `LOGIN_RATE_LIMIT_WINDOW_SECONDS`, `LOGIN_LOCK_THRESHOLD` y
 `LOGIN_LOCK_MINUTES`.
+
+### Las cuentas las crea el equipo
+
+Nadie se registra solo. Quien quiera usar Lumen habla con el equipo de
+plataforma, y desde ahí se da de alta el colegio:
+
+```bash
+curl -X POST http://localhost:8010/v1/platform/schools \
+  -H "Authorization: Bearer $TOKEN_DE_PLATAFORMA" \
+  -H "Content-Type: application/json" \
+  -d '{"school_name":"Colegio Sagrado Corazón","short_code":"SAGCOR",
+       "plan_code":"estandar","admin_email":"ana@colegio.edu.co",
+       "admin_name":"Ana Restrepo"}'
+```
+
+La respuesta trae el enlace de activación del administrador: su cuenta nace
+sin contraseña y la define con ese enlace. Por eso el sitio público no tiene
+ninguna puerta de registro.
 
 ---
 

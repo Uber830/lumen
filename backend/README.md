@@ -30,8 +30,8 @@ faster and it does not touch the real data.
 ```
 
 It creates a Postgres container, applies the schema from
-`supabase/migrations/`, loads the seed data, and prints the
-`DATABASE_URL` to put in `backend/.env`. The seeded accounts use the
+`supabase/migrations/` and then from `backend/migrations/`, loads the
+seed data, and prints the `DATABASE_URL` to put in `backend/.env`. The seeded accounts use the
 password `lumen-dev`:
 
 | Account | Role |
@@ -117,8 +117,9 @@ app/
   health.py          /health and /ready probes
   icfes/             the attempt lifecycle and the authoring
   notifications/      the in-app notifications of each user
+  platform/          what the platform team can do (creating schools)
   plans/             the subscription catalog
-  schools/           the signup bootstrap (port of the SQL function)
+  schools/           the profile of each school
   subscriptions/     Wompi checkout and webhook
   tasks/             the assignments and their submissions
   users/             Invitations and identity operations
@@ -134,15 +135,13 @@ Dockerfile           multi-stage production image
 | --- | --- | --- |
 | GET  | `/health` | liveness probe |
 | GET  | `/ready` | readiness probe (database + schema check) |
-| POST | `/v1/auth/register` | create an account and sign in |
 | POST | `/v1/auth/login` | exchange a password for a session |
 | POST | `/v1/auth/refresh` | exchange a refresh token for a new pair |
 | POST | `/v1/auth/logout` | revoke a refresh token |
 | GET  | `/v1/auth/me` | the caller's session context |
 | POST | `/v1/auth/forgot-password` | start the password-reset flow |
 | POST | `/v1/auth/reset-password` | set a new password with a reset token |
-| POST | `/v1/auth/verify-email` | consume an email-verification token |
-| POST | `/v1/schools/bootstrap` | create a school for the caller, with a trial subscription |
+| POST | `/v1/platform/schools` | create a school with its administrator (platform admin only) |
 | GET  | `/v1/academics/periods` | the school's academic periods |
 | POST | `/v1/academics/periods` | create a period |
 | PATCH | `/v1/academics/periods/{id}` | update a period |
@@ -291,19 +290,20 @@ project JWT secret.
 
 ## Database
 
-**The SQL migrations under `supabase/migrations/` are the single owner
-of the schema**, including the identity table the backend uses for
+**The SQL migrations are the single owner of the schema**: the ones
+inherited from the original project under `supabase/migrations/`, and
+the ones this project owns under `backend/migrations/`, applied in
+that order. That includes the identity table the backend uses for
 authentication (`public.users`, which replaces `auth.users`) and its
-session tables. They are applied with `supabase db push`, and nothing
-else creates production tables.
+session tables. Nothing else creates production tables.
 
 The backend checks the schema at startup and refuses to run when a
 migration was not applied:
 
 ```
 The database is missing 3 table(s): refresh_tokens, ...
-The SQL migrations under supabase/migrations/ have not been applied.
-Run `supabase db push` (or apply them with psql).
+The SQL migrations have not been applied. Apply them with psql (see
+scripts/dev-db.sh) or with the migration tool of your database.
 ```
 
 `GET /ready` reports the same thing, so a deployment that skipped the
