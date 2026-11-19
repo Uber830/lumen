@@ -151,6 +151,58 @@ la base: se escribe una migración y se corre `./scripts/dev-db.sh reset`.
 
 ---
 
+## El sitio público
+
+La landing (`/`) y la pantalla de acceso (`/login`) tienen su propia dirección
+visual, **«El Índice»**: papel claro, retícula de cuaderno, monoespaciada para
+las etiquetas y botones rectangulares. La guía de estilo completa está en
+[`docs/site-style-guide.md`](docs/site-style-guide.md).
+
+### El contenido vive en la base
+
+Nada del texto de la landing está en el frontend: todo llega de
+`GET /v1/public/site`.
+
+```bash
+curl http://localhost:8010/v1/public/site
+```
+
+La respuesta trae las cifras, el catálogo editorial y el copy completo de las
+ocho secciones. El copy se guarda en la fila `landing` de `site_content` y el
+catálogo en `catalog_items` y `catalog_item_schools`, así que el equipo de
+plataforma edita la página sin redesplegar:
+
+```sql
+select content from public.site_content where key = 'landing';
+```
+
+> Los nombres de los colegios del catálogo se escriben a mano, uno por uno:
+> publicar un cliente es una decisión explícita, nunca un efecto colateral.
+> La pantalla de acceso muestra filas de ejemplo, no clientes reales.
+
+### Editar la semilla
+
+```bash
+./scripts/dev-db.sh reset   # aplica las migraciones y la semilla de nuevo
+```
+
+### La protección del acceso
+
+`POST /v1/auth/login` responde siempre lo mismo cuando las credenciales no
+cuadran —`El correo o la contraseña no coinciden.`— para que no sirva de
+enumerador de cuentas. Además:
+
+- **5 intentos por minuto** y por par (correo, dirección) → `429` con
+  `Retry-After`;
+- **10 fallos** bloquean la cuenta 15 minutos → `423`;
+- cada intento queda en `login_attempts`, con el correo hasheado.
+
+Los tres valores se ajustan por entorno: `LOGIN_RATE_LIMIT_ATTEMPTS`,
+`LOGIN_RATE_LIMIT_WINDOW_SECONDS`, `LOGIN_LOCK_THRESHOLD` y
+`LOGIN_LOCK_MINUTES`.
+
+---
+
 ## Comandos
 
 ```bash
