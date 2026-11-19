@@ -121,14 +121,6 @@ def _session_info(context: UserSession) -> SessionInfo:
                 "display_name": context.school.display_name,
                 "logo_url": context.school.logo_url,
                 "primary_color": context.school.primary_color,
-                "mission": context.school.mission,
-                "vision": context.school.vision,
-                "banner_url": context.school.banner_url,
-                "gallery": [
-                    {"url": image.get("url", ""), "caption": image.get("caption")}
-                    for image in (context.school.gallery or [])
-                    if image.get("url")
-                ],
             }
             if context.school is not None
             else None

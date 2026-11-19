@@ -186,7 +186,7 @@ que devuelve el enlace de activación del administrador.
 | POST | `/v1/users/memberships/{id}/activation-link` | un enlace nuevo para un miembro sin activar |
 | GET | `/v1/schools/me` | el colegio del llamador, con su marca |
 | PATCH | `/v1/schools/me` | actualizar la marca del colegio |
-| POST | `/v1/schools/me/logo`, `/v1/schools/me/images` | subir el logo o las imágenes |
+| POST | `/v1/schools/me/logo` | subir el escudo del colegio |
 | GET | `/v1/plans` | el catálogo de planes |
 
 ### Suscripciones, contenido y evaluación

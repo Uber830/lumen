@@ -20,8 +20,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.schools.schemas import SchoolGalleryImage
-
 
 class LoginRequest(BaseModel):
     """Body for POST /v1/auth/login."""
@@ -142,9 +140,7 @@ class SchoolBranding(BaseModel):
 
     It travels with the session so the app can paint itself with the
     school's colour and show its logo on the first frame, instead of
-    using the default theme and repainting a second later. The mission,
-    the vision and the pictures travel with it for the same reason: the
-    dashboard shows them as soon as the page arrives.
+    using the default theme and repainting a second later.
     """
 
     id: UUID
@@ -152,10 +148,6 @@ class SchoolBranding(BaseModel):
     display_name: str | None = None
     logo_url: str | None = None
     primary_color: str | None = None
-    mission: str | None = None
-    vision: str | None = None
-    banner_url: str | None = None
-    gallery: list[SchoolGalleryImage] = Field(default_factory=list)
 
 
 class SessionInfo(BaseModel):

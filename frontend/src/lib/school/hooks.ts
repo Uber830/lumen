@@ -48,12 +48,6 @@ export function useUpdateSchool(
 
 export class LogoUploadError extends Error {}
 
-/**
- * How many pictures the gallery holds. The backend refuses more, so the
- * page knows the limit without asking.
- */
-export const MAX_GALLERY_IMAGES = 5;
-
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_LOGO_MIME = new Set(["image/png", "image/jpeg", "image/svg+xml"]);
 
@@ -66,16 +60,7 @@ export async function uploadSchoolLogo(file: File): Promise<School> {
   return uploadImage("/v1/schools/me/logo", file);
 }
 
-/**
- * Upload one of the school's pictures: the dashboard banner or one of
- * the gallery images. The backend writes it to the school-logos bucket
- * and saves the URL on the school.
- */
-export async function uploadSchoolImage(file: File, kind: "banner" | "gallery"): Promise<School> {
-  return uploadImage("/v1/schools/me/images", file, kind);
-}
-
-async function uploadImage(path: string, file: File, kind?: string): Promise<School> {
+async function uploadImage(path: string, file: File): Promise<School> {
   if (!ALLOWED_LOGO_MIME.has(file.type)) {
     throw new LogoUploadError("Tipo de archivo no soportado. Usa PNG, JPG o SVG.");
   }
@@ -85,7 +70,6 @@ async function uploadImage(path: string, file: File, kind?: string): Promise<Sch
 
   const form = new FormData();
   form.append("file", file, file.name);
-  if (kind) form.append("kind", kind);
 
   let response: Response;
   try {

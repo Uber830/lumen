@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, created_at, updated_at
@@ -189,21 +189,6 @@ class School(Base):
     logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Brand primary colour as an oklch() string, applied to the theme.
     primary_color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # --- Institutional identity (the dashboard hero) --------------------
-    # What the school says about itself, in its own words.
-    mission: Mapped[str | None] = mapped_column(Text, nullable=True)
-    vision: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Public URL of the cover image (the dashboard hero).
-    banner_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The pictures the school chose to show: a list of
-    # {"url": ..., "caption": ...}. It is a column and not a table
-    # because the list is short and always read with the school.
-    gallery: Mapped[list[dict[str, object]]] = mapped_column(
-        JSONB,
-        nullable=False,
-        default=list,
-        server_default=text("'[]'::jsonb"),
-    )
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()
 
