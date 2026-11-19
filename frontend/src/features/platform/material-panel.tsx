@@ -1,7 +1,7 @@
-import { AlertTriangle, Check, FileText, History, Link2, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, FileText, History, Link2, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
 import { StatusPill, Tag } from "@/components/ui-kit";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -159,18 +159,31 @@ export function MaterialPanel({
   return (
     <Dialog open={Boolean(materialId)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
+        showClose={false}
         className={cn(
-          "flex h-dvh max-h-none w-full max-w-lg flex-col gap-0 overflow-hidden rounded-none border-l border-border bg-card p-0 sm:rounded-none",
+          // The panel is a drawer on the right, not a centered dialog:
+          // the list stays visible behind it.
+          "fixed right-0 top-0 left-auto flex h-dvh max-h-none w-full max-w-lg translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-l border-border bg-card p-0 shadow-lift sm:rounded-none",
           className,
         )}
       >
-        <div className="border-b border-border px-5 py-4 text-left">
-          <DialogTitle className="text-[16px]">
-            {detail?.title ?? (material.isLoading ? "Cargando…" : "Material")}
-          </DialogTitle>
-          <DialogDescription className="mt-0.5 text-xs">
-            {detail ? `${detail.code} · ${detail.size_label}` : "Los metadatos del material."}
-          </DialogDescription>
+        <div className="flex items-start gap-3 border-b border-border px-5 py-4 text-left">
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-[16px]">
+              {detail?.title ?? (material.isLoading ? "Cargando…" : "Material")}
+            </DialogTitle>
+            <DialogDescription className="mt-0.5 text-xs">
+              {detail ? `${detail.code} · ${detail.size_label}` : "Los metadatos del material."}
+            </DialogDescription>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar el panel"
+            className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-4" strokeWidth={1.9} />
+          </button>
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">

@@ -212,9 +212,11 @@ export function SearchField({
 export function StatusPill({
   label,
   tone = "muted",
+  className,
 }: {
   label: string;
   tone?: "muted" | "success" | "warning" | "danger" | "info";
+  className?: string;
 }) {
   const tones = {
     muted: "bg-muted text-ink-2",
@@ -229,6 +231,7 @@ export function StatusPill({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
         tones[tone],
+        className,
       )}
     >
       <span className="size-1.5 rounded-full bg-current" aria-hidden />

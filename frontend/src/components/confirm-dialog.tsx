@@ -107,7 +107,7 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget && !pending) onCancel();
       }}
     >
-      <div className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-lift sm:rounded-2xl sm:p-6">
+      <div className="w-full max-w-md rounded-t-lg bg-card p-5 shadow-lift sm:rounded-lg sm:p-6">
         <div className="flex items-start gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-full bg-destructive-soft text-destructive">
             <AlertTriangle className="size-5" strokeWidth={2} aria-hidden />

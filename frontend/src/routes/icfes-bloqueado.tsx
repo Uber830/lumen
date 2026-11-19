@@ -25,7 +25,7 @@ function Bloqueado() {
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4 py-16">
       <div className="surface-card w-full max-w-lg p-8 text-center">
-        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-warning-soft text-warning-foreground">
+        <span className="mx-auto grid size-12 place-items-center rounded-lg bg-warning-soft text-warning-foreground">
           <Lock className="size-6" strokeWidth={1.75} />
         </span>
         <h1 className="mt-5 text-2xl font-bold tracking-tight">

@@ -200,7 +200,7 @@ function QuestionModal({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-end bg-foreground/40 p-0 sm:place-items-center sm:p-6">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl bg-card p-5 sm:rounded-2xl sm:p-6">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-lg bg-card p-5 sm:rounded-lg sm:p-6">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <h2 className="truncate text-lg font-bold">
             {form.id ? "Editar pregunta" : "Nueva pregunta"}
