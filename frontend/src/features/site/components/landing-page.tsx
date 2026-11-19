@@ -9,6 +9,9 @@
 // =============================================================================
 
 import { CatalogIndex } from "./CatalogIndex";
+import { CoverageSection } from "./CoverageSection";
+import { ProcessSection } from "./ProcessSection";
+import { RolesSection } from "./RolesSection";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 import { SiteHeroSection } from "./SiteHeroSection";
@@ -48,6 +51,9 @@ export function LandingPage() {
       <main id="contenido" className="relative z-10 flex-1">
         <SiteHeroSection />
         <CatalogIndex />
+        <ProcessSection />
+        <RolesSection />
+        <CoverageSection />
       </main>
 
       <SiteFooter footer={content.footer} />
