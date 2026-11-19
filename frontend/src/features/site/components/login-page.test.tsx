@@ -7,10 +7,10 @@ import { destinationForSession, safeNext } from "@/features/site/destination";
 import { flush, typeInto } from "@/test/site-helpers";
 import type { SessionInfo } from "@/lib/api/types";
 
-// The development password of the seeded accounts. It is a
-// fixture of the test, not a secret: it is documented in the
-// README and only works against the local database.
-const SEED_LOGIN = "lumen-dev";
+// The development password of the seeded accounts. It is a fixture of
+// the test, not a secret: it is documented in the README and only
+// works against the local database.
+const DEV_CREDENTIAL = "lumen-dev";
 
 async function render(onSignedIn = vi.fn()) {
   const container = document.createElement("div");
@@ -113,7 +113,7 @@ describe("LoginPage", () => {
     const { container, email, password, submit, cleanup } = await render();
 
     await typeInto(email, "ana@colegio.edu.co");
-    SEED_LOGIN
+    await typeInto(password, DEV_CREDENTIAL);
     await act(async () => {
       submit.click();
     });
@@ -136,7 +136,7 @@ describe("LoginPage", () => {
     const { container, email, password, submit, cleanup } = await render();
 
     await typeInto(email, "ana@colegio.edu.co");
-    SEED_LOGIN
+    await typeInto(password, DEV_CREDENTIAL);
     await act(async () => {
       submit.click();
     });
@@ -157,7 +157,7 @@ describe("LoginPage", () => {
     const { container, email, password, submit, cleanup } = await render();
 
     await typeInto(email, "ana@colegio.edu.co");
-    SEED_LOGIN
+    await typeInto(password, DEV_CREDENTIAL);
     await act(async () => {
       submit.click();
     });
@@ -190,7 +190,7 @@ describe("LoginPage", () => {
     const { email, password, submit, cleanup } = await render(onSignedIn);
 
     await typeInto(email, "ana@colegio.edu.co");
-    SEED_LOGIN
+    await typeInto(password, DEV_CREDENTIAL);
     await act(async () => {
       submit.click();
     });
