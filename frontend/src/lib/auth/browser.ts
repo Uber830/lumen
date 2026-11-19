@@ -15,6 +15,12 @@ import type { AuthResponse, SessionInfo } from "@/lib/api/types";
 export type SignInInput = {
   email: string;
   password: string;
+  /**
+   * Keep the session in this browser. It does not make the refresh
+   * token last longer: the browser just does not forget it when it
+   * closes.
+   */
+  remember_me?: boolean;
 };
 
 export type RegisterInput = {
