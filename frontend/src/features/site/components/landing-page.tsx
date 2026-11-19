@@ -8,14 +8,13 @@
 // thing a keyboard reaches.
 // =============================================================================
 
-import { CatalogIndex } from "./CatalogIndex";
-import { CoverageSection } from "./CoverageSection";
-import { FaqSection } from "./FaqSection";
-import { ProcessSection } from "./ProcessSection";
-import { RolesSection } from "./RolesSection";
-import { SiteFooter } from "./SiteFooter";
-import { SiteHeader } from "./SiteHeader";
-import { SiteHeroSection } from "./SiteHeroSection";
+import { CatalogIndex } from "./catalog-index";
+import { CtaSection } from "./cta-section";
+import { FaqSection } from "./faq-section";
+import { CoverageSection, ProcessSection, RolesSection } from "./sections";
+import { SiteFooter } from "./site-footer";
+import { SiteHeader } from "./site-header";
+import { SiteHeroSection } from "./site-hero";
 import { CONTAINER } from "./ui";
 import { useSiteContent } from "../use-site-content";
 
@@ -50,12 +49,13 @@ export function LandingPage() {
       <SiteHeader nav={content.nav} brand={content.footer.brand} contactEmail={contactEmail} />
 
       <main id="contenido" className="relative z-10 flex-1">
-        <SiteHeroSection />
-        <CatalogIndex />
-        <ProcessSection />
-        <RolesSection />
-        <CoverageSection />
-        <FaqSection />
+        <SiteHeroSection hero={content.hero} stats={stats} />
+        <CatalogIndex catalog={content.catalog} entries={catalog} total={catalogTotal} />
+        <ProcessSection process={content.process} />
+        <RolesSection roles={content.roles} />
+        <CoverageSection coverage={content.coverage} />
+        <FaqSection faq={content.faq} />
+        <CtaSection cta={content.cta} />
       </main>
 
       <SiteFooter footer={content.footer} />
