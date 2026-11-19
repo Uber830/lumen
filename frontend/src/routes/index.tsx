@@ -44,6 +44,10 @@ export const Route = createFileRoute("/")({
     links: [
       { rel: "canonical", href: SITE_URL },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      // The site has its own mark: the sun of El Índice.
+      { rel: "icon", href: "/favicon-lumen.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon-lumen-32.png", type: "image/png", sizes: "32x32" },
+      { rel: "apple-touch-icon", href: "/favicon-lumen-180.png" },
     ],
   }),
   component: LandingPage,
