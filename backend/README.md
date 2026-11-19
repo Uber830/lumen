@@ -1,304 +1,294 @@
 # Lumen backend (FastAPI)
 
-The API for Lumen. It owns authentication, authorization and every
-business operation: the browser talks only to this service.
+La API de Lumen. Es la dueña de la autenticación, la autorización y de cada
+regla de negocio: el navegador solo habla con este servicio.
 
-Postgres (hosted by Supabase) is the datastore, and the backend
-connects to it directly with asyncpg. Supabase Storage and Realtime
-remain in use for file uploads and live chat.
+Postgres es el almacén de datos y el backend se conecta a él directamente con
+asyncpg. Supabase Storage y Realtime siguen en uso para los archivos y el
+chat en vivo.
 
-## Stack
+- [Arranque rápido](#arranque-rápido)
+- [Layout](#layout)
+- [Endpoints](#endpoints)
+- [Autenticación](#autenticación)
+- [Esquema y migraciones](#esquema-y-migraciones)
+- [Pruebas](#pruebas)
+- [Convenciones](#convenciones)
 
-- FastAPI + Pydantic v2
-- uv-managed Python 3.12
-- SQLAlchemy 2.0 (async) + asyncpg
-- Argon2id password hashing (+ bcrypt for the migrated accounts) + PyJWT
-- Alembic for schema drift checks (the SQL migrations own the schema)
-- pytest + ruff + mypy
+---
 
-## Local development
-
-### The database
-
-The backend talks to Postgres directly, with SQLAlchemy. In development
-that can be a local container instead of the Supabase project: it is
-faster and it does not touch the real data.
+## Arranque rápido
 
 ```sh
-# From the repository root.
+# 1. La base de datos, desde la raíz del repositorio
 ./scripts/dev-db.sh up
+#    imprime: postgresql://postgres:postgres@127.0.0.1:55440/lumen_dev
+
+# 2. La configuración
+cp .env.example .env
+#    pega la DATABASE_URL que imprimió el paso anterior y rellena
+#    JWT_SECRET:  python -c "import secrets; print(secrets.token_urlsafe(48))"
+
+# 3. Las dependencias y el servidor
+uv sync --extra dev
+uv run lumen-api            # http://localhost:8010
 ```
 
-It creates a Postgres container, applies the schema from
-`supabase/migrations/` and then from `backend/migrations/`, loads the
-seed data, and prints the `DATABASE_URL` to put in `backend/.env`. The seeded accounts use the
-password `lumen-dev`:
+`lumen-api` es el script de `pyproject.toml`; arranca en el puerto **8010**
+(8000 lo usa la pila de EduSuite en esta máquina) y acepta `--reload`:
 
-| Account | Role |
+```sh
+uv run uvicorn app.main:app --reload --port 8010
+```
+
+Comprobación de que está vivo:
+
+```sh
+curl http://localhost:8010/ready
+```
+
+`/ready` devuelve 503 si a la base le falta el esquema: es la forma rápida de
+ver que las migraciones no se aplicaron.
+
+### Variables de entorno
+
+| Variable | Para qué |
 | --- | --- |
-| `admin6@cms.edu.co` | school admin of Colegio San Martin |
-| `uber@edu.com` | school admin of Colegio San Juan |
+| `DATABASE_URL` | la cadena de conexión de Postgres (obligatoria) |
+| `JWT_SECRET` | firma los tokens de acceso (obligatoria) |
+| `CORS_ALLOWED_ORIGINS` | orígenes permitidos, separados por comas |
+| `COOKIE_DOMAIN` | solo si el frontend y la API viven en subdominios distintos |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Storage y Realtime |
+| `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | la puerta del login (5 por minuto) |
+| `LOGIN_LOCK_THRESHOLD`, `LOGIN_LOCK_MINUTES` | el bloqueo de la cuenta (10 fallos, 15 min) |
 
-To work against the **real** Supabase project instead, put its
-connection string in `DATABASE_URL`. Copy it from the dashboard:
-*Project Settings → Database → Connection string → URI*. Use the
-"Session pooler" one. A bare `postgresql://` URL is fine: the backend
-picks the async driver.
+El resto está en `.env.example`, comentado.
 
-### The rest
-
-```sh
-cd backend
-cp .env.example .env      # then fill in DATABASE_URL and JWT_SECRET
-uv sync --extra dev       # install dependencies (requires uv >= 0.4)
-uv run uvicorn app.main:app --reload --port 8000
-```
-
-`JWT_SECRET` signs the access tokens. Generate one with:
-
-```sh
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-### Verification
-
-```sh
-uv run pytest              # run the tests
-uv run ruff check app tests
-uv run ruff format --check app tests
-uv run mypy
-```
-
-The tests need a Postgres. They use `TEST_DATABASE_URL`, or
-`DATABASE_URL` when it is not set:
-
-```sh
-docker run -d --name lumen-test-db \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=lumen_test \
-  -p 55432:5432 postgres:16-alpine
-
-TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@127.0.0.1:55432/lumen_test" \
-  uv run pytest
-```
-
-Without a database the pure-logic tests still run and the rest are
-skipped.
+---
 
 ## Layout
 
 ```
 app/
-  main.py            FastAPI app, middleware, exception handlers
+  main.py            FastAPI app, middleware, manejadores de errores
   config.py          Pydantic settings (env)
-  deps.py            FastAPI dependencies (session, context, role guards)
-  academics/         periods, courses, subjects, assignments, enrollments
+  deps.py            dependencias de FastAPI (sesión, contexto, roles)
+  academics/         períodos, cursos, materias, asignaciones, matrículas
   auth/
-    dependencies.py  JWT verification + current-user dependency
-    operations.py    register, authenticate, sessions, password reset
-    router.py        the auth endpoints
-    schemas.py       request/response models
-  chat/              conversations, members, messages
-  content/           the material a teacher posts to a course subject
+    dependencies.py  verificación del JWT y dependencia del usuario actual
+    operations.py    cuentas, autenticación, sesiones, contraseñas
+    router.py        los endpoints de acceso
+    schemas.py       modelos de petición y respuesta
+    attempts.py      la traza de intentos: rate limit y bloqueo
+  chat/              conversaciones, miembros, mensajes
+  content/           el material que un docente publica en un curso
   core/
-    access.py        the per-course-subject access checks
-    context.py       the RequestContext: who is calling and what they may do
-    pagination.py    the shared list envelope
-    permissions.py   the permission checks (port of the SQL helpers)
-    security.py      Argon2id password hashing
-    tokens.py        access and refresh token issuance
-    errors.py        domain exceptions and their HTTP mapping
+    access.py        los permisos por curso-materia
+    context.py       el RequestContext: quién llama y qué puede hacer
+    pagination.py    el sobre de las listas
+    permissions.py   los permisos (puerto de los helpers SQL)
+    security.py      hash de contraseñas Argon2id
+    tokens.py        emisión de tokens de acceso y de refresco
+    errors.py        excepciones del dominio y su mapeo HTTP
   db/
-    base.py          DeclarativeBase and shared column helpers
-    enums.py         Python enums mirroring the Postgres enum types
-    models/          one module per domain
-    session.py       async engine, session factory, get_db dependency
-  evaluations/       the authored assessments and their attempts
-  grades/            the scores a teacher records and a student reads
-  health.py          /health and /ready probes
-  icfes/             the attempt lifecycle and the authoring
-  notifications/      the in-app notifications of each user
-  platform/          what the platform team can do (creating schools)
-  plans/             the subscription catalog
-  schools/           the profile of each school
-  subscriptions/     Wompi checkout and webhook
-  tasks/             the assignments and their submissions
-  users/             Invitations and identity operations
-  wompi/             Wompi HTTP client
-alembic/             Drift-check scaffolding (the SQL migrations own the schema)
-tests/               pytest suite
-Dockerfile           multi-stage production image
+    base.py          DeclarativeBase y helpers de columnas
+    enums.py         enums que reflejan los tipos enum de Postgres
+    models/          un módulo por dominio
+    session.py       engine async, session factory, dependencia get_db
+    schema_check.py  la verificación del esquema al arrancar
+  evaluations/       las evaluaciones escritas y sus intentos
+  grades/            las notas que registra un docente
+  health.py          las sondas /health y /ready
+  icfes/             el ciclo de intento del banco y la autoría
+  notifications/     las notificaciones dentro de la app
+  platform/          lo que hace el equipo de plataforma (dar de alta colegios)
+  plans/             el catálogo de planes
+  schools/           el perfil de cada colegio
+  site/              el contenido editable del sitio público
+  subscriptions/     el checkout y el webhook de Wompi
+  tasks/             las tareas y sus entregas
+  users/             invitaciones y operaciones de identidad
+  wompi/             cliente HTTP de Wompi
+migrations/          migraciones SQL de este proyecto
+seeds/               datos semilla de este proyecto
+alembic/             andamiaje para el diff de esquema (el esquema vive en SQL)
+tests/               la suite de pytest
+Dockerfile           imagen de producción multi-etapa
 ```
+
+---
 
 ## Endpoints
 
+### Salud
+
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET  | `/health` | liveness probe |
-| GET  | `/ready` | readiness probe (database + schema check) |
-| POST | `/v1/auth/login` | exchange a password for a session |
-| POST | `/v1/auth/refresh` | exchange a refresh token for a new pair |
-| POST | `/v1/auth/logout` | revoke a refresh token |
-| GET  | `/v1/auth/me` | the caller's session context |
-| POST | `/v1/auth/forgot-password` | start the password-reset flow |
-| POST | `/v1/auth/reset-password` | set a new password with a reset token |
-| POST | `/v1/platform/schools` | create a school with its administrator (platform admin only) |
-| GET  | `/v1/academics/periods` | the school's academic periods |
-| POST | `/v1/academics/periods` | create a period |
-| PATCH | `/v1/academics/periods/{id}` | update a period |
-| DELETE | `/v1/academics/periods/{id}` | delete a period |
-| GET  | `/v1/academics/courses` | the school's courses, with their counts |
-| POST | `/v1/academics/courses` | create a course |
-| PATCH | `/v1/academics/courses/{id}` | update a course |
-| DELETE | `/v1/academics/courses/{id}` | delete a course |
-| GET  | `/v1/academics/subjects` | the school's subjects |
-| POST | `/v1/academics/subjects` | create a subject |
-| PATCH | `/v1/academics/subjects/{id}` | update a subject |
-| DELETE | `/v1/academics/subjects/{id}` | delete a subject |
-| GET  | `/v1/academics/course-subjects` | the school's course subjects, with their names |
-| POST | `/v1/academics/course-subjects` | offer a subject in a course |
-| PATCH | `/v1/academics/course-subjects/{id}` | update a course subject |
-| DELETE | `/v1/academics/course-subjects/{id}` | remove a subject from a course |
-| GET  | `/v1/academics/teacher-assignments` | the school's teacher assignments |
-| POST | `/v1/academics/teacher-assignments` | assign a teacher to a course subject |
-| PATCH | `/v1/academics/teacher-assignments/{id}` | update an assignment |
-| DELETE | `/v1/academics/teacher-assignments/{id}` | remove an assignment |
-| GET  | `/v1/academics/student-enrollments` | the school's enrollments |
-| POST | `/v1/academics/student-enrollments` | enroll a student in a course |
-| PATCH | `/v1/academics/student-enrollments/{id}` | update an enrollment |
-| DELETE | `/v1/academics/student-enrollments/{id}` | remove an enrollment |
-| GET  | `/v1/academics/members` | the school's members, joined with their profile |
-| POST | `/v1/users/invitations` | create one user + profile + membership |
-| POST | `/v1/users/bulk-upload` | create up to 500 invitations in one call |
-| GET  | `/v1/users/memberships` | the caller's active memberships |
-| POST | `/v1/subscriptions/checkout` | start a Wompi hosted-checkout session |
-| POST | `/v1/subscriptions/portal` | return the Wompi customer-portal URL |
-| GET  | `/v1/subscriptions` | current subscription + entitlements for the caller's school |
-| POST | `/v1/webhooks/wompi` | Wompi event webhook (signature-verified, idempotent) |
-| POST | `/v1/icfes/simulations/{id}/attempts` | start an attempt; returns questions (no keys) |
-| POST | `/v1/icfes/attempts/{id}/finalize` | submit answers, score, persist |
-| GET  | `/v1/icfes/comparisons` | per-simulation aggregates (teacher view) |
-| GET  | `/v1/notifications` | the caller's notifications, newest first |
-| GET  | `/v1/notifications/unread-count` | how many notifications are unread |
-| POST | `/v1/notifications/{id}/read` | mark one notification as read |
-| POST | `/v1/notifications/read-all` | mark every unread notification as read |
-| DELETE | `/v1/notifications/{id}` | dismiss a notification |
-| GET  | `/v1/notifications/preferences` | what the caller wants to be told about |
-| PATCH | `/v1/notifications/preferences` | change what the caller wants to be told about |
+| GET | `/health` | sonda de vida |
+| GET | `/ready` | sonda de disponibilidad (base de datos + esquema) |
 
-## Notifications
+### Acceso
 
-A notification is a row addressed to one user inside one school. The
-recipient is what scopes every read: the endpoints filter on the
-caller, never on an id the browser sent, and a notification that
-belongs to somebody else is a **404** rather than a 403, so the ids of
-the other tenants cannot be probed.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/v1/auth/login` | cambiar una contraseña por una sesión |
+| POST | `/v1/auth/refresh` | cambiar un refresh token por un par nuevo |
+| POST | `/v1/auth/logout` | revocar un refresh token |
+| GET | `/v1/auth/me` | el contexto de sesión del llamador |
+| PATCH | `/v1/auth/me` | actualizar el perfil |
+| POST | `/v1/auth/me/avatar` | cambiar el avatar |
+| POST | `/v1/auth/forgot-password` | iniciar el flujo de restablecimiento |
+| POST | `/v1/auth/reset-password` | poner una contraseña nueva con un token |
+| GET | `/v1/auth/supabase-token` | el token corto para Storage y Realtime |
 
-The rows are not written by an endpoint. The domain modules create them
-when something happens, through `app/notifications/service.py`:
+**No hay registro público.** Quien quiera usar Lumen habla con el equipo de
+plataforma; el alta la hace `POST /v1/platform/schools` (solo `platform_admin`),
+que devuelve el enlace de activación del administrador.
 
-| Event | Who is told |
-| --- | --- |
-| a task is posted | the students enrolled in the course |
-| a submission arrives | the teachers of the course subject |
-| a submission is graded | the student who submitted it |
-| content is published | the students enrolled in the course |
-| a chat message is sent | the other members of the conversation |
+### Sitio público
 
-Each trigger runs inside the transaction of the operation that caused
-it, so a notification exists exactly when the event does. The wording
-and the link are part of the row: the backend knows the recipient and
-their role, so it can point at the page that recipient has to open.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/public/site` | el copy, las cifras y el catálogo de la landing |
 
-The bell of the app shell polls `unread-count`. The delivery by email
-is not implemented yet: it needs a provider that this repository does
-not have.
+### Plataforma
 
-### The preferences
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/v1/platform/schools` | crear un colegio con su administrador (solo plataforma) |
 
-`notification_preferences` holds one row per (user, kind) with two
-channels: `in_app` and `email`. A user without a row gets the
-defaults — everything inside the app, nothing by email — so the API
-always answers with one entry per kind.
+### Académico
 
-The preferences are personal, not tenant scoped: a user who belongs to
-two schools keeps the same preferences in both. They are honoured when
-the notification is created: a user who turned a kind off inside the
-app does not get it. The email column is the preference for a channel
-that does not exist yet; it is already where the provider will look.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET/POST | `/v1/academics/periods` | los períodos académicos del colegio |
+| PATCH/DELETE | `/v1/academics/periods/{id}` | actualizar o borrar un período |
+| GET/POST | `/v1/academics/courses` | los cursos del colegio, con sus conteos |
+| PATCH/DELETE | `/v1/academics/courses/{id}` | actualizar o borrar un curso |
+| GET/POST | `/v1/academics/subjects` | las materias del colegio |
+| PATCH/DELETE | `/v1/academics/subjects/{id}` | actualizar o borrar una materia |
+| GET/POST | `/v1/academics/course-subjects` | las materias que se ofrecen en un curso |
+| PATCH/DELETE | `/v1/academics/course-subjects/{id}` | actualizar o quitar una materia de un curso |
+| GET/POST | `/v1/academics/teacher-assignments` | las asignaciones de docentes |
+| PATCH/DELETE | `/v1/academics/teacher-assignments/{id}` | actualizar o quitar una asignación |
+| GET/POST | `/v1/academics/student-enrollments` | las matrículas de estudiantes |
+| PATCH/DELETE | `/v1/academics/student-enrollments/{id}` | actualizar o quitar una matrícula |
+| GET | `/v1/academics/members` | los miembros del colegio, con su perfil |
 
-`PATCH /v1/notifications/preferences` takes the changes to apply:
+### Usuarios, colegios y planes
 
-```json
-{ "preferences": [{ "kind": "task_graded", "in_app": false }] }
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/v1/users/invitations` | crear un usuario + perfil + membresía |
+| POST | `/v1/users/bulk-upload` | hasta 500 invitaciones en una llamada |
+| GET | `/v1/users/memberships` | las membresías activas del llamador |
+| PATCH | `/v1/users/memberships/{id}` | cambiar el rol o revocar una membresía |
+| POST | `/v1/users/memberships/{id}/activation-link` | un enlace nuevo para un miembro sin activar |
+| GET | `/v1/schools/me` | el colegio del llamador, con su marca |
+| PATCH | `/v1/schools/me` | actualizar la marca del colegio |
+| POST | `/v1/schools/me/logo`, `/v1/schools/me/images` | subir el logo o las imágenes |
+| GET | `/v1/plans` | el catálogo de planes |
+
+### Suscripciones, contenido y evaluación
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/subscriptions` | la suscripción y los entitlements del colegio |
+| POST | `/v1/subscriptions/checkout` | abrir el checkout de Wompi |
+| POST | `/v1/subscriptions/portal` | la URL del portal de cliente de Wompi |
+| POST | `/v1/webhooks/wompi` | el webhook de Wompi (firma verificada, idempotente) |
+| POST | `/v1/icfes/simulations/{id}/attempts` | empezar un intento (sin respuestas) |
+| POST | `/v1/icfes/attempts/{id}/finalize` | entregar, calificar y guardar |
+| GET | `/v1/icfes/comparisons` | los agregados por simulación (docente) |
+| GET/POST/PATCH/DELETE | `/v1/content/items` | el material de un curso-materia |
+| GET/POST/PATCH/DELETE | `/v1/tasks` | las tareas y sus entregas |
+| GET/POST/PATCH/DELETE | `/v1/grades` | las notas |
+| GET/POST/PATCH/DELETE | `/v1/evaluations` | las evaluaciones y sus intentos |
+| GET/POST/PATCH/DELETE | `/v1/chat/conversations` | el chat |
+
+### Notificaciones
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/notifications` | las notificaciones del llamador, más recientes primero |
+| GET | `/v1/notifications/unread-count` | cuántas hay sin leer |
+| POST | `/v1/notifications/{id}/read` | marcar una como leída |
+| POST | `/v1/notifications/read-all` | marcar todas como leídas |
+| DELETE | `/v1/notifications/{id}` | descartar una |
+| GET/PATCH | `/v1/notifications/preferences` | qué se le quiere contar |
+
+---
+
+## Autenticación
+
+El backend es el dueño de la autenticación.
+
+- **Contraseñas**: Argon2id. Los hashes bcrypt de las cuentas migradas se
+  siguen aceptando y el primer login los reescribe a Argon2id, así que el
+  formato antiguo se drena solo.
+- **Tokens de acceso**: JWT HS256 firmados con `JWT_SECRET`. Duran 15 minutos
+  y solo llevan el id del usuario y su correo.
+- **Tokens de refresco**: cadenas opacas. Solo se guarda su hash SHA-256, así
+  que una fuga de la base no entrega sesiones válidas.
+
+**La sesión del navegador vive en cookies httpOnly.** El JavaScript de la
+página no puede leerlas, así que un XSS no puede robarse la sesión. El
+navegador las manda con `credentials: "include"`; las server functions del
+frontend las leen de la petición y las reenvían como `Authorization: Bearer`.
+La API acepta las dos formas.
+
+Dos propiedades que los tests imponen:
+
+- **Un refresh token es de un solo uso.** Al rotarlo se revoca el anterior.
+  Presentar uno ya usado revoca *todas* las sesiones de ese usuario.
+- **Un restablecimiento de contraseña revoca todas las sesiones.**
+
+Ni el login ni el «olvidé mi contraseña» revelan si una cuenta existe: las
+respuestas son idénticas en los dos casos.
+
+### La puerta del login
+
+`POST /v1/auth/login` responde siempre `El correo o la contraseña no
+coinciden.` cuando las credenciales no cuadran. Además:
+
+- **5 intentos por minuto** y por par (correo, dirección) → `429` con
+  `Retry-After`;
+- **10 fallos** bloquean la cuenta 15 minutos → `423`;
+- cada intento queda en `login_attempts`, con el correo hasheado (HMAC), nunca
+  en claro.
+
+El bloqueo se responde **después** de validar la contraseña, para no confirmar
+que la cuenta existe.
+
+### El alta de los colegios
+
+Nadie se registra solo. El equipo de plataforma da de alta el colegio:
+
+```sh
+curl -X POST http://localhost:8010/v1/platform/schools \
+  -H "Authorization: Bearer $TOKEN_DE_PLATAFORMA" \
+  -H "Content-Type: application/json" \
+  -d '{"school_name":"Colegio Sagrado Corazón","short_code":"SAGCOR",
+       "plan_code":"estandar","admin_email":"ana@colegio.edu.co",
+       "admin_name":"Ana Restrepo"}'
 ```
 
-Only the channels that are sent are changed: turning the app
-notifications off leaves the email ones alone.
+La respuesta trae el **enlace de activación** del administrador: su cuenta
+nace sin contraseña y la define con ese enlace (`POST /v1/auth/reset-password`
+con el token). Nadie tiene que llevar una contraseña escrita de un sitio a
+otro.
 
-## Authentication
+---
 
-The backend owns authentication. Supabase Auth is no longer involved.
+## Esquema y migraciones
 
-- **Passwords** are hashed with Argon2id. The parameters live in
-  `Settings` and can be tuned without a code change. The bcrypt hashes
-  of the accounts migrated from Supabase Auth are still accepted, and
-  the first successful login rehashes them to Argon2id, so the legacy
-  format drains itself.
-- **Access tokens** are HS256 JWTs signed with `JWT_SECRET`. They
-  last 15 minutes by default and carry only the user id and the
-  email.
-- **Refresh tokens** are opaque random strings. Only their SHA-256
-  hash is stored, so a database leak does not hand out valid
-  sessions. They last 30 days by default.
+**Las migraciones SQL son la única dueña del esquema**: las heredadas en
+`supabase/migrations/` y las de este proyecto en `backend/migrations/`, que se
+aplican en ese orden. Eso incluye la tabla de identidad que usa el backend
+(`public.users`, que sustituye a `auth.users`) y sus tablas de sesión.
 
-**The browser's session lives in httpOnly cookies.** The page's
-JavaScript cannot read them, so an XSS cannot steal them. The browser
-sends them with `credentials: "include"`; the server functions read
-them from the incoming request and forward them as an
-`Authorization: Bearer` header. The API accepts either.
-
-Set `COOKIE_DOMAIN` (for example `.example.com`) when the frontend
-and the API live on different subdomains, so the frontend's server
-can read the cookie during SSR. Leave it empty when they share a
-host. In development it can stay empty: cookies ignore the port, so
-`localhost` covers both.
-
-Two properties the tests enforce:
-
-- **A refresh token is single-use.** Rotating it revokes the old one.
-  Presenting an already-used token revokes *every* session of that
-  user, because it means either a stale client or a replayed stolen
-  token. The revocation is committed even though the request fails.
-- **A password reset revokes every session**, so a reset really does
-  lock out whoever held the old password.
-
-Neither the login nor the forgot-password flow reveals whether an
-account exists: the responses are identical either way, so the
-endpoints cannot be used to enumerate accounts.
-
-### Storage and Realtime
-
-Storage and Realtime stay on Supabase, and their RLS policies call
-`auth.uid()`. The bridge is a short-lived token the backend mints
-(`POST /v1/auth/supabase-token`), whose `sub` is the caller's id:
-with it, every storage and realtime policy works unchanged.
-
-The token is not an authentication token: the API refuses it. It
-lasts an hour, and the browser asks for a new one when it expires.
-The browser cannot mint it itself: signing it would mean exposing the
-project JWT secret.
-
-## Database
-
-**The SQL migrations are the single owner of the schema**: the ones
-inherited from the original project under `supabase/migrations/`, and
-the ones this project owns under `backend/migrations/`, applied in
-that order. That includes the identity table the backend uses for
-authentication (`public.users`, which replaces `auth.users`) and its
-session tables. Nothing else creates production tables.
-
-The backend checks the schema at startup and refuses to run when a
-migration was not applied:
+El backend comprueba el esquema al arrancar y se niega a levantar si falta
+una migración:
 
 ```
 The database is missing 3 table(s): refresh_tokens, ...
@@ -306,108 +296,94 @@ The SQL migrations have not been applied. Apply them with psql (see
 scripts/dev-db.sh) or with the migration tool of your database.
 ```
 
-`GET /ready` reports the same thing, so a deployment that skipped the
-migrations shows up as not-ready instead of answering 500 to every
-request.
+`GET /ready` informa de lo mismo, así que un despliegue que se saltó las
+migraciones aparece como no disponible en vez de responder 500 a todo.
 
-Alembic is not a second source of migrations. `backend/alembic/` is
-scaffolding for `alembic revision --autogenerate`, which diffs the
-SQLAlchemy models against a live database; the generated revision is
-translated into a SQL migration and then deleted. See
-`alembic/versions/README.md`.
+Para escribir una migración nueva:
 
-`tests/test_schema_drift.py` compares the models against the SQL
-migrations, and `tests/test_migrations.py` applies the migrations to a
-fresh database and checks the result, so a mismatch fails the build
-instead of surfacing as a runtime error.
+1. se escribe el SQL en `backend/migrations/<fecha>_<qué>.sql`;
+2. se corre `./scripts/dev-db.sh reset` desde la raíz;
+3. `backend/tests/test_schema_drift.py` compara los modelos con las
+   migraciones y `backend/tests/test_migrations.py` las aplica en una base
+   limpia: un desajuste rompe el build en vez de aparecer en runtime.
 
-The `local-shim.sql` script under `supabase/` creates stand-ins for
-the Supabase platform objects (`auth` schema, `storage` schema, the
-`authenticated` role) so the SQL migrations can also be applied to a
-plain Postgres container. It must not be run against a real Supabase
-project.
+Alembic no es una segunda fuente de migraciones. `backend/alembic/` es
+andamiaje para `alembic revision --autogenerate`, que contrasta los modelos
+SQLAlchemy con una base viva; la revisión generada se traduce a SQL y se
+borra. Ver `alembic/versions/README.md`.
 
-## Conventions
+`supabase/local-shim.sql` crea los objetos de plataforma de Supabase (el
+schema `auth`, el `storage`, el rol `authenticated`) para que las migraciones
+heredadas también se puedan aplicar en un Postgres normal.
 
-- Pure functional style: routers stay thin, business logic lives in
-  `operations.py` / `scoring.py` modules. Keep the score math
-  deterministic so unit tests can use fixtures.
-- **Tenant isolation**: `school_id` is never taken from a request
-  body. It is derived from the caller's own memberships and the
-  resource being addressed.
-- The Wompi webhook handler MUST verify the signature before touching
-  the database. Idempotency is enforced by inserting into
-  `wompi_events_processed` with `ON CONFLICT DO NOTHING`.
-- Secrets come from `pydantic-settings` (`SecretStr` for tokens).
-  Never log or trace them.
-- Tests are pytest. Database-backed tests run against a real
-  Postgres; the pure-logic tests do not need one.
+---
 
-## Permissions
+## Pruebas
 
-Until Phase 2, Row Level Security was the only thing standing between
-one school's data and another's. With the CRUD moving into the
-backend, RLS is no longer in the path, so the checks it performed
-live in Python instead.
+La suite necesita un Postgres. Usa `TEST_DATABASE_URL`, o `DATABASE_URL` si no
+está definida. La base de pruebas es **otra** que la de desarrollo, en el
+puerto **55441** (55440 es la de desarrollo, 55432 la de EduSuite):
 
-`app/core/permissions.py` is the port of the seven `SECURITY DEFINER`
-helpers the migrations declared. The behaviour is preserved exactly,
-including the subtle parts: a revoked membership grants nothing, a
-withdrawn enrollment is not an active enrollment, and the ICFES
-entitlement counts only while the subscription is active or on trial.
+```sh
+docker run -d --name lumen-test-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=lumen_test \
+  -p 55441:5432 postgres:16-alpine
 
-`app/core/context.py` holds the `RequestContext`: the caller's
-identity, their active memberships and their platform role, loaded
-once per request. The routers read the school from it, never from the
-request body.
+cd backend
+TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55441/lumen_test" \
+  uv run pytest
+```
 
-Two rules the code follows:
+Sin base de datos, las pruebas de lógica pura corren igual y el resto se
+saltan.
 
-- **The `school_id` in a request body is only ever used to look up a
-  membership.** It never grants access on its own.
-- **A caller who does not belong to a school gets a 404, not a 403.**
-  A 403 would confirm that the school exists, so the endpoint could
-  be used to probe for other tenants' ids. A caller who *does* belong
-  to the school but with the wrong role gets a 403: they already know
-  it exists.
+```sh
+uv run pytest                          # la suite
+uv run ruff check app tests            # lint
+uv run ruff format --check app tests   # formato
+uv run mypy                            # tipos
+```
 
-`tests/test_tenant_isolation.py` covers the cross-tenant scenarios:
-a caller from one school cannot read or write anything belonging to
-another.
+Los correos de las pruebas usan el dominio `@example.com`: el fixture
+`cleanup_users` borra esas filas entre pruebas.
 
-## Migration status
+---
 
-The backend is being migrated from a Supabase-hosted design to a
-Python-only one. See `ARCHITECTURE.md` at the repository root for the
-full plan.
+## Permisos
 
-- **Phase 0 (done)** — the Supabase SDK is gone. The backend talks to
-  Postgres directly through SQLAlchemy. All the tables are modelled.
-- **Phase 1 (done)** — the auth endpoints: register, login, refresh,
-  logout, the password-reset flow, email verification, and
-  `bootstrap_school` as a Python function. The legacy Supabase token
-  path was removed: the backend is the only issuer of tokens.
-- **Phase 2 (done)** — the permission layer: the seven SQL helper
-  functions reimplemented in Python, plus the request context that
-  carries the caller's memberships. The routers now resolve their
-  school from that context.
-- **Phase 3 (done)** — the domain endpoints: the CRUD that the
-  browser used to do directly against PostgREST. Every module is
-  covered: academics, content, tasks, grades, evaluations, the ICFES
-  bank and simulations, chat, and the plan catalog.
+Con la CRUD dentro del backend, la RLS ya no está en el camino, así que sus
+comprobaciones viven en Python. `app/core/permissions.py` es el puerto de los
+siete helpers `SECURITY DEFINER` que declaraban las migraciones, y
+`app/core/context.py` lleva el `RequestContext`: la identidad del llamador,
+sus membresías activas y su rol de plataforma, cargados una vez por petición.
 
-  The permissions follow the RLS policies the migrations declared.
-  Two of them are finer-grained than "member of the school": the
-  content, task, grade and evaluation modules check the *course
-  subject*, so a teacher only reaches their own material and a
-  student only reaches the courses they are enrolled in.
+Dos reglas que sigue el código:
 
-  The answer keys — of the evaluations and of the ICFES bank — never
-  reach a student. The scoring happens on the server, which is why
-  those attempt lifecycles live in the backend rather than in the
-  browser.
-- **Phase 4 (done)** — the frontend. The browser talks only to this
-  API: the Supabase client is gone from the data path, and the hooks
-  are rewritten against the endpoints above. Storage and Realtime stay
-  on Supabase, isolated in `lib/supabase/client.ts` and reached with
-  the short-lived token the backend mints.
+- **El `school_id` del cuerpo de la petición solo sirve para buscar una
+  membresía.** Nunca da acceso por sí mismo.
+- **Un llamador que no pertenece a un colegio recibe un 404, no un 403.** Un
+  403 confirmaría que el colegio existe, y el endpoint serviría para
+  sondear los ids de otros tenants. Si sí pertenece pero con otro rol, ahí
+  sí es un 403: ya sabe que existe.
+
+`tests/test_tenant_isolation.py` cubre los escenarios entre tenants.
+
+---
+
+## Convenciones
+
+- Estilo funcional puro: los routers se quedan finos y la lógica vive en
+  `operations.py`. Que el cálculo de notas sea determinista, para que las
+  pruebas puedan usar fixtures.
+- **Aislamiento por tenant**: `school_id` nunca se toma del cuerpo de la
+  petición, sale de las membresías del llamador y del recurso que se
+  direcciona.
+- El webhook de Wompi **tiene que** verificar la firma antes de tocar la
+  base. La idempotencia se fuerza con un insert en
+  `wompi_events_processed` con `ON CONFLICT DO NOTHING`.
+- Los secretos vienen de `pydantic-settings` (`SecretStr` para los tokens).
+  Nunca se registran ni se trazan.
+- Las pruebas son pytest. Las que tocan la base corren contra un Postgres
+  real; las de lógica pura no necesitan uno.
+- El comentario de código va en español y solo cuando explica un *por qué*,
+  nunca un *qué*.
