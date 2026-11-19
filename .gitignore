@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log
+
+# Node modules anywhere in the tree (Vite + Vitepress + supabase CLI).
+node_modules
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local agent skill bundles and the lock file. Skills are installed
+# per-machine from the global ~/.agents/skills/ directory; the lock
+# file is also machine-local because source paths may differ.
+.agents/
+skills-lock.json
+
+# Local TODO backlog. Each developer keeps their own .todos/ as a
+# working scratchpad; the repo only carries the structure (see
+# .todos/README.md convention in commit history if needed).
+.todos/
+
+# Root env: backend reads backend/.env directly; the frontend
+# (Vite) reads /.env at the repo root. The .env itself is untracked;
+# .env.example is checked in at the repo root.
+.env
+.env.*
+!.env.example
+
+# Supabase CLI scratch directory (created by `supabase db diff` etc).
+supabase/.temp/
+
+# Python virtualenv / build artifacts for the FastAPI backend.
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/dist/
+backend/build/
+backend/*.egg-info/
+

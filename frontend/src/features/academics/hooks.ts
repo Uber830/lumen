@@ -1,0 +1,332 @@
+// =============================================================================
+// The academic hooks: periods, courses, subjects, assignments, enrollments.
+// -----------------------------------------------------------------------------
+// These used to read and write PostgREST directly from the browser.
+// They talk to the API now.
+//
+// Types live in `./types`: entities and the hook input shapes. This
+// file only wires React Query to the API, so the shapes stay in one
+// place and the module is self-contained.
+// =============================================================================
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
+
+import { api } from "@/lib/api/client";
+import type {
+  AcademicPeriod,
+  Course,
+  CourseSubject,
+  CourseSubjectSummary,
+  CourseSummary,
+  CreateAcademicPeriodInput,
+  CreateCourseInput,
+  CreateCourseSubjectInput,
+  CreateStudentEnrollmentInput,
+  CreateSubjectInput,
+  CreateTeacherAssignmentInput,
+  SchoolMember,
+  StudentEnrollment,
+  Subject,
+  TeacherAssignment,
+  UpdateAcademicPeriodInput,
+  UpdateCourseInput,
+  UpdateSubjectInput,
+} from "@/features/academics/types";
+
+export const queryKeys = {
+  periods: (schoolId: string) => ["academic_periods", schoolId] as const,
+  courses: (schoolId: string) => ["courses", schoolId] as const,
+  subjects: (schoolId: string) => ["subjects", schoolId] as const,
+  courseSubjects: (schoolId: string) => ["course_subjects", schoolId] as const,
+  teacherAssignments: (schoolId: string) => ["teacher_assignments", schoolId] as const,
+  studentEnrollments: (schoolId: string) => ["student_enrollments", schoolId] as const,
+  members: (schoolId: string) => ["school_members", schoolId] as const,
+};
+
+// ---------------------------------------------------------------------------
+// Academic periods
+// ---------------------------------------------------------------------------
+
+export function useAcademicPeriods(
+  schoolId: string | null,
+): UseQueryResult<AcademicPeriod[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.periods(schoolId) : ["academic_periods", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<AcademicPeriod[]>("/v1/academics/periods"),
+  });
+}
+
+export function useCreateAcademicPeriod(
+  schoolId: string,
+): UseMutationResult<AcademicPeriod, Error, CreateAcademicPeriodInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<AcademicPeriod>("/v1/academics/periods", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+    },
+  });
+}
+
+export function useUpdateAcademicPeriod(
+  schoolId: string,
+): UseMutationResult<AcademicPeriod, Error, UpdateAcademicPeriodInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }) => api.patch<AcademicPeriod>(`/v1/academics/periods/${id}`, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+    },
+  });
+}
+
+export function useDeleteAcademicPeriod(schoolId: string): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/periods/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+
+export function useCourses(schoolId: string | null): UseQueryResult<CourseSummary[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.courses(schoolId) : ["courses", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<CourseSummary[]>("/v1/academics/courses"),
+  });
+}
+
+export function useCreateCourse(
+  schoolId: string,
+): UseMutationResult<Course, Error, CreateCourseInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<Course>("/v1/academics/courses", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+export function useUpdateCourse(
+  schoolId: string,
+): UseMutationResult<Course, Error, UpdateCourseInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }) => api.patch<Course>(`/v1/academics/courses/${id}`, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+export function useDeleteCourse(schoolId: string): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/courses/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Subjects
+// ---------------------------------------------------------------------------
+
+export function useSubjects(schoolId: string | null): UseQueryResult<Subject[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.subjects(schoolId) : ["subjects", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<Subject[]>("/v1/academics/subjects"),
+  });
+}
+
+export function useCreateSubject(
+  schoolId: string,
+): UseMutationResult<Subject, Error, CreateSubjectInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<Subject>("/v1/academics/subjects", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+    },
+  });
+}
+
+export function useUpdateSubject(
+  schoolId: string,
+): UseMutationResult<Subject, Error, UpdateSubjectInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }) => api.patch<Subject>(`/v1/academics/subjects/${id}`, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+    },
+  });
+}
+
+export function useDeleteSubject(schoolId: string): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/subjects/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Course subjects
+// ---------------------------------------------------------------------------
+
+export function useCourseSubjects(
+  schoolId: string | null,
+): UseQueryResult<CourseSubjectSummary[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.courseSubjects(schoolId) : ["course_subjects", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<CourseSubjectSummary[]>("/v1/academics/course-subjects"),
+  });
+}
+
+export function useCreateCourseSubject(
+  schoolId: string,
+): UseMutationResult<CourseSubject, Error, CreateCourseSubjectInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<CourseSubject>("/v1/academics/course-subjects", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+export function useDeleteCourseSubject(schoolId: string): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/course-subjects/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Teacher assignments
+// ---------------------------------------------------------------------------
+
+export function useTeacherAssignments(
+  schoolId: string | null,
+): UseQueryResult<TeacherAssignment[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.teacherAssignments(schoolId) : ["teacher_assignments", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<TeacherAssignment[]>("/v1/academics/teacher-assignments"),
+  });
+}
+
+export function useCreateTeacherAssignment(
+  schoolId: string,
+): UseMutationResult<TeacherAssignment, Error, CreateTeacherAssignmentInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<TeacherAssignment>("/v1/academics/teacher-assignments", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.teacherAssignments(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+    },
+  });
+}
+
+export function useDeleteTeacherAssignment(
+  schoolId: string,
+): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/teacher-assignments/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.teacherAssignments(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Student enrollments
+// ---------------------------------------------------------------------------
+
+export function useStudentEnrollments(
+  schoolId: string | null,
+): UseQueryResult<StudentEnrollment[], Error> {
+  return useQuery({
+    queryKey: schoolId ? queryKeys.studentEnrollments(schoolId) : ["student_enrollments", "none"],
+    enabled: !!schoolId,
+    queryFn: () => api.get<StudentEnrollment[]>("/v1/academics/student-enrollments"),
+  });
+}
+
+export function useCreateStudentEnrollment(
+  schoolId: string,
+): UseMutationResult<StudentEnrollment, Error, CreateStudentEnrollmentInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<StudentEnrollment>("/v1/academics/student-enrollments", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.studentEnrollments(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+export function useDeleteStudentEnrollment(
+  schoolId: string,
+): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.delete<void>(`/v1/academics/student-enrollments/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.studentEnrollments(schoolId) });
+      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Members
+// ---------------------------------------------------------------------------
+
+export function useSchoolMembers(
+  schoolId: string | null,
+  role?: string,
+  includeRevoked = false,
+): UseQueryResult<SchoolMember[], Error> {
+  return useQuery({
+    queryKey: schoolId
+      ? [...queryKeys.members(schoolId), role ?? "all", includeRevoked ? "withRevoked" : "active"]
+      : ["school_members", "none"],
+    enabled: !!schoolId,
+    queryFn: () =>
+      api.get<SchoolMember[]>("/v1/academics/members", {
+        ...(role ? { role } : {}),
+        ...(includeRevoked ? { include_revoked: true } : {}),
+      }),
+  });
+}

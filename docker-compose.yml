@@ -1,0 +1,38 @@
+# =============================================================================
+# Lumen local stack.
+# -----------------------------------------------------------------------------
+# The only service here is the Postgres that backs the development
+# environment. The backend and the frontend run on the host (uv and
+# npm) so the reload is fast; only the database is containerized.
+#
+#   docker compose up -d db        # start the database
+#   docker compose down            # stop it (the volume survives)
+#   docker compose down -v         # stop it and wipe the data
+#
+# The schema is applied by ./scripts/dev-db.sh up, which reuses this
+# container.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lumen-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lumen_dev
+    ports:
+      # Host port 55440 keeps Lumen clear of the EduSuite container,
+      # which owns 55432. Both stacks can run at the same time.
+      - "55440:5432"
+    volumes:
+      - lumen-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lumen_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  lumen-pgdata:

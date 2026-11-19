@@ -1,0 +1,45 @@
+# Anything under these paths is not useful inside the container image.
+# This file is the production Docker context. (At repo root there is
+# another .dockerignore that constrains the dev context.)
+
+# VCS
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+env
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+dist
+build
+*.egg-info
+*.whl
+
+# uv
+.uv-cache
+
+# Editor / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Docs / tests not needed at runtime
+*.md
+!app/**/*.md
+tests

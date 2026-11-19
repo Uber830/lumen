@@ -1,0 +1,23 @@
+# Frontend build outputs
+dist
+dist-ssr
+.output
+.vinxi
+.tanstack
+.nitro
+
+# Vitest / Playwright artifacts (generated at frontend/)
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Wrangler / Cloudflare workers output (Vite's cloudflare target)
+.wrangler/
+.dev.vars
+
+# Local env overrides (the VITE_* env is loaded from ../../.env)
+*.local
+.env
+.env.*
+!.env.example

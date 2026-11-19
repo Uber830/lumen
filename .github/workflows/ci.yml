@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: "Frontend: lint, typecheck, unit tests, build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Unit tests
+        working-directory: frontend
+        run: npm run test
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  backend:
+    name: "Backend: lint, typecheck, tests"
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lumen_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The SQL migrations under supabase/migrations/ own the schema.
+      # They are applied below, before the tests run.
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/lumen_test
+      JWT_SECRET: ci-jwt-secret-with-enough-entropy-for-hs256
+      SUPABASE_JWT_SECRET: ci-supabase-project-secret-1234567890
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SECRET_KEY: ci-secret-key
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci
+      CORS_ALLOWED_ORIGINS: http://localhost:8080
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen --extra dev
+
+      - name: Apply the schema
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
+            -v ON_ERROR_STOP=1 -q -f supabase/local-shim.sql
+          for migration in $(ls supabase/migrations/*.sql | sort); do
+            echo "applying $migration"
+            psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
+              -v ON_ERROR_STOP=1 -q -f "$migration"
+          done
+
+      - name: Format
+        working-directory: backend
+        run: uv run --no-sync ruff format --check .
+
+      - name: Lint
+        working-directory: backend
+        run: uv run --no-sync ruff check .
+
+      - name: Typecheck
+        working-directory: backend
+        run: uv run --no-sync mypy app tests
+
+      - name: Tests
+        working-directory: backend
+        run: uv run --no-sync pytest -q
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        # --no-install forces npx to use the project's own Playwright.
+        # Without it, npx downloads the latest release and installs a
+        # browser the test runner does not know about.
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: E2E tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
