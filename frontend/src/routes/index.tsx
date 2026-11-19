@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
           "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
       },
       { property: "og:url", content: SITE_URL },
-      { property: "og:image", content: `${SITE_URL}/og-lumen.svg` },
+      { property: "og:image", content: `${SITE_URL}/og-lumen.png` },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -43,7 +43,7 @@ export const Route = createFileRoute("/")({
         content:
           "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
       },
-      { name: "twitter:image", content: `${SITE_URL}/og-lumen.svg` },
+      { name: "twitter:image", content: `${SITE_URL}/og-lumen.png` },
     ],
     links: [
       { rel: "canonical", href: SITE_URL },
