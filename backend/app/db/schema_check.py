@@ -1,8 +1,9 @@
 """The schema check.
 
 The backend talks to a database whose schema is owned by the SQL
-migrations under `supabase/migrations/`. If a migration was not
-applied, the endpoints fail deep inside the request with an opaque
+migrations: the inherited ones under `supabase/migrations/` and the
+ones this project owns under `backend/migrations/`. If a migration was
+not applied, the endpoints fail deep inside the request with an opaque
 500: `relation "public.users" does not exist`.
 
 This module turns that into a clear message, as early as possible.
@@ -93,8 +94,9 @@ class SchemaStatus:
         listed = ", ".join(self.missing)
         return (
             f"The database is missing {len(self.missing)} table(s): {listed}. "
-            "The SQL migrations under supabase/migrations/ have not been "
-            "applied. Run `supabase db push` (or apply them with psql)."
+            "The SQL migrations have not been applied. Apply them with psql "
+            "(see scripts/dev-db.sh) or with the migration tool of your "
+            "database."
         )
 
 

@@ -115,10 +115,11 @@ create index if not exists login_attempts_created_idx
 -- ---------------------------------------------------------------------------
 -- RLS, with no policies
 --
--- `public` is exposed by PostgREST. These tables hold the editable
--- content of the site and the audit trail of the sign-ins, so nobody
--- holding an `anon` or `authenticated` token may read or write them:
--- only the backend, which connects with the owner role, can.
+-- The tables hold the editable content of the site and the audit trail
+-- of the sign-ins. Row level security is enabled on all of them, so
+-- that a table that later gets a policy starts from a closed door
+-- instead of an open one. The API connects with the owner role, which
+-- is not affected by the policies.
 -- ---------------------------------------------------------------------------
 alter table public.site_content enable row level security;
 alter table public.catalog_items enable row level security;
