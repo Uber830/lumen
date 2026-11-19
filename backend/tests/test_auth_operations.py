@@ -24,14 +24,12 @@ from app.auth.operations import (
     authenticate,
     create_user,
     find_user_by_email,
-    issue_email_verification_token,
     issue_password_reset_token,
     issue_session,
     load_session_context,
     reset_password,
     revoke_all_refresh_tokens,
     rotate_refresh_token,
-    verify_email,
 )
 from app.core.errors import AuthenticationError, ConflictError
 from app.core.security import verify_password
@@ -80,7 +78,7 @@ async def test_create_user_normalizes_the_email(engine):
 
 
 async def test_create_user_rejects_a_duplicate_email(engine):
-    """Registering the same email twice raises a conflict."""
+    """The same email twice raises a conflict."""
     async with AsyncSession(bind=engine, expire_on_commit=False) as session:
         await create_user(
             session,
@@ -97,6 +95,18 @@ async def test_create_user_rejects_a_duplicate_email(engine):
                 password="another password",
                 full_name="Second",
             )
+
+
+async def test_create_user_can_leave_the_account_pending(engine):
+    """An account without a password waits for its activation link."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        user = await create_user(
+            session,
+            email="pending@example.com",
+            full_name="Pending",
+        )
+        await session.commit()
+        assert user.password_hash == ""
 
 
 # ---------------------------------------------------------------------------
@@ -458,56 +468,6 @@ async def test_reset_password_rejects_an_expired_token(engine):
 
         with pytest.raises(AuthenticationError):
             await reset_password(session, token, "another password")
-
-
-# ---------------------------------------------------------------------------
-# Email verification
-# ---------------------------------------------------------------------------
-
-
-async def test_verify_email_marks_the_user_verified(engine):
-    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
-        user = await create_user(
-            session,
-            email="verify@example.com",
-            password="a password",
-            full_name="Verify",
-        )
-        await session.commit()
-        assert user.email_verified is False
-
-        token = await issue_email_verification_token(session, user.id)
-        await session.commit()
-
-        verified = await verify_email(session, token)
-        await session.commit()
-        assert verified.email_verified is True
-
-
-async def test_verify_email_rejects_an_unknown_token(engine):
-    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
-        with pytest.raises(AuthenticationError):
-            await verify_email(session, "not-a-real-token")
-
-
-async def test_verify_email_rejects_a_used_token(engine):
-    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
-        user = await create_user(
-            session,
-            email="twice@example.com",
-            password="a password",
-            full_name="Twice",
-        )
-        await session.commit()
-
-        token = await issue_email_verification_token(session, user.id)
-        await session.commit()
-
-        await verify_email(session, token)
-        await session.commit()
-
-        with pytest.raises(AuthenticationError):
-            await verify_email(session, token)
 
 
 # ---------------------------------------------------------------------------

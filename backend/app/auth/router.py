@@ -1,4 +1,4 @@
-"""Auth router: register, login, refresh, logout and the password flows.
+"""Auth router: login, refresh, logout and the password flows.
 
 These endpoints replace Supabase Auth. The frontend migrates to them
 in Phase 4; until then it keeps using Supabase Auth and
@@ -35,16 +35,13 @@ from app.auth.operations import (
     IssuedSession,
     UserSession,
     authenticate,
-    create_user,
     find_user_by_email,
-    issue_email_verification_token,
     issue_password_reset_token,
     issue_session,
     load_session_context,
     reset_password,
     revoke_refresh_token,
     rotate_refresh_token,
-    verify_email,
 )
 from app.auth.schemas import (
     AuthResponse,
@@ -53,12 +50,10 @@ from app.auth.schemas import (
     LogoutRequest,
     MessageResponse,
     RefreshRequest,
-    RegisterRequest,
     ResetPasswordRequest,
     SessionInfo,
     TokenPair,
     UpdateProfileRequest,
-    VerifyEmailRequest,
 )
 from app.config import get_settings
 from app.core import supabase_storage
@@ -178,49 +173,6 @@ def _mint_supabase_token(user: object) -> str | None:
             "will not work for this user."
         )
         return None
-
-
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(
-    body: RegisterRequest,
-    request: Request,
-    response: Response,
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> AuthResponse:
-    """Create an account and sign the user in.
-
-    The account starts unverified: an email-verification token is
-    created and, in a deployment with an email provider, emailed out.
-    """
-    user = await create_user(
-        session,
-        email=body.email,
-        password=body.password,
-        full_name=body.full_name,
-    )
-    await issue_email_verification_token(session, user.id)
-
-    user_agent, ip_address = _client_context(request)
-    issued = await issue_session(
-        session,
-        user,
-        user_agent=user_agent,
-        ip_address=ip_address,
-    )
-    await session.commit()
-
-    set_auth_cookies(
-        response,
-        access_token=issued.access_token.access_token,
-        refresh_token=issued.refresh_token,
-    )
-
-    context = await load_session_context(session, user.id)
-    return AuthResponse(
-        tokens=_token_pair(issued),
-        session=_session_info(context),
-        supabase_token=_mint_supabase_token(user),
-    )
 
 
 @router.post("/login")
@@ -555,17 +507,6 @@ async def reset_password_endpoint(
     await reset_password(session, body.token, body.password)
     await session.commit()
     return MessageResponse(message="Contrasena actualizada.")
-
-
-@router.post("/verify-email")
-async def verify_email_endpoint(
-    body: VerifyEmailRequest,
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> MessageResponse:
-    """Consume an email-verification token."""
-    await verify_email(session, body.token)
-    await session.commit()
-    return MessageResponse(message="Correo verificado.")
 
 
 __all__ = ["router"]

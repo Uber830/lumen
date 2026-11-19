@@ -83,7 +83,7 @@ def test_ready_reports_a_missing_migration(client, monkeypatch):
     assert body["status"] == "degraded"
     assert body["database"] is True
     assert body["missing_tables"] == ["users", "refresh_tokens"]
-    assert "supabase db push" in body["detail"]
+    assert "The SQL migrations have not been applied" in body["detail"]
 
 
 def test_ready_never_raises_when_the_schema_check_fails(client, monkeypatch):

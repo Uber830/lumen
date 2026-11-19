@@ -2,7 +2,7 @@
 
 - `dependencies` — the JWT verification and the `get_current_user`
   dependency. This module proves identity; it does not authorize.
-- `operations`   — the business logic: registering, authenticating,
+- `operations`   — the business logic: creating accounts, authenticating,
   issuing and rotating sessions, the password-reset flow.
 - `router`       — the HTTP endpoints.
 - `schemas`      — the request and response models.

@@ -27,18 +27,36 @@ from app.core.supabase_tokens import (
 # ---------------------------------------------------------------------------
 
 
-async def test_register_sets_the_session_cookies(client, engine):
-    """The browser's session travels in httpOnly cookies."""
-    response = client.post(
-        "/v1/auth/register",
-        json={
-            "email": f"cookie-{uuid.uuid4().hex[:8]}@example.com",
-            "password": "a good password",
-            "full_name": "Cookie User",
-        },
+async def test_the_cookie_alone_authenticates_the_request(client, engine, make_user):
+    """The browser sends the cookie; no Authorization header needed."""
+    email = f"cookieonly-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="Cookie Only")
+    registered = client.post(
+        "/v1/auth/login",
+        json={"email": email, "password": "a good password"},
     )
-    assert response.status_code == 201, response.text
+    assert registered.status_code == 200, registered.text
 
+    # A fresh client that only has the cookies.
+    cookies = {
+        "lumen_access": registered.cookies["lumen_access"],
+        "lumen_refresh": registered.cookies["lumen_refresh"],
+    }
+    response = client.get("/v1/auth/me", cookies=cookies)
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["email"] == email
+
+
+async def test_login_sets_the_cookies(client, engine, make_user):
+    """The browser's session travels in httpOnly cookies."""
+    email = f"login-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="Login")
+
+    response = client.post(
+        "/v1/auth/login",
+        json={"email": email, "password": "a good password"},
+    )
+    assert response.status_code == 200, response.text
     assert "lumen_access" in response.cookies
     assert "lumen_refresh" in response.cookies
 
@@ -51,47 +69,9 @@ async def test_register_sets_the_session_cookies(client, engine):
         assert "SameSite=lax" in matching[0]
 
 
-async def test_the_cookie_alone_authenticates_the_request(client, engine):
-    """The browser sends the cookie; no Authorization header needed."""
-    email = f"cookieonly-{uuid.uuid4().hex[:8]}@example.com"
-    registered = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Cookie Only"},
-    )
-    assert registered.status_code == 201, registered.text
-
-    # A fresh client that only has the cookies.
-    cookies = {
-        "lumen_access": registered.cookies["lumen_access"],
-        "lumen_refresh": registered.cookies["lumen_refresh"],
-    }
-    response = client.get("/v1/auth/me", cookies=cookies)
-    assert response.status_code == 200, response.text
-    assert response.json()["user"]["email"] == email
-
-
-async def test_login_sets_the_cookies(client, engine):
-    email = f"login-{uuid.uuid4().hex[:8]}@example.com"
-    client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Login"},
-    )
-
-    response = client.post(
-        "/v1/auth/login",
-        json={"email": email, "password": "a good password"},
-    )
-    assert response.status_code == 200, response.text
-    assert "lumen_access" in response.cookies
-    assert "lumen_refresh" in response.cookies
-
-
-async def test_logout_clears_the_cookies(client, engine):
+async def test_logout_clears_the_cookies(client, engine, make_user):
     email = f"logout-{uuid.uuid4().hex[:8]}@example.com"
-    client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Logout"},
-    )
+    make_user(email=email, password="a good password", full_name="Logout")
 
     response = client.post("/v1/auth/logout", json={"refresh_token": ""})
     assert response.status_code == 200
@@ -100,13 +80,15 @@ async def test_logout_clears_the_cookies(client, engine):
     assert any(h.startswith("lumen_access=") and "Max-Age=0" in h for h in cleared)
 
 
-async def test_refresh_reads_the_cookie(client, engine):
+async def test_refresh_reads_the_cookie(client, engine, make_user):
     """The browser cannot read the refresh cookie, so it posts an empty body."""
     email = f"refresh-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="Refresh")
     registered = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "Refresh"},
+        "/v1/auth/login",
+        json={"email": email, "password": "a good password"},
     )
+    assert registered.status_code == 200, registered.text
     cookies = {
         "lumen_access": registered.cookies["lumen_access"],
         "lumen_refresh": registered.cookies["lumen_refresh"],
@@ -182,14 +164,15 @@ def test_minting_without_the_secret_raises():
         mint_supabase_token(user_id=uuid.uuid4(), settings=settings)
 
 
-async def test_the_supabase_token_endpoint(client, engine):
+async def test_the_supabase_token_endpoint(client, engine, make_user):
     """The endpoint hands out the short-lived token."""
     email = f"sb-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="SB")
     registered = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "SB"},
+        "/v1/auth/login",
+        json={"email": email, "password": "a good password"},
     )
-    assert registered.status_code == 201, registered.text
+    assert registered.status_code == 200, registered.text
 
     # The register response carries one too.
     assert registered.json()["supabase_token"]
@@ -200,13 +183,15 @@ async def test_the_supabase_token_endpoint(client, engine):
     assert token
 
 
-async def test_the_supabase_token_is_not_an_authentication_token(client, engine):
+async def test_the_supabase_token_is_not_an_authentication_token(client, engine, make_user):
     """The API refuses it: it is scoped to Storage and Realtime."""
     email = f"sbauth-{uuid.uuid4().hex[:8]}@example.com"
+    make_user(email=email, password="a good password", full_name="SB Auth")
     registered = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": "a good password", "full_name": "SB Auth"},
+        "/v1/auth/login",
+        json={"email": email, "password": "a good password"},
     )
+    assert registered.status_code == 200, registered.text
     supabase_token = registered.json()["supabase_token"]
     assert supabase_token
 

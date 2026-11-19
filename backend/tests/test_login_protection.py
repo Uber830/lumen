@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import LoginAttempt
+from tests.support import sign_in
 
 pytestmark = pytest.mark.usefixtures("cleanup_users")
 
@@ -26,13 +27,15 @@ pytestmark = pytest.mark.usefixtures("cleanup_users")
 LIMIT = 5
 
 
-def _register(client, email: str = "ana@example.com", password: str = "a good password"):
-    response = client.post(
-        "/v1/auth/register",
-        json={"email": email, "password": password, "full_name": "Ana Restrepo"},
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
+def _register(
+    make_user,
+    client,
+    email: str = "ana@example.com",
+    password: str = "a good password",
+):
+    """Create an account the way the platform team does, and sign in."""
+    make_user(email=email, password=password, full_name="Ana Restrepo")
+    return sign_in(client, email=email, password=password)
 
 
 def _fail(client, email: str = "ana@example.com", password: str = "wrong password"):
@@ -57,9 +60,9 @@ def low_lock_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_a_wrong_password_answers_a_generic_message(client):
+def test_a_wrong_password_answers_a_generic_message(make_user, client):
     """The message does not say which of the two was wrong."""
-    _register(client)
+    _register(make_user, client)
 
     response = _fail(client)
 
@@ -68,9 +71,9 @@ def test_a_wrong_password_answers_a_generic_message(client):
     assert response.json()["code"] == "invalid_credentials"
 
 
-def test_an_unknown_email_answers_the_same_message(client):
+def test_an_unknown_email_answers_the_same_message(make_user, client):
     """An email that does not exist answers exactly the same."""
-    _register(client)
+    _register(make_user, client)
 
     unknown = _fail(client, email="nadie@example.com")
     wrong = _fail(client, password="otra cosa")
@@ -84,9 +87,9 @@ def test_an_unknown_email_answers_the_same_message(client):
 # ---------------------------------------------------------------------------
 
 
-def test_the_rate_limit_stops_the_sixth_attempt(client):
+def test_the_rate_limit_stops_the_sixth_attempt(make_user, client):
     """After five failures the endpoint answers 429 with a retry hint."""
-    _register(client)
+    _register(make_user, client)
 
     for _ in range(LIMIT):
         assert _fail(client).status_code == 401
@@ -99,9 +102,9 @@ def test_the_rate_limit_stops_the_sixth_attempt(client):
     assert blocked.headers["Retry-After"] == str(blocked.json()["retry_after"])
 
 
-def test_the_rate_limit_counts_the_email_and_the_address(client):
+def test_the_rate_limit_counts_the_email_and_the_address(make_user, client):
     """The limit is per pair: another email from the same address is free."""
-    _register(client)
+    _register(make_user, client)
 
     for index in range(LIMIT):
         _fail(client, email=f"alguien{index}@example.com")
@@ -110,9 +113,9 @@ def test_the_rate_limit_counts_the_email_and_the_address(client):
     assert other.status_code == 401
 
 
-def test_a_successful_sign_in_is_not_rate_limited(client):
+def test_a_successful_sign_in_is_not_rate_limited(make_user, client):
     """The limit counts the failures, not the sign-ins."""
-    _register(client)
+    _register(make_user, client)
     _fail(client)
 
     response = client.post(
@@ -129,10 +132,10 @@ def test_a_successful_sign_in_is_not_rate_limited(client):
 
 
 def test_too_many_failures_lock_the_account(
-    client, db_session: AsyncSession, low_lock_threshold: None
+    make_user, client, db_session: AsyncSession, low_lock_threshold: None
 ):
     """The account stops signing in and says so."""
-    _register(client)
+    _register(make_user, client)
     for _ in range(3):
         _fail(client)
 
@@ -146,10 +149,10 @@ def test_too_many_failures_lock_the_account(
 
 
 def test_the_lock_is_only_answered_after_the_password(
-    client, db_session: AsyncSession, low_lock_threshold: None
+    make_user, client, db_session: AsyncSession, low_lock_threshold: None
 ):
     """A wrong password never says that the account is locked."""
-    _register(client)
+    _register(make_user, client)
     for _ in range(3):
         _fail(client)
 
@@ -164,9 +167,9 @@ def test_the_lock_is_only_answered_after_the_password(
 # ---------------------------------------------------------------------------
 
 
-async def test_every_attempt_is_written_to_the_trail(client, db_session: AsyncSession):
+async def test_every_attempt_is_written_to_the_trail(make_user, client, db_session: AsyncSession):
     """The attempts are audited, with the email hashed."""
-    _register(client)
+    _register(make_user, client)
     _fail(client)
 
     result = await db_session.execute(select(LoginAttempt))
@@ -185,9 +188,9 @@ async def test_every_attempt_is_written_to_the_trail(client, db_session: AsyncSe
 # ---------------------------------------------------------------------------
 
 
-def test_remember_me_keeps_the_cookies_after_the_browser_closes(client):
+def test_remember_me_keeps_the_cookies_after_the_browser_closes(make_user, client):
     """Without it the cookies are session cookies."""
-    _register(client)
+    _register(make_user, client)
 
     response = client.post(
         "/v1/auth/login",
@@ -204,9 +207,9 @@ def test_remember_me_keeps_the_cookies_after_the_browser_closes(client):
     assert "Max-Age" not in refresh
 
 
-def test_remember_me_gives_the_cookies_a_life(client):
+def test_remember_me_gives_the_cookies_a_life(make_user, client):
     """With it the cookies live as long as the server allows."""
-    _register(client)
+    _register(make_user, client)
 
     response = client.post(
         "/v1/auth/login",

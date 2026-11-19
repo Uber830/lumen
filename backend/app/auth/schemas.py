@@ -23,34 +23,6 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.schools.schemas import SchoolGalleryImage
 
 
-class RegisterRequest(BaseModel):
-    """Body for POST /v1/auth/register.
-
-    Creates a user account. Registering a school (which also creates
-    the school, its admin membership, the trial subscription and the
-    entitlements) is a separate flow: POST /v1/schools/bootstrap.
-    """
-
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-    full_name: str = Field(min_length=2, max_length=120)
-
-    @field_validator("password")
-    @classmethod
-    def _check_password(cls, value: str) -> str:
-        if value.strip() == "":
-            raise ValueError("password must not be blank")
-        return value
-
-    @field_validator("full_name")
-    @classmethod
-    def _strip_name(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("full_name must not be blank")
-        return value
-
-
 class LoginRequest(BaseModel):
     """Body for POST /v1/auth/login."""
 
@@ -101,12 +73,6 @@ class ResetPasswordRequest(BaseModel):
         if value.strip() == "":
             raise ValueError("password must not be blank")
         return value
-
-
-class VerifyEmailRequest(BaseModel):
-    """Body for POST /v1/auth/verify-email."""
-
-    token: str = Field(min_length=1, max_length=512)
 
 
 class TokenPair(BaseModel):
@@ -230,10 +196,8 @@ __all__ = [
     "MessageResponse",
     "ProfileInfo",
     "RefreshRequest",
-    "RegisterRequest",
     "ResetPasswordRequest",
     "SessionInfo",
     "TokenPair",
     "UpdateProfileRequest",
-    "VerifyEmailRequest",
 ]
