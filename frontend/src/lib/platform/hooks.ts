@@ -65,11 +65,17 @@ export interface AuditFilters {
   per_page?: number;
 }
 
-/** The figures of the global panel. */
-export function usePlatformMetrics(): UseQueryResult<PlatformMetrics, Error> {
+/**
+ * The figures of the global panel.
+ *
+ * Only the platform team may ask for them, so the query stays asleep
+ * for the other roles.
+ */
+export function usePlatformMetrics(enabled = true): UseQueryResult<PlatformMetrics, Error> {
   return useQuery({
     queryKey: platformKeys.metrics,
     queryFn: () => api.get<PlatformMetrics>("/v1/platform/metrics"),
+    enabled,
   });
 }
 
