@@ -61,9 +61,7 @@ def _without_comments(sql: str) -> str:
     rollback block of a migration describes the tables it would
     recreate, and those tables are not part of the schema.
     """
-    return "\n".join(
-        line for line in sql.split("\n") if not line.lstrip().startswith("--")
-    )
+    return "\n".join(line for line in sql.split("\n") if not line.lstrip().startswith("--"))
 
 
 def _parse_migration_columns() -> dict[str, set[str]]:
