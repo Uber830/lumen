@@ -13,6 +13,8 @@ The modules are grouped by domain:
 - `evaluations`— authored assessments and their attempts.
 - `icfes`      — the question bank, simulations and attempts.
 - `billing`    — subscriptions, entitlements, the Wompi ledger.
+- `catalog`    — the editorial catalog of the platform role: materials,
+                 their files, their access, their history and the audit trail.
 - `sessions`   — refresh tokens, password resets, email verifications.
 - `notifications` — the in-app notifications of each user.
 """
@@ -29,6 +31,13 @@ from app.db.models.academics import (
     TeacherAssignment,
 )
 from app.db.models.billing import Entitlement, Subscription, WompiEventProcessed
+from app.db.models.catalog import (
+    AuditLog,
+    Material,
+    MaterialFile,
+    MaterialHistory,
+    MaterialSchool,
+)
 from app.db.models.chat import ChatConversation, ChatMember, ChatMessage
 from app.db.models.evaluations import (
     Evaluation,
@@ -68,13 +77,12 @@ from app.db.models.sessions import (
     PasswordResetToken,
     RefreshToken,
 )
-from app.db.models.site import CatalogItem, CatalogItemSchool, SiteContent
+from app.db.models.site import SiteContent
 
 __all__ = [
     "AcademicPeriod",
+    "AuditLog",
     "Base",
-    "CatalogItem",
-    "CatalogItemSchool",
     "ChatConversation",
     "ChatMember",
     "ChatMessage",
@@ -97,6 +105,10 @@ __all__ = [
     "IcfesSimulation",
     "IcfesSimulationQuestion",
     "LoginAttempt",
+    "Material",
+    "MaterialFile",
+    "MaterialHistory",
+    "MaterialSchool",
     "Notification",
     "NotificationPreference",
     "Plan",

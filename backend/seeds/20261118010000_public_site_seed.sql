@@ -1,13 +1,12 @@
 -- =========================================================================
 -- The seed of the public site.
 -- -------------------------------------------------------------------------
--- The copy of the landing and the editorial catalog. The platform team
--- edits the `site_content` row and the `catalog_items` table; the site
--- serves whatever is there.
+-- The copy of the landing. The platform team edits the `site_content`
+-- row; the site serves whatever is there.
 --
--- The schools of the catalog are demonstration names: they are not the
--- tenants of this database, and publishing a client is an explicit
--- decision of the platform team.
+-- The catalog the landing shows lives in `materials` and in the schools
+-- that have access to each piece. It is seeded in
+-- `20261119100000_editorial_catalog_seed.sql`.
 -- =========================================================================
 
 insert into public.site_content (key, content) values
@@ -405,75 +404,3 @@ insert into public.site_content (key, content) values
 on conflict (key) do update
   set content = excluded.content,
       updated_at = now();
-
-insert into public.catalog_items (ref, title, meta, area, state, position) values
-  ('C-1041', 'Matemáticas 7 — Álgebra y funciones', '18,4 MB · 7° A, 7° B', 'Matemáticas', 'published', 1),
-  ('C-1042', 'Lengua 8 — Lectura y escritura', '12,1 MB · 8° A', 'Lengua', 'published', 2),
-  ('C-1043', 'Ciencias 6 — El sistema solar', '24,0 MB · 6° B', 'Ciencias', 'review', 3),
-  ('C-1044', 'Historia 9 — Colombia', '9,8 MB · 9° A', 'Sociales', 'published', 4),
-  ('C-1045', 'Inglés 7 — Intermediate', '15,3 MB · 7° C', 'Inglés', 'draft', 5),
-  ('C-1046', 'Biología 10 — Genética', '31,7 MB · 10° A', 'Ciencias', 'published', 6),
-  ('C-1047', 'Matemáticas 9 — Ecuaciones', '20,2 MB · 9° B', 'Matemáticas', 'published', 7),
-  ('C-1048', 'Arte 6 — Técnicas y materiales', '45,0 MB · 6° A', 'Artes', 'draft', 8),
-  ('C-1049', 'Sociales 7 — Constitución y permisos', '11,7 MB · 7° A', 'Sociales', 'review', 9),
-  ('C-1050', 'Física 11 — Ondas y sonido', '28,4 MB · 11° A', 'Ciencias', 'archived', 10),
-  ('C-1051', 'Lengua 6 — Gramática y escritura', '14,9 MB · 6° A', 'Lengua', 'published', 11),
-  ('C-1052', 'Química 10 — Reacciones químicas', '22,6 MB · 10° B', 'Ciencias', 'published', 12),
-  ('C-1053', 'Inglés 9 — Intermediate', '13,8 MB · 9° A', 'Inglés', 'published', 13),
-  ('C-1054', 'Matemáticas 6 — Números naturales', '19,5 MB · 6° B', 'Matemáticas', 'review', 14),
-  ('C-1055', 'Historia 8 — Independencia', '10,4 MB · 8° B', 'Sociales', 'draft', 15),
-  ('C-1056', 'Educación Física 7 — Atletismo', '8,2 MB · 7° B', 'Deportes', 'archived', 16)
-on conflict (ref) do update
-  set title = excluded.title,
-      meta = excluded.meta,
-      area = excluded.area,
-      state = excluded.state,
-      position = excluded.position;
-
-delete from public.catalog_item_schools;
-
-insert into public.catalog_item_schools (catalog_item_id, school_name, position)
-select c.id, s.name, s.position
-from public.catalog_items c
-join (values
-    ('C-1041', 'Sagrado Corazón', 1),
-    ('C-1041', 'Los Alpes', 2),
-    ('C-1041', 'Santa María', 3),
-    ('C-1041', 'El Roble', 4),
-    ('C-1042', 'Sagrado Corazón', 1),
-    ('C-1042', 'Los Alpes', 2),
-    ('C-1043', 'Sagrado Corazón', 1),
-    ('C-1043', 'Los Alpes', 2),
-    ('C-1043', 'Santa María', 3),
-    ('C-1044', 'Sagrado Corazón', 1),
-    ('C-1044', 'Los Alpes', 2),
-    ('C-1044', 'Santa María', 3),
-    ('C-1044', 'El Roble', 4),
-    ('C-1044', 'La Primavera', 5),
-    ('C-1045', 'Sagrado Corazón', 1),
-    ('C-1046', 'Sagrado Corazón', 1),
-    ('C-1046', 'Los Alpes', 2),
-    ('C-1046', 'Santa María', 3),
-    ('C-1047', 'Sagrado Corazón', 1),
-    ('C-1047', 'Los Alpes', 2),
-    ('C-1048', 'Sagrado Corazón', 1),
-    ('C-1049', 'Sagrado Corazón', 1),
-    ('C-1049', 'Los Alpes', 2),
-    ('C-1050', 'Sagrado Corazón', 1),
-    ('C-1050', 'Los Alpes', 2),
-    ('C-1051', 'Sagrado Corazón', 1),
-    ('C-1051', 'Los Alpes', 2),
-    ('C-1051', 'Santa María', 3),
-    ('C-1051', 'El Roble', 4),
-    ('C-1052', 'Sagrado Corazón', 1),
-    ('C-1052', 'Los Alpes', 2),
-    ('C-1052', 'Santa María', 3),
-    ('C-1053', 'Sagrado Corazón', 1),
-    ('C-1053', 'Los Alpes', 2),
-    ('C-1054', 'Sagrado Corazón', 1),
-    ('C-1054', 'Los Alpes', 2),
-    ('C-1054', 'Santa María', 3),
-    ('C-1055', 'Sagrado Corazón', 1),
-    ('C-1056', 'Sagrado Corazón', 1),
-    ('C-1056', 'Los Alpes', 2)
-  ) as s(catalog_ref, name, position) on c.ref = s.catalog_ref;

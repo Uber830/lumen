@@ -156,6 +156,19 @@ que devuelve el enlace de activación del administrador.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/v1/platform/schools` | crear un colegio con su administrador (solo plataforma) |
+| GET | `/v1/platform/metrics` | las cifras del panel global: red, comunidad y catálogo |
+| GET | `/v1/platform/catalog-options` | los catálogos cerrados: tipos, áreas, grados y planes |
+| GET | `/v1/platform/catalog` | el catálogo editorial, con filtros y paginación |
+| GET | `/v1/platform/catalog/{id}` | un material con sus archivos, su acceso y su historial |
+| POST | `/v1/platform/catalog` | crear un material en borrador |
+| PATCH | `/v1/platform/catalog/{id}` | editar los metadatos (no el estado ni el acceso) |
+| DELETE | `/v1/platform/catalog/{id}` | borrar un material (solo en borrador) |
+| POST | `/v1/platform/catalog/{id}/status` | publicar, archivar o desarchivar |
+| PUT | `/v1/platform/catalog/{id}/schools` | reemplazar los colegios con acceso |
+| POST | `/v1/platform/uploads` | subir un archivo del catálogo |
+| DELETE | `/v1/platform/uploads/{file_id}` | quitar un archivo subido y no usado |
+| GET | `/v1/platform/schools` | los colegios de la red, con su cobertura |
+| GET | `/v1/platform/audit` | la traza de los eventos críticos |
 
 ### Académico
 
@@ -216,6 +229,40 @@ que devuelve el enlace de activación del administrador.
 | POST | `/v1/notifications/read-all` | marcar todas como leídas |
 | DELETE | `/v1/notifications/{id}` | descartar una |
 | GET/PATCH | `/v1/notifications/preferences` | qué se le quiere contar |
+
+---
+
+## El catálogo editorial
+
+El catálogo que carga el equipo de plataforma vive en `public.materials` y sus
+tablas hijas: `material_files` (los archivos), `material_schools` (qué colegio
+ve cada pieza), `material_history` (qué pasó y quién lo hizo) y `audit_log`
+(la traza de los eventos críticos). La tabla vieja `catalog_items` se
+transformó en `materials` en la migración `20261119010000` y se eliminó.
+
+El ciclo de vida es `borrador → en revisión → publicado → archivado`. **Las
+transiciones válidas las decide el backend** (`available_transitions` en la
+respuesta del detalle): el frontend las muestra, no las adivina. Publicar
+exige título, tipo, área, grados y al menos un colegio; si falta algo, la
+respuesta es un `422` con la lista de lo que falta en `missing`.
+
+Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
+colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
+
+Decisiones que se tomaron sin respuesta del negocio:
+
+- **El prefijo es `/v1/platform`**, no `/api/platform`: es la convención del
+  repositorio (`/v1/auth`, `/v1/schools`, `/v1/public`).
+- **El almacenamiento de los archivos** es el adaptador que ya tenía el
+  proyecto (`app/core/supabase_storage.py`), detrás de la interfaz de
+  `app/platform/storage.py`. Cambiar de destino es cambiar el adaptador, no el
+  catálogo; el bucket es configurable.
+- **Los formatos admitidos** son PDF, EPUB, DOCX, MP4 y ZIP.
+- **ISBN, autor y editorial no bloquean la publicación**: son opcionales.
+- **La cobertura de un colegio** cuenta las piezas publicadas que puede ver.
+- **Los avisos al equipo de plataforma** se registran en `audit_log` y se
+  muestran en la vista de soporte y auditoría; el centro de notificaciones en
+  la aplicación llega con esa vista.
 
 ---
 
