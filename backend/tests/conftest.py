@@ -358,6 +358,70 @@ def client(test_app) -> Iterator[Any]:
 
 
 @pytest.fixture
+def make_user(engine):
+    """Create a user with a password, straight in the database.
+
+    Nobody signs up on their own anymore, so the tests do not go
+    through an endpoint that would create accounts.
+    """
+    from tests.support import create_test_user
+
+    def _create(
+        email: str,
+        password: str = "a good password",
+        full_name: str = "Test User",
+    ) -> str:
+        return create_test_user(
+            engine,
+            email=email,
+            password=password,
+            full_name=full_name,
+        )
+
+    return _create
+
+
+@pytest.fixture
+def platform_admin(engine) -> dict[str, str]:
+    """An Authorization header for a platform admin.
+
+    The platform team is the one that creates the schools, so the tests
+    of that flow need a caller with the platform role.
+    """
+    import asyncio
+
+    from app.db.enums import PlatformRoleKind
+    from app.db.models import PlatformRole
+    from tests.support import create_test_user
+
+    email = "platform@example.com"
+    user_id = create_test_user(
+        engine,
+        email=email,
+        password="a good password",
+        full_name="Platform Admin",
+    )
+
+    async def _grant() -> None:
+        async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+            session.add(
+                PlatformRole(
+                    user_id=UUID(user_id),
+                    role=PlatformRoleKind.PLATFORM_ADMIN,
+                )
+            )
+            await session.commit()
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_grant())
+    finally:
+        loop.close()
+
+    return {"Authorization": f"Bearer {mint_token(user_id, email)}"}
+
+
+@pytest.fixture
 def auth_header() -> dict[str, str]:
     """A valid Authorization header for the test user."""
     return {"Authorization": f"Bearer {mint_token()}"}
