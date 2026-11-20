@@ -346,10 +346,12 @@ aplican en ese orden. Eso incluye la tabla de identidad que usa el backend
 (`public.users`, que sustituye a `auth.users`) y sus tablas de sesión.
 
 El backend comprueba el esquema al arrancar y se niega a levantar si falta
-una migración:
+una migración. La comprobación mira **tablas y columnas**: una base que tiene
+la tabla `schools` pero no la columna `mission` es una base desfasada, y antes
+solo se enteraba la API cuando una consulta fallaba con un 500:
 
 ```
-The database is missing 3 table(s): refresh_tokens, ...
+The database is missing 1 column(s): schools.mission.
 The SQL migrations have not been applied. Apply them with psql (see
 scripts/dev-db.sh) or with the migration tool of your database.
 ```
@@ -357,10 +359,25 @@ scripts/dev-db.sh) or with the migration tool of your database.
 `GET /ready` informa de lo mismo, así que un despliegue que se saltó las
 migraciones aparece como no disponible en vez de responder 500 a todo.
 
+### Actualizar una base que ya existe
+
+`./scripts/dev-db.sh reset` reconstruye la base desde cero y **borra los
+datos**. Cuando la base ya tiene lo que importa y solo le falta una
+migración nueva, el comando es `migrate`:
+
+```sh
+./scripts/dev-db.sh migrate
+```
+
+Aplica únicamente las migraciones pendientes y conserva las filas. El
+script lleva su propio registro (`lumen_schema_migrations`) en la base, así
+que no vuelve a aplicar lo que ya está.
+
 Para escribir una migración nueva:
 
 1. se escribe el SQL en `backend/migrations/<fecha>_<qué>.sql`;
-2. se corre `./scripts/dev-db.sh reset` desde la raíz;
+2. se corre `./scripts/dev-db.sh migrate` desde la raíz (o `reset` si la
+   base de desarrollo se puede perder);
 3. `backend/tests/test_schema_drift.py` compara los modelos con las
    migraciones y `backend/tests/test_migrations.py` las aplica en una base
    limpia: un desajuste rompe el build en vez de aparecer en runtime.

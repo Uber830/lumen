@@ -9,6 +9,7 @@
 #
 # Usage:
 #   ./scripts/dev-db.sh up      # create the database and apply the schema
+#   ./scripts/dev-db.sh migrate # apply the pending migrations, keep the data
 #   ./scripts/dev-db.sh reset   # drop it and start over
 #   ./scripts/dev-db.sh down    # remove it
 #
@@ -18,6 +19,10 @@
 #   backend/migrations/    the schema owned by this project
 #
 # The seed data comes from supabase/seed.sql and backend/seeds/.
+#
+# `migrate` is the one to use when the database already exists and a
+# new migration landed: it applies only what is pending and keeps the
+# rows that are there.
 #
 # The container is defined in docker-compose.yml; this script only
 # manages its schema. The connection string it prints is the one to put
@@ -35,6 +40,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 DATABASE_URL="postgresql://postgres:${PASSWORD}@127.0.0.1:${PORT}/${DB}"
+
+# The log of the migrations that were applied. It lives in the database
+# so the script knows what is pending without guessing.
+MIGRATION_LOG="public.lumen_schema_migrations"
+
+# The SQL states that mean "this object is already there". A migration
+# that only fails with these was applied before: the base was created
+# before the log existed, or the migration was run twice.
+ALREADY_THERE="42P07 42710 42701 23505 25P02"
 
 COMPOSE_FILE="$ROOT/docker-compose.yml"
 USE_COMPOSE="false"
@@ -102,12 +116,7 @@ create_database() {
   docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
     < "$ROOT/supabase/local-shim.sql" >/dev/null
 
-  for migration in "$ROOT"/supabase/migrations/*.sql "$ROOT"/backend/migrations/*.sql; do
-    [ -e "$migration" ] || continue
-    echo "  applying $(basename "$migration")"
-    docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
-      < "$migration" >/dev/null
-  done
+  apply_migrations
 
   for seed in "$ROOT/supabase/seed.sql" "$ROOT"/backend/seeds/*.sql; do
     [ -e "$seed" ] || continue
@@ -115,6 +124,99 @@ create_database() {
     docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
       < "$seed" >/dev/null
   done
+}
+
+# The log of the migrations that were applied. It is created by the
+# script and not by a migration: it belongs to the tool, not to the
+# schema the application uses.
+ensure_log() {
+  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null <<SQL
+create table if not exists ${MIGRATION_LOG} (
+  name       text primary key,
+  applied_at timestamptz not null default now()
+);
+SQL
+}
+
+record_migration() {
+  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null <<SQL
+insert into ${MIGRATION_LOG} (name) values ('$1')
+  on conflict (name) do nothing;
+SQL
+}
+
+migration_applied() {
+  local name="$1"
+  local count
+  count="$(docker exec "$CONTAINER" psql -U postgres -d "$DB" -t -A -c \
+    "select count(*) from ${MIGRATION_LOG} where name = '$name'")"
+  [ "$count" != "0" ]
+}
+
+# Apply one migration.
+#
+# Every statement runs on its own, the way the CI applies them. A
+# migration whose only failures are "this object is already there" was
+# applied before: it is recorded and the script moves on. A migration
+# that fails for any other reason stops the script and prints the
+# error, so a broken migration is never hidden.
+apply_one() {
+  local file="$1"
+  local name output state unexpected=""
+  name="$(basename "$file")"
+
+  output="$(docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q \
+    -v VERBOSITY=verbose -f - < "$file" 2>&1)" || true
+
+  if [ -z "$output" ]; then
+    record_migration "$name"
+    echo "  applied $name"
+    return 0
+  fi
+
+  # The SQL state of every failure says what happened.
+  while read -r state; do
+    [ -n "$state" ] || continue
+    case " $ALREADY_THERE " in
+      *" $state "*) ;;
+      *) unexpected="$unexpected $state" ;;
+    esac
+  done <<<"$(printf '%s\n' "$output" | grep -oE 'ERROR:  [0-9A-Z]{5}' | awk '{print $2}' | sort -u)"
+
+  if [ -z "$unexpected" ]; then
+    record_migration "$name"
+    echo "  already applied $name"
+    return 0
+  fi
+
+  echo "  FAILED $name ($unexpected)" >&2
+  printf '%s\n' "$output" >&2
+  return 1
+}
+
+# Apply the migrations that are pending, in order.
+apply_migrations() {
+  ensure_log
+  for migration in "$ROOT"/supabase/migrations/*.sql "$ROOT"/backend/migrations/*.sql; do
+    [ -e "$migration" ] || continue
+    local name
+    name="$(basename "$migration")"
+    if migration_applied "$name"; then
+      continue
+    fi
+    apply_one "$migration" "$name"
+  done
+}
+
+migrate_database() {
+  start_container
+  # The database has to be there before the log: `migrate` updates an
+  # existing one, it does not create it.
+  docker exec "$CONTAINER" psql -U postgres -d postgres -q \
+    -c "CREATE DATABASE ${DB}" >/dev/null 2>&1 || true
+  apply_migrations
+  echo
+  echo "Up to date. DATABASE_URL=${DATABASE_URL}"
 }
 
 case "${1:-up}" in
@@ -125,6 +227,9 @@ case "${1:-up}" in
     echo "Ready. Put this in backend/.env:"
     echo
     echo "  DATABASE_URL=${DATABASE_URL}"
+    ;;
+  migrate)
+    migrate_database
     ;;
   reset)
     start_container
@@ -137,7 +242,7 @@ case "${1:-up}" in
     echo "Removed ${CONTAINER}."
     ;;
   *)
-    echo "Usage: $0 [up|reset|down]" >&2
+    echo "Usage: $0 [up|migrate|reset|down]" >&2
     exit 2
     ;;
 esac
