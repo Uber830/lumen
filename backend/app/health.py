@@ -30,6 +30,7 @@ def _degraded(
     *,
     database: bool,
     missing: tuple[str, ...] = (),
+    missing_columns: tuple[str, ...] = (),
 ) -> JSONResponse:
     """A 503 with the same shape every failure uses."""
     content: dict[str, object] = {
@@ -39,6 +40,8 @@ def _degraded(
     }
     if missing:
         content["missing_tables"] = list(missing)
+    if missing_columns:
+        content["missing_columns"] = list(missing_columns)
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=content,
@@ -89,7 +92,12 @@ async def ready() -> JSONResponse:
         )
 
     if not schema.ok:
-        return _degraded(schema.message(), database=True, missing=schema.missing)
+        return _degraded(
+            schema.message(),
+            database=True,
+            missing=schema.missing,
+            missing_columns=schema.missing_columns,
+        )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
