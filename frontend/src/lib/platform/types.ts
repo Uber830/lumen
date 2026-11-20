@@ -119,12 +119,49 @@ export interface SchoolSummary {
   id: string;
   name: string;
   short_code: string;
+  city: string | null;
   status: string;
   plan: string | null;
   students: number;
   teachers: number;
   covered: number;
   total: number;
+}
+
+/** One material of the catalog, as the sheet of a school shows it. */
+export interface SchoolCatalogItem {
+  id: string;
+  code: string;
+  title: string;
+  type: string;
+  area: string;
+  status: MaterialStatus;
+  /** Whether the school can see it right now. */
+  enabled: boolean;
+}
+
+/** One school with its figures and its coverage of the catalog. */
+export interface SchoolDetail {
+  id: string;
+  name: string;
+  short_code: string;
+  city: string | null;
+  status: string;
+  plan: string | null;
+  students: number;
+  teachers: number;
+  covered: number;
+  total: number;
+  catalog: SchoolCatalogItem[];
+}
+
+/** The school and the administrator that are registered. */
+export interface RegisteredSchool {
+  school_id: string;
+  admin_user_id: string;
+  admin_email: string;
+  activation_token: string;
+  activation_expires_at: string;
 }
 
 export interface AuditEntry {
@@ -190,3 +227,119 @@ export const MATERIAL_STATUS_TONE: Record<
   published: "success",
   archived: "danger",
 };
+
+// =============================================================================
+// The support desk
+// -----------------------------------------------------------------------------
+// The levels, the states and the channels come from the API
+// (`GET /v1/platform/case-options`): the frontend never hardcodes them.
+// =============================================================================
+
+export type CaseLevel = "info" | "warning" | "urgent";
+
+export type CaseStatus = "open" | "waiting" | "resolved";
+
+export type CaseChannel = "web_form" | "email" | "call";
+
+export interface CaseMessage {
+  id: string;
+  author_name: string;
+  author_role: string;
+  body: string;
+  created_at: string;
+}
+
+/** One movement of the platform, shown inside a case. */
+export interface CaseAuditEvent {
+  id: string;
+  event_type: string;
+  level: string;
+  actor_name: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface CaseSummary {
+  id: string;
+  code: string;
+  subject: string;
+  school_id: string | null;
+  school_name: string | null;
+  requester_name: string;
+  requester_role: string;
+  channel: string;
+  level: CaseLevel;
+  status: CaseStatus;
+  message_count: number;
+  last_message_at: string | null;
+  created_at: string;
+}
+
+export interface CaseDetail extends CaseSummary {
+  detail: string | null;
+  messages: CaseMessage[];
+  audit: CaseAuditEvent[];
+  /** Whether the case can still be closed. */
+  can_resolve: boolean;
+}
+
+export interface CaseOptions {
+  levels: string[];
+  statuses: string[];
+  channels: string[];
+}
+
+/** How urgent a case is, as the panel shows it. */
+export const CASE_LEVEL_LABEL: Record<CaseLevel, string> = {
+  info: "Info",
+  warning: "Aviso",
+  urgent: "Urgente",
+};
+
+export const CASE_LEVEL_TONE: Record<CaseLevel, "info" | "warning" | "danger"> = {
+  info: "info",
+  warning: "warning",
+  urgent: "danger",
+};
+
+/** The state of a case, as the panel shows it. */
+export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
+  open: "Abierto",
+  waiting: "En espera",
+  resolved: "Resuelto",
+};
+
+export const CASE_STATUS_TONE: Record<CaseStatus, "info" | "warning" | "success"> = {
+  open: "info",
+  waiting: "warning",
+  resolved: "success",
+};
+
+/** How the case arrived. */
+export const CASE_CHANNEL_LABEL: Record<CaseChannel, string> = {
+  web_form: "Formulario web",
+  email: "Correo",
+  call: "Llamada",
+};
+
+/**
+ * The movements of the platform, as the panel reads them.
+ *
+ * The backend writes the type of the event; the label is the one the
+ * platform team reads.
+ */
+export const AUDIT_EVENT_LABEL: Record<string, string> = {
+  "material.created": "Material creado en el catálogo",
+  "material.updated": "Metadatos del material editados",
+  "material.deleted": "Material eliminado del catálogo",
+  "material.status_changed": "Cambió el estado del material",
+  "school.access_granted": "Acceso al material habilitado",
+  "school.access_revoked": "Acceso al material retirado",
+  "support.case_answered": "El equipo respondió un caso",
+  "support.case_resolved": "Caso cerrado",
+};
+
+/** The label of a movement, or its own name when it is not known. */
+export function auditEventLabel(eventType: string): string {
+  return AUDIT_EVENT_LABEL[eventType] ?? eventType;
+}
