@@ -15,7 +15,7 @@ import uuid
 from contextlib import suppress
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -370,6 +370,14 @@ async def create_material(
         # team did not write one.
         if not material.title:
             material.title = uploaded.file_name
+        # The file leaves the "pending" folder and joins the one of
+        # its material.
+        final_key = build_storage_key(
+            file_name=uploaded.file_name,
+            material_code=material.code,
+        )
+        await get_storage().move(key=uploaded.storage_key, new_key=final_key)
+        uploaded.storage_key = final_key
 
     for school in known_schools:
         session.add(
@@ -764,6 +772,35 @@ async def upload_file(
         size_bytes=uploaded.size_bytes,
         size_label=catalog.format_size(uploaded.size_bytes),
         mime_type=uploaded.mime_type,
+    )
+
+
+@router.get("/files/{file_id}")
+async def download_file(
+    file_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """The content of a file of the catalog.
+
+    The file is served by the API: the catalog keeps the key of the
+    object and never a public address, so the copy that is downloaded
+    is the one the platform team uploaded.
+    """
+    stored = await session.get(MaterialFile, file_id)
+    if stored is None:
+        raise NotFoundError("The file does not exist.")
+
+    try:
+        content = await get_storage().read(key=stored.storage_key)
+    except FileNotFoundError as error:
+        raise NotFoundError("The file is not in the storage.") from error
+
+    name = stored.file_name.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    return Response(
+        content=content,
+        media_type=stored.mime_type,
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 
