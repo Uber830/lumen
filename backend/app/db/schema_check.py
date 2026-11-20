@@ -73,6 +73,8 @@ REQUIRED_TABLES = (
     "material_schools",
     "material_history",
     "audit_log",
+    "support_cases",
+    "support_messages",
     "login_attempts",
 )
 

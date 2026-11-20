@@ -166,6 +166,9 @@ class School(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     short_code: Mapped[str] = mapped_column(Text, nullable=False)
+    # The city where the school is, reported when the platform team
+    # registers it.
+    city: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[SchoolStatus] = mapped_column(
         pg_enum(SchoolStatus, "school_status"),
         nullable=False,

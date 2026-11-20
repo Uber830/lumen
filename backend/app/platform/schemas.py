@@ -24,6 +24,9 @@ class ProvisionSchoolRequest(BaseModel):
     admin_email: EmailStr
     admin_name: str = Field(min_length=2, max_length=120)
     trial_days: int = Field(default=DEFAULT_TRIAL_DAYS, ge=1, le=365)
+    # Where the school is. It is optional: a school that does not
+    # report it simply does not show it.
+    city: str | None = Field(default=None, max_length=120)
 
     @field_validator("school_name", "short_code", "plan_code", "admin_name")
     @classmethod
@@ -32,6 +35,15 @@ class ProvisionSchoolRequest(BaseModel):
         if not value:
             raise ValueError("must not be blank")
         return value
+
+    @field_validator("city")
+    @classmethod
+    def _strip_city(cls, value: str | None) -> str | None:
+        """The city is optional: a blank one is no city."""
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class ProvisionSchoolResponse(BaseModel):

@@ -38,6 +38,7 @@ async def provision_school(
     admin_email: str,
     admin_name: str,
     trial_days: int,
+    city: str | None = None,
 ) -> ProvisionedSchool:
     """Create a school, its administrator and the activation link.
 
@@ -63,6 +64,7 @@ async def provision_school(
         short_code=short_code,
         plan_code=plan_code,
         trial_days=trial_days,
+        city=city,
     )
 
     token, expires_at = await issue_activation_token(session, admin.id)

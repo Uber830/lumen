@@ -43,6 +43,8 @@ from app.platform.catalog_schemas import (
     MaterialSummary,
     MetricsResponse,
     PatchMaterialRequest,
+    SchoolCatalogItem,
+    SchoolDetail,
     SchoolPage,
     SchoolRef,
     SchoolSummary,
@@ -545,6 +547,37 @@ async def change_material_status(
     return await _detail(session, await _load_material(session, material.id))
 
 
+@router.post("/catalog/{material_id}/schools", response_model=MaterialDetail)
+async def grant_material_schools(
+    material_id: uuid.UUID,
+    body: SetSchoolsRequest,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetail:
+    """Give access to a material to more schools.
+
+    Nobody loses access here: the schools that already had it keep it.
+    It is what the panel does when the platform team enables a piece
+    for several schools at once.
+    """
+    material = await _load_material(session, material_id)
+
+    current_rows = await session.execute(
+        select(MaterialSchool.school_id).where(MaterialSchool.material_id == material.id)
+    )
+    current_ids = [school_id for (school_id,) in current_rows.all()]
+
+    await _replace_schools(
+        session,
+        material=material,
+        wanted=[*current_ids, *body.school_ids],
+        confirm=body.confirm,
+        actor_id=context.user_id,
+    )
+    await session.commit()
+    return await _detail(session, await _load_material(session, material.id))
+
+
 @router.put("/catalog/{material_id}/schools", response_model=MaterialDetail)
 async def set_material_schools(
     material_id: uuid.UUID,
@@ -560,7 +593,27 @@ async def set_material_schools(
     """
     material = await _load_material(session, material_id)
 
-    wanted = list(dict.fromkeys(body.school_ids))
+    await _replace_schools(
+        session,
+        material=material,
+        wanted=body.school_ids,
+        confirm=body.confirm,
+        actor_id=context.user_id,
+    )
+    await session.commit()
+    return await _detail(session, await _load_material(session, material.id))
+
+
+async def _replace_schools(
+    session: AsyncSession,
+    *,
+    material: Material,
+    wanted: list[uuid.UUID],
+    confirm: bool,
+    actor_id: uuid.UUID | None,
+) -> None:
+    """Write the access of a material: the schools that change, and only those."""
+    wanted = list(dict.fromkeys(wanted))
     known_schools: list[School] = []
     if wanted:
         result = await session.execute(select(School).where(School.id.in_(wanted)))
@@ -584,7 +637,7 @@ async def set_material_schools(
     added = [school for school in known_schools if school.id not in current]
     removed = [school for school in current.values() if school.id not in set(wanted)]
 
-    if removed and material.status == "published" and not body.confirm:
+    if removed and material.status == "published" and not confirm:
         raise ConflictError(
             f"Se quitará el acceso de {len(removed)} colegio(s). ¿Confirmas?",
             code="access_revoked",
@@ -611,7 +664,7 @@ async def set_material_schools(
             MaterialSchool(
                 material_id=material.id,
                 school_id=school.id,
-                enabled_by=context.user_id,
+                enabled_by=actor_id,
             )
         )
 
@@ -620,19 +673,19 @@ async def set_material_schools(
             session,
             material=material,
             action="access_changed",
-            actor_id=context.user_id,
+            actor_id=actor_id,
             detail={
                 "added": [{"id": str(school.id), "name": school.name} for school in added],
                 "removed": [{"id": str(school.id), "name": school.name} for school in removed],
             },
         )
 
-    actor_name = await _actor_name(session, context.user_id)
+    actor_name = await _actor_name(session, actor_id)
     for school in added:
         await catalog.record_audit(
             session,
             event_type="school.access_granted",
-            actor_id=context.user_id,
+            actor_id=actor_id,
             actor_name=actor_name,
             school_id=school.id,
             subject_type="material",
@@ -643,7 +696,7 @@ async def set_material_schools(
         await catalog.record_audit(
             session,
             event_type="school.access_revoked",
-            actor_id=context.user_id,
+            actor_id=actor_id,
             actor_name=actor_name,
             school_id=school.id,
             subject_type="material",
@@ -651,9 +704,6 @@ async def set_material_schools(
             level="warning",
             detail={"code": material.code, "school": school.name},
         )
-
-    await session.commit()
-    return await _detail(session, await _load_material(session, material.id))
 
 
 @router.delete("/catalog/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -855,6 +905,41 @@ async def list_schools(
         total=total,
         page=page,
         per_page=per_page,
+    )
+
+
+@router.get("/schools/{school_id}", response_model=SchoolDetail)
+async def read_school(
+    school_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolDetail:
+    """One school with its figures and its coverage of the catalog.
+
+    The drawer of the school lists the whole catalog and says, piece
+    by piece, whether the school can see it.
+    """
+    school = await session.get(School, school_id)
+    if school is None:
+        raise NotFoundError("The school does not exist.")
+
+    figures = await catalog.school_figures(session, [school.id])
+    row = figures.get(school.id, {})
+    total = await catalog.total_materials(session)
+    access = await catalog.school_catalog_access(session, school.id)
+
+    return SchoolDetail(
+        id=school.id,
+        name=school.name,
+        short_code=school.short_code,
+        city=school.city,
+        status=school.status,
+        plan=row.get("plan"),
+        students=row.get("students", 0),
+        teachers=row.get("teachers", 0),
+        covered=row.get("covered", 0),
+        total=total,
+        catalog=[SchoolCatalogItem(**item) for item in access],
     )
 
 

@@ -78,6 +78,7 @@ from app.db.models.sessions import (
     RefreshToken,
 )
 from app.db.models.site import SiteContent
+from app.db.models.support import SupportCase, SupportMessage
 
 __all__ = [
     "AcademicPeriod",
@@ -123,6 +124,8 @@ __all__ = [
     "StudentEnrollment",
     "Subject",
     "Subscription",
+    "SupportCase",
+    "SupportMessage",
     "Task",
     "TaskSubmission",
     "TeacherAssignment",

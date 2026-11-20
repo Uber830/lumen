@@ -270,12 +270,44 @@ class SchoolSummary(BaseModel):
     id: UUID
     name: str
     short_code: str
+    city: str | None = None
     status: str
     plan: str | None = None
     students: int = 0
     teachers: int = 0
     covered: int = 0
     total: int = 0
+
+
+class SchoolCatalogItem(BaseModel):
+    """One material of the catalog, as the school drawer shows it.
+
+    `enabled` says whether the school can see it right now.
+    """
+
+    id: UUID
+    code: str
+    title: str
+    type: str
+    area: str
+    status: str
+    enabled: bool
+
+
+class SchoolDetail(BaseModel):
+    """One school with its figures and its coverage of the catalog."""
+
+    id: UUID
+    name: str
+    short_code: str
+    city: str | None = None
+    status: str
+    plan: str | None = None
+    students: int = 0
+    teachers: int = 0
+    covered: int = 0
+    total: int = 0
+    catalog: list[SchoolCatalogItem] = Field(default_factory=list)
 
 
 class SchoolPage(BaseModel):
@@ -335,6 +367,8 @@ class CatalogOptions(BaseModel):
 
 
 __all__ = [
+    "SchoolCatalogItem",
+    "SchoolDetail",
     "AuditEntryOut",
     "AuditPage",
     "CatalogOptions",

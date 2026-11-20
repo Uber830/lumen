@@ -48,6 +48,7 @@ async def create_school(
             admin_email=body.admin_email,
             admin_name=body.admin_name,
             trial_days=body.trial_days,
+            city=body.city,
         )
     except BootstrapError as exc:
         await session.rollback()

@@ -39,35 +39,36 @@ on conflict (user_id) do nothing;
 -- ---------------------------------------------------------------------------
 -- The schools of the network
 -- ---------------------------------------------------------------------------
-insert into public.schools (id, name, short_code, status, display_name, created_at) values
-  ('d0000001-0000-4000-8000-000000000001', 'Sagrado Corazón', 'DEMO01', 'active', 'Sagrado Corazón', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000002', 'Los Alpes', 'DEMO02', 'active', 'Los Alpes', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000003', 'Santa María', 'DEMO03', 'active', 'Santa María', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000004', 'El Roble', 'DEMO04', 'active', 'El Roble', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000005', 'La Primavera', 'DEMO05', 'trial', 'La Primavera', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000006', 'San Rafael', 'DEMO06', 'active', 'San Rafael', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000007', 'Montessori Belmont', 'DEMO07', 'active', 'Montessori Belmont', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000008', 'Nueva Granada', 'DEMO08', 'active', 'Nueva Granada', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000009', 'Los Nogales', 'DEMO09', 'trial', 'Los Nogales', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000010', 'El Carmen', 'DEMO10', 'active', 'El Carmen', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000011', 'Santa Catalina', 'DEMO11', 'active', 'Santa Catalina', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000012', 'San Juan de Dios', 'DEMO12', 'active', 'San Juan de Dios', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000013', 'Los Arrayanes', 'DEMO13', 'trial', 'Los Arrayanes', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000014', 'La Mersé', 'DEMO14', 'active', 'La Mersé', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000015', 'San Vicente', 'DEMO15', 'active', 'San Vicente', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000016', 'El Guadual', 'DEMO16', 'active', 'El Guadual', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000017', 'Colegio Mayor', 'DEMO17', 'active', 'Colegio Mayor', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000018', 'La Amiga', 'DEMO18', 'trial', 'La Amiga', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000019', 'Monte Carlo', 'DEMO19', 'active', 'Monte Carlo', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000020', 'San Lucas', 'DEMO20', 'active', 'San Lucas', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000021', 'La Salle', 'DEMO21', 'active', 'La Salle', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000022', 'San Ignacio', 'DEMO22', 'trial', 'San Ignacio', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000023', 'Los Pinos', 'DEMO23', 'active', 'Los Pinos', '2026-10-01T08:00:00+00:00'),
-  ('d0000001-0000-4000-8000-000000000024', 'Santa Bárbara', 'DEMO24', 'active', 'Santa Bárbara', '2026-10-01T08:00:00+00:00')
+insert into public.schools (id, name, short_code, status, display_name, city, created_at) values
+  ('d0000001-0000-4000-8000-000000000001', 'Sagrado Corazón', 'DEMO01', 'active', 'Sagrado Corazón', 'Bogotá', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000002', 'Los Alpes', 'DEMO02', 'active', 'Los Alpes', 'Medellín', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000003', 'Santa María', 'DEMO03', 'active', 'Santa María', 'Cali', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000004', 'El Roble', 'DEMO04', 'active', 'El Roble', 'Bucaramanga', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000005', 'La Primavera', 'DEMO05', 'trial', 'La Primavera', 'Barranquilla', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000006', 'San Rafael', 'DEMO06', 'active', 'San Rafael', 'Pereira', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000007', 'Montessori Belmont', 'DEMO07', 'active', 'Montessori Belmont', 'Cartagena', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000008', 'Nueva Granada', 'DEMO08', 'active', 'Nueva Granada', 'Cúcuta', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000009', 'Los Nogales', 'DEMO09', 'trial', 'Los Nogales', 'Ibagué', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000010', 'El Carmen', 'DEMO10', 'active', 'El Carmen', 'Manizales', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000011', 'Santa Catalina', 'DEMO11', 'active', 'Santa Catalina', 'Villavicencio', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000012', 'San Juan de Dios', 'DEMO12', 'active', 'San Juan de Dios', 'Pasto', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000013', 'Los Arrayanes', 'DEMO13', 'trial', 'Los Arrayanes', 'Neiva', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000014', 'La Mersé', 'DEMO14', 'active', 'La Mersé', 'Popayán', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000015', 'San Vicente', 'DEMO15', 'active', 'San Vicente', 'Valledupar', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000016', 'El Guadual', 'DEMO16', 'active', 'El Guadual', 'Sincelejo', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000017', 'Colegio Mayor', 'DEMO17', 'active', 'Colegio Mayor', 'Tunja', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000018', 'La Amiga', 'DEMO18', 'trial', 'La Amiga', 'Riohacha', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000019', 'Monte Carlo', 'DEMO19', 'active', 'Monte Carlo', 'Florencia', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000020', 'San Lucas', 'DEMO20', 'active', 'San Lucas', 'Yopal', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000021', 'La Salle', 'DEMO21', 'active', 'La Salle', 'Quibdó', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000022', 'San Ignacio', 'DEMO22', 'trial', 'San Ignacio', 'Arauca', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000023', 'Los Pinos', 'DEMO23', 'active', 'Los Pinos', 'Mocoa', '2026-10-01T08:00:00+00:00'),
+  ('d0000001-0000-4000-8000-000000000024', 'Santa Bárbara', 'DEMO24', 'active', 'Santa Bárbara', 'Leticia', '2026-10-01T08:00:00+00:00')
 on conflict (short_code) do update
   set name = excluded.name,
       display_name = excluded.display_name,
-      status = excluded.status;
+      status = excluded.status,
+      city = excluded.city;
 
 -- ---------------------------------------------------------------------------
 -- The plan of each school

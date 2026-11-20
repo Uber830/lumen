@@ -79,6 +79,7 @@ async def bootstrap_school(
     short_code: str,
     plan_code: str,
     trial_days: int = DEFAULT_TRIAL_DAYS,
+    city: str | None = None,
 ) -> BootstrapResult:
     """Create a school for a user, with its trial subscription.
 
@@ -135,6 +136,7 @@ async def bootstrap_school(
             id=uuid.uuid4(),
             name=normalized_name,
             short_code=normalized_code,
+            city=city.strip() if city and city.strip() else None,
             status="trial",
         )
         session.add(school)

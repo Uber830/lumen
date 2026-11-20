@@ -38,6 +38,7 @@ COLUMNS_ADDED_BY_ALTER = {
     "profiles": {"avatar_url"},
     "users": {"locked_until"},
     "schools": {
+        "city",
         "display_name",
         "logo_url",
         "primary_color",
