@@ -4,8 +4,9 @@ La API de Lumen. Es la dueña de la autenticación, la autorización y de cada
 regla de negocio: el navegador solo habla con este servicio.
 
 Postgres es el almacén de datos y el backend se conecta a él directamente con
-asyncpg. Supabase Storage y Realtime siguen en uso para los archivos y el
-chat en vivo.
+asyncpg. El material del catálogo se guarda en el disco del servidor
+(`PLATFORM_STORAGE_DIR`) hasta que el proyecto tenga un bucket; Supabase
+Realtime sigue en uso para el chat en vivo.
 
 - [Arranque rápido](#arranque-rápido)
 - [Layout](#layout)
@@ -58,7 +59,8 @@ ver que las migraciones no se aplicaron.
 | `JWT_SECRET` | firma los tokens de acceso (obligatoria) |
 | `CORS_ALLOWED_ORIGINS` | orígenes permitidos, separados por comas |
 | `COOKIE_DOMAIN` | solo si el frontend y la API viven en subdominios distintos |
-| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Storage y Realtime |
+| `PLATFORM_STORAGE_DIR` | la carpeta del material del catálogo (por defecto `backend/var/materiales`) |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Realtime |
 | `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | la puerta del login (5 por minuto) |
 | `LOGIN_LOCK_THRESHOLD`, `LOGIN_LOCK_MINUTES` | el bloqueo de la cuenta (10 fallos, 15 min) |
 
@@ -165,9 +167,18 @@ que devuelve el enlace de activación del administrador.
 | DELETE | `/v1/platform/catalog/{id}` | borrar un material (solo en borrador) |
 | POST | `/v1/platform/catalog/{id}/status` | publicar, archivar o desarchivar |
 | PUT | `/v1/platform/catalog/{id}/schools` | reemplazar los colegios con acceso |
+| POST | `/v1/platform/catalog/{id}/schools` | darle acceso a más colegios, sin quitarlo a nadie |
 | POST | `/v1/platform/uploads` | subir un archivo del catálogo |
+| GET | `/v1/platform/files/{file_id}` | descargar un archivo del catálogo |
 | DELETE | `/v1/platform/uploads/{file_id}` | quitar un archivo subido y no usado |
 | GET | `/v1/platform/schools` | los colegios de la red, con su cobertura |
+| GET | `/v1/platform/schools/{id}` | un colegio y su cobertura, pieza por pieza |
+| PUT | `/v1/platform/schools/{id}/materials/{material_id}` | encender o apagar una pieza para un colegio |
+| GET | `/v1/platform/case-options` | los catálogos cerrados del escritorio: niveles, estados y canales |
+| GET | `/v1/platform/cases` | los casos de soporte, con filtros y paginación |
+| GET | `/v1/platform/cases/{id}` | un caso con su conversación y los movimientos de la plataforma |
+| POST | `/v1/platform/cases/{id}/messages` | responder un caso |
+| POST | `/v1/platform/cases/{id}/resolve` | cerrar un caso |
 | GET | `/v1/platform/audit` | la traza de los eventos críticos |
 
 ### Académico
