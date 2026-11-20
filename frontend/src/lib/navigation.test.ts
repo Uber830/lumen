@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NAV, ROLE_LABEL, ROLE_NOTE, type AppShellRole } from "@/lib/navigation";
+import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
 
 /*
  * The menu is part of the contract with the business: the platform role
@@ -49,5 +49,27 @@ describe("el menú de cada rol", () => {
       expect(ROLE_NOTE[role]).toBeTruthy();
       expect(ROLE_LABEL[role]).toBeTruthy();
     }
+  });
+});
+
+describe("la entrada que es la página actual", () => {
+  it("marca solo la página exacta", () => {
+    expect(isCurrentPath("/super", "/super")).toBe(true);
+    expect(isCurrentPath("/super/colegios", "/super/colegios")).toBe(true);
+  });
+
+  it("no marca a la entrada padre cuando se está en una hija", () => {
+    // Con una comparación por prefijo, «Panel global» seguía pintado
+    // al abrir «Colegios»: parecían dos entradas seleccionadas.
+    expect(isCurrentPath("/super/colegios", "/super")).toBe(false);
+    expect(isCurrentPath("/super/catalogo", "/super")).toBe(false);
+    expect(isCurrentPath("/super/soporte", "/super")).toBe(false);
+    expect(isCurrentPath("/admin/docentes", "/admin")).toBe(false);
+    expect(isCurrentPath("/docente/materia", "/docente")).toBe(false);
+  });
+
+  it("no marca a una entrada hermana", () => {
+    expect(isCurrentPath("/super/catalogo", "/super/colegios")).toBe(false);
+    expect(isCurrentPath("/admin/icfes", "/admin/icfes-simulacros")).toBe(false);
   });
 });

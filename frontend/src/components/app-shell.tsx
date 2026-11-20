@@ -31,7 +31,7 @@ import {
   subscribeSidebar,
 } from "@/lib/sidebar";
 import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
-import { NAV, ROLE_LABEL, ROLE_NOTE, type AppShellRole } from "@/lib/navigation";
+import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 type SchoolPlan = "Basico" | "Estandar" | "Premium" | "Sin plan";
@@ -115,12 +115,14 @@ function NavList({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const groups = NAV[role];
 
+  // Which entry is the current page. The rule lives in the navigation
+  // module, where it can be tested.
+  const isCurrent = (to: string) => isCurrentPath(pathname, to);
+
   // The ICFES views live in one block that folds and unfolds. It opens
   // by itself when the user is already inside one of them.
   const insideIcfes = groups.some((group) =>
-    group.items.some(
-      (item) => item.collapsible && (pathname === item.to || pathname.startsWith(`${item.to}/`)),
-    ),
+    group.items.some((item) => item.collapsible && isCurrent(item.to)),
   );
   const [icfesChoice, setIcfesChoice] = useState<{ path: string; open: boolean } | null>(null);
   const icfesOpen = icfesChoice?.path === pathname ? icfesChoice.open : insideIcfes;
@@ -131,7 +133,7 @@ function NavList({
       collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
       active
         ? "bg-sidebar-accent text-sidebar-accent-foreground"
-        : "text-sidebar-foreground hover:bg-muted hover:text-sidebar-foreground",
+        : "text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-foreground",
     );
 
   // Folded, there is no room for the groups: the entries become plain
@@ -142,7 +144,7 @@ function NavList({
         {groups
           .flatMap((group) => group.items)
           .map((item) => {
-            const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+            const active = isCurrent(item.to);
             return (
               <Link
                 key={item.to}
@@ -171,7 +173,7 @@ function NavList({
             {group.items.map((item) => {
               const hidden = item.collapsible && !icfesEnabled;
               if (hidden) return null;
-              const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+              const active = isCurrent(item.to);
               const badge = badges[item.to];
 
               if (item.collapsible) {
@@ -185,7 +187,7 @@ function NavList({
                         "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground hover:bg-muted hover:text-sidebar-foreground",
+                          : "text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-foreground",
                       )}
                     >
                       <item.icon className="size-4.5 shrink-0" strokeWidth={1.9} />
@@ -205,8 +207,7 @@ function NavList({
                           .flatMap((g) => g.items)
                           .filter((child) => child.collapsible)
                           .map((child) => {
-                            const childActive =
-                              pathname === child.to || pathname.startsWith(`${child.to}/`);
+                            const childActive = isCurrent(child.to);
                             return (
                               <li key={child.to}>
                                 <Link
@@ -216,7 +217,7 @@ function NavList({
                                     "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                                     childActive
                                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                      : "text-sidebar-foreground/80 hover:bg-muted hover:text-sidebar-foreground",
+                                      : "text-sidebar-foreground/80 hover:bg-sidebar-hover hover:text-sidebar-foreground",
                                   )}
                                 >
                                   <child.icon className="size-4 shrink-0" strokeWidth={1.9} />

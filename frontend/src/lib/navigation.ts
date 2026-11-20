@@ -155,3 +155,15 @@ export const ROLE_LABEL: Record<AppShellRole, string> = {
   docente: "Docente",
   estudiante: "Estudiante",
 };
+
+/**
+ * Whether an entry is the page the reader is on.
+ *
+ * The comparison is exact. With a prefix comparison (`/super` matches
+ * `/super/colegios`) two entries lit up at once and the one the reader
+ * had just left kept its block painted, which looked like a leftover
+ * shadow.
+ */
+export function isCurrentPath(pathname: string, to: string): boolean {
+  return pathname === to;
+}
