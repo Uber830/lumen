@@ -130,7 +130,7 @@ create_database() {
 # script and not by a migration: it belongs to the tool, not to the
 # schema the application uses.
 ensure_log() {
-  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null <<SQL
+  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null 2>&1 <<SQL
 create table if not exists ${MIGRATION_LOG} (
   name       text primary key,
   applied_at timestamptz not null default now()
@@ -139,7 +139,7 @@ SQL
 }
 
 record_migration() {
-  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null <<SQL
+  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - >/dev/null 2>&1 <<SQL
 insert into ${MIGRATION_LOG} (name) values ('$1')
   on conflict (name) do nothing;
 SQL
@@ -162,13 +162,19 @@ migration_applied() {
 # error, so a broken migration is never hidden.
 apply_one() {
   local file="$1"
-  local name output state unexpected=""
+  local name output errors state unexpected=""
   name="$(basename "$file")"
 
   output="$(docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q \
     -v VERBOSITY=verbose -f - < "$file" 2>&1)" || true
 
-  if [ -z "$output" ]; then
+  # Only the errors matter: a migration that says "this does not exist,
+  # skipping" did its job. The `|| true` matters: the script stops at
+  # the first command that fails, and a search that finds nothing is
+  # not a failure.
+  errors="$(printf '%s\n' "$output" | grep -E 'ERROR:  [0-9A-Z]{5}' || true)"
+
+  if [ -z "$errors" ]; then
     record_migration "$name"
     echo "  applied $name"
     return 0
@@ -181,7 +187,7 @@ apply_one() {
       *" $state "*) ;;
       *) unexpected="$unexpected $state" ;;
     esac
-  done <<<"$(printf '%s\n' "$output" | grep -oE 'ERROR:  [0-9A-Z]{5}' | awk '{print $2}' | sort -u)"
+  done <<<"$(printf '%s\n' "$errors" | awk '{print $2}' | sort -u || true)"
 
   if [ -z "$unexpected" ]; then
     record_migration "$name"
@@ -190,7 +196,7 @@ apply_one() {
   fi
 
   echo "  FAILED $name ($unexpected)" >&2
-  printf '%s\n' "$output" >&2
+  printf '%s\n' "$errors" >&2
   return 1
 }
 
@@ -214,6 +220,14 @@ migrate_database() {
   # existing one, it does not create it.
   docker exec "$CONTAINER" psql -U postgres -d postgres -q \
     -c "CREATE DATABASE ${DB}" >/dev/null 2>&1 || true
+
+  # The migrations assume the Supabase platform objects. The shim
+  # creates stand-ins so they can be applied to a plain Postgres. It
+  # is written with `if not exists`, so running it on a database that
+  # already has the schema changes nothing.
+  docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
+    < "$ROOT/supabase/local-shim.sql" >/dev/null 2>&1
+
   apply_migrations
   echo
   echo "Up to date. DATABASE_URL=${DATABASE_URL}"
