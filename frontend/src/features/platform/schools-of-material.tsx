@@ -8,44 +8,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
-import { StatusPill, Tag } from "@/components/ui-kit";
-import type { MaterialSummary } from "@/lib/platform/types";
+import { StatusPill } from "@/components/ui-kit";
+import { useMaterial } from "@/lib/platform/hooks";
 
 /**
  * The schools that can see a material.
  *
- * It is the cell of the catalog, opened: it says who sees the piece
- * and how many schools are not on the list. The access is changed from
- * the sheet of the school, where the switch of every piece lives.
+ * The row of the catalog shows one or two schools and the number of the
+ * ones that are not on screen. This dialog opens from that number and
+ * lists every school with access, read from the detail of the material:
+ * the listing cuts the list, the detail does not.
+ *
+ * The access is changed from the sheet of the school, where the switch
+ * of every piece lives.
  */
 export function SchoolsOfMaterial({
-  material,
-  schoolNames,
+  materialId,
   onClose,
 }: {
-  material: MaterialSummary | null;
-  schoolNames: Map<string, string>;
+  materialId: string | null;
   onClose: () => void;
 }) {
+  const material = useMaterial(materialId);
+  const schools = material.data?.schools ?? [];
+
   return (
-    <Dialog open={Boolean(material)} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={Boolean(materialId)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Colegios con acceso</DialogTitle>
-          <DialogDescription>{material?.title}</DialogDescription>
+          <DialogDescription>
+            {material.data ? material.data.title : "Los colegios que pueden ver esta pieza."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-hidden rounded-lg border border-border">
-          {material && material.schools.length > 0 ? (
-            <ul className="flex flex-col divide-y divide-border">
-              {material.schools.map((school) => (
+          {material.isLoading ? (
+            <p className="px-3 py-4 text-sm text-muted-foreground">Cargando…</p>
+          ) : schools.length > 0 ? (
+            <ul className="flex max-h-80 flex-col divide-y divide-border overflow-y-auto">
+              {schools.map((school) => (
                 <li key={school.id} className="flex items-center gap-3 px-3 py-2.5">
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
                     <Building2 className="size-4" strokeWidth={1.9} aria-hidden />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {schoolNames.get(school.id) ?? school.name}
+                    <span className="block truncate text-sm font-medium">{school.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {school.short_code}
+                      {school.plan ? ` · ${school.plan}` : ""} · {school.students} estudiantes
                     </span>
                   </span>
                   <StatusPill label="Habilitado" tone="success" />
@@ -59,12 +70,9 @@ export function SchoolsOfMaterial({
           )}
         </div>
 
-        {material && material.schools_extra > 0 && (
-          <p className="text-xs text-muted-foreground">
-            <Tag>+{material.schools_extra}</Tag>{" "}
-            <span className="ml-1">colegios más tienen acceso a esta pieza.</span>
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {schools.length} colegio(s) con acceso a esta pieza.
+        </p>
 
         <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.9} aria-hidden />

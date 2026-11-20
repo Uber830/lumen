@@ -260,13 +260,29 @@ export function Tag({ children, className }: { children: ReactNode; className?: 
   );
 }
 
-/** The counter of the extra schools of a row: "+3". */
-export function ExtraCount({ count }: { count: number }) {
+/**
+ * The counter of the extra schools of a row: "+3".
+ *
+ * When it is given a click, it becomes the button that opens the full
+ * list, so the counter is the way into the schools that are not on
+ * screen.
+ */
+export function ExtraCount({ count, onClick }: { count: number; onClick?: () => void }) {
   if (count <= 0) return null;
+  const style =
+    "inline-flex items-center rounded-full bg-primary-soft px-2 py-0.5 font-mono text-xs font-semibold text-primary";
+  if (!onClick) {
+    return <span className={style}>+{count}</span>;
+  }
   return (
-    <span className="inline-flex items-center rounded-full bg-primary-soft px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Ver los ${count} colegio(s) que también tienen acceso`}
+      className={cn(style, "transition-opacity hover:opacity-80")}
+    >
       +{count}
-    </span>
+    </button>
   );
 }
 

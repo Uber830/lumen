@@ -244,25 +244,27 @@ function Catalogo() {
                       </td>
                       <td className="px-5 py-3">{item.area}</td>
                       <td className="px-5 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setAccessOf(item)}
-                          className="flex flex-wrap items-center gap-1.5 rounded text-left transition-opacity hover:opacity-80"
-                          title="Ver los colegios con acceso"
-                        >
-                          {item.schools.length === 0 ? (
-                            <span className="text-muted-foreground">Ninguno</span>
-                          ) : (
-                            <>
-                              {item.schools.slice(0, 2).map((school) => (
-                                <Tag key={school.id}>
-                                  {schoolNames.get(school.id) ?? school.name}
-                                </Tag>
-                              ))}
-                              <ExtraCount count={item.schools_extra} />
-                            </>
-                          )}
-                        </button>
+                        {item.schools.length === 0 ? (
+                          <span className="text-muted-foreground">Ninguno</span>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {item.schools.slice(0, 2).map((school) => (
+                              <button
+                                key={school.id}
+                                type="button"
+                                onClick={() => setAccessOf(item)}
+                                title="Ver todos los colegios con acceso"
+                                className="inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
+                              >
+                                {schoolNames.get(school.id) ?? school.name}
+                              </button>
+                            ))}
+                            <ExtraCount
+                              count={item.schools_extra}
+                              onClick={() => setAccessOf(item)}
+                            />
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3">
                         <StatusPill
@@ -292,11 +294,7 @@ function Catalogo() {
         )}
       </section>
 
-      <SchoolsOfMaterial
-        material={accessOf}
-        schoolNames={schoolNames}
-        onClose={() => setAccessOf(null)}
-      />
+      <SchoolsOfMaterial materialId={accessOf?.id ?? null} onClose={() => setAccessOf(null)} />
 
       <MaterialPanel
         key={openId ?? "none"}
