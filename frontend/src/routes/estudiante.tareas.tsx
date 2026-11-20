@@ -204,7 +204,7 @@ function Tareas() {
                   event.preventDefault();
                   void pickFile(event.dataTransfer.files[0]);
                 }}
-                className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/40 px-4 py-8 text-center"
+                className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/40 px-4 py-8 text-center"
               >
                 <Upload className="size-7 text-muted-foreground" strokeWidth={1.75} />
                 <p className="mt-3 text-sm font-semibold">Arrastrá tu archivo acá</p>

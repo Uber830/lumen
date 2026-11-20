@@ -99,7 +99,7 @@ function TeacherDashboard() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {subjects.map((s) => (
-              <article key={s.id} className="rounded-xl border border-border p-5">
+              <article key={s.id} className="rounded-lg border border-border p-5">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate text-base font-semibold">{s.subject_name}</h3>

@@ -133,7 +133,7 @@ function PlanesPage() {
                 <li
                   key={p.id}
                   className={cn(
-                    "rounded-xl border p-5",
+                    "rounded-lg border p-5",
                     isCurrent ? "border-primary bg-primary-soft" : "border-border bg-card",
                   )}
                 >

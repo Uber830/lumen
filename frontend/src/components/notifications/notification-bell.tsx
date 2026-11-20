@@ -69,7 +69,7 @@ export function NotificationBell({ userId }: { userId: string }) {
             onClick={() => setOpen(false)}
           />
 
-          <div className="absolute right-0 z-40 mt-2 flex w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lift">
+          <div className="absolute right-0 z-40 mt-2 flex w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lift">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-4 py-3">
               <h2 className="truncate text-sm font-semibold">Notificaciones</h2>
               {unreadCount > 0 && (

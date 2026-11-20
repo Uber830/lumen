@@ -1,17 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Building2, DollarSign, LineChart, TrendingUp } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { BookOpen, Building2, ChevronRight, GraduationCap, Users } from "lucide-react";
+
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { PageHeader, SectionCard, StatCard } from "@/components/ui-kit";
-import { StatusBadge, toneForEstado } from "@/components/status-badge";
-import { mrrTrend, schoolsTable } from "@/lib/edu-data";
+  MeterRow,
+  PageHeader,
+  SectionCard,
+  SkeletonCards,
+  StatCard,
+  StatusPill,
+} from "@/components/ui-kit";
+import { usePlatformMetrics } from "@/lib/platform/hooks";
+import { MATERIAL_STATUS_LABEL, type MaterialStatus } from "@/lib/platform/types";
 
 export const Route = createFileRoute("/super/")({
   head: () => ({
@@ -19,140 +18,168 @@ export const Route = createFileRoute("/super/")({
       { title: "Panel de plataforma — Lumen" },
       {
         name: "description",
-        content: "Métricas globales de Lumen: colegios activos, MRR y uso por módulo.",
+        content: "Estado de la red: colegios, comunidad y catálogo editorial.",
       },
       { property: "og:title", content: "Panel de plataforma — Lumen" },
       {
         property: "og:description",
-        content: "Vista de negocio de la plataforma, sin acceso a datos académicos.",
+        content: "Vista de operación de la plataforma, sin acceso a datos académicos.",
       },
     ],
   }),
   component: SuperDashboard,
 });
 
-const usage = [
-  { modulo: "Evaluaciones", pct: 87 },
-  { modulo: "Calificaciones", pct: 94 },
-  { modulo: "Chat interno", pct: 62 },
-  { modulo: "Contenidos", pct: 78 },
-];
+const STATUS_ORDER: MaterialStatus[] = ["published", "review", "draft", "archived"];
 
 function SuperDashboard() {
+  const metrics = usePlatformMetrics();
+
+  if (metrics.isLoading) {
+    return (
+      <>
+        <PageHeader
+          title="Panel global"
+          subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+        />
+        <SkeletonCards />
+      </>
+    );
+  }
+
+  const data = metrics.data;
+  const byStatus = data?.materials_by_status ?? {};
+  const byArea = data?.materials_by_area ?? {};
+  const maxStatus = Math.max(1, ...Object.values(byStatus));
+  const maxArea = Math.max(1, ...Object.values(byArea));
+  const coverage = data?.school_coverage ?? [];
+  const covered = coverage.filter((school) => school.covered > 0).length;
+
   return (
     <>
-      <PageHeader title="Plataforma Lumen" subtitle="Métricas globales · Julio 2026" />
+      <PageHeader
+        title="Panel global"
+        subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Colegios activos" value="128" delta="+9 este mes" icon={Building2} />
         <StatCard
-          label="En trial"
-          value="17"
-          delta="Conversión 41%"
-          icon={TrendingUp}
+          label="Colegios en la red"
+          value={String(data?.schools ?? 0)}
+          delta={`${covered} con material habilitado`}
+          icon={Building2}
+        />
+        <StatCard
+          label="Docentes"
+          value={(data?.teachers ?? 0).toLocaleString("es-CO")}
+          delta="en las instituciones registradas"
+          icon={Users}
+          tone="teal"
+        />
+        <StatCard
+          label="Estudiantes"
+          value={(data?.students ?? 0).toLocaleString("es-CO")}
+          delta="matriculados en la red"
+          icon={GraduationCap}
+          tone="success"
+        />
+        <StatCard
+          label="Material en catálogo"
+          value={String(data?.materials ?? 0)}
+          delta={`${byStatus.published ?? 0} publicados`}
+          icon={BookOpen}
           tone="warning"
         />
-        <StatCard
-          label="Suspendidos"
-          value="4"
-          delta="Pago vencido"
-          icon={LineChart}
-          tone="danger"
-        />
-        <StatCard label="MRR" value="$68.900" delta="+12,2% MoM" icon={DollarSign} tone="success" />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
-          title="Crecimiento de ingresos"
-          description="MRR de los últimos 6 meses"
-          className="lg:col-span-2"
+          title="Catálogo editorial"
+          description="El material por estado y por área"
+          leading={
+            <Link
+              to="/super/catalogo"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+            >
+              Abrir catálogo
+              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
+            </Link>
+          }
         >
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mrrTrend} margin={{ left: -10, right: 8, top: 8 }}>
-                <defs>
-                  <linearGradient id="gMrr" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border)"
-                  vertical={false}
-                />
-                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis tickLine={false} axisLine={false} fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-card)",
-                    fontSize: 12,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="mrr"
-                  stroke="var(--color-chart-1)"
-                  strokeWidth={2.5}
-                  fill="url(#gMrr)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+                Por estado
+              </p>
+              {Object.keys(byStatus).length === 0 ? (
+                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+              ) : (
+                STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
+                  <MeterRow
+                    key={status}
+                    label={MATERIAL_STATUS_LABEL[status]}
+                    value={byStatus[status] ?? 0}
+                    max={maxStatus}
+                  />
+                ))
+              )}
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+                Por área
+              </p>
+              {Object.keys(byArea).length === 0 ? (
+                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+              ) : (
+                Object.entries(byArea)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([area, count]) => (
+                    <MeterRow key={area} label={area} value={count} max={maxArea} />
+                  ))
+              )}
+            </div>
           </div>
         </SectionCard>
 
-        <SectionCard title="Uso por módulo" description="% de colegios que lo usan semanalmente">
-          <ul className="space-y-4">
-            {usage.map((u) => (
-              <li key={u.modulo}>
-                <div className="mb-1.5 flex items-center justify-between text-sm">
-                  <span className="font-medium">{u.modulo}</span>
-                  <span className="text-muted-foreground">{u.pct}%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${u.pct}%` }} />
-                </div>
-              </li>
-            ))}
-          </ul>
+        <SectionCard
+          title="Cobertura del catálogo"
+          description="Qué colegio ve qué parte del catálogo"
+          actions={
+            <Link
+              to="/super/colegios"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Ver todos
+            </Link>
+          }
+          bodyClassName="p-0"
+        >
+          {coverage.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {coverage.slice(0, 6).map((school) => (
+                <li
+                  key={school.school_id}
+                  className="flex items-center gap-3 border-b border-border px-5 py-2 last:border-b-0"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm">{school.name}</span>
+                  <StatusPill
+                    label={`${school.covered} de ${school.total}`}
+                    tone={school.covered === school.total ? "success" : "muted"}
+                  />
+                </li>
+              ))}
+              {coverage.length > 6 && (
+                <li className="px-5 py-2 text-xs text-muted-foreground">
+                  y {coverage.length - 6} colegios más
+                </li>
+              )}
+            </ul>
+          )}
         </SectionCard>
       </div>
-
-      <SectionCard
-        title="Colegios"
-        description="Estado de suscripción y plan contratado"
-        bodyClassName="p-0"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Colegio</th>
-                <th className="px-5 py-3 font-semibold">Plan</th>
-                <th className="px-5 py-3 font-semibold">Alumnos</th>
-                <th className="px-5 py-3 font-semibold">Alta</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schoolsTable.map((s) => (
-                <tr key={s.id} className="border-t border-border hover:bg-muted/40">
-                  <td className="px-5 py-3 font-medium">{s.name}</td>
-                  <td className="px-5 py-3">{s.plan}</td>
-                  <td className="px-5 py-3">{s.alumnos.toLocaleString("es-AR")}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{s.alta}</td>
-                  <td className="px-5 py-3">
-                    <StatusBadge tone={toneForEstado(s.estado)}>{s.estado}</StatusBadge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
     </>
   );
 }

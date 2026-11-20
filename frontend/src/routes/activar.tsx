@@ -71,7 +71,7 @@ function ActivarPage() {
     <div className="grid min-h-screen place-items-center px-4 py-12">
       <div className="w-full max-w-sm">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2.5 text-lg font-bold">
-          <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground">
+          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground">
             <GraduationCap className="size-5" strokeWidth={1.75} />
           </span>
           Lumen

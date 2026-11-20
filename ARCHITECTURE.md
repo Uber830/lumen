@@ -171,6 +171,35 @@ El `platform_admin` no debe recibir acceso general a tablas académicas. Consumi
 
 Esto convierte la promesa actual del producto en una restricción técnica, no solo en texto de interfaz.
 
+### 3.5 El catálogo editorial del rol de plataforma — **implementado**
+
+El equipo de plataforma carga el material de la editorial y decide qué colegio
+puede ver cada pieza. Su panel vive bajo `/super` y habla con `/v1/platform`,
+un prefijo que solo ese rol puede usar.
+
+| Pieza | Qué es |
+| --- | --- |
+| `materials` | El material: título, tipo, área, grados, estado, origen y visibilidad. |
+| `material_files` | Los archivos subidos, con su tamaño y su huella. |
+| `material_schools` | Qué colegio ve qué pieza, y desde cuándo. |
+| `material_history` | Los movimientos de cada pieza, para que el panel diga qué pasó. |
+| `audit_log` | Los avisos de la red: acceso dado o quitado, cambio de estado. |
+
+Las reglas las decide el backend, no el frontend:
+
+- Publicar exige título, tipo, área, grados y al menos un colegio con acceso.
+  Si falta algo, la respuesta es `422` con la lista de lo que falta (`missing`).
+- Quitarle el acceso a un colegio un material **publicado** responde `409` con
+  los colegios afectados (`affected`). El cliente pregunta y reenvía la misma
+  petición con `confirm: true`.
+- Las transiciones posibles las devuelve el endpoint (`available_transitions`);
+  el panel nunca las adivina.
+- La cobertura de un colegio cuenta **solo el material publicado**.
+
+El rol de plataforma **no administra los planes de los colegios**: no hay
+sección de planes en su menú. El plan de un colegio lo ve su administración
+(`/admin/planes`).
+
 ## 4. Modelo de datos conceptual
 
 Nombres definitivos y columnas se cerrarán durante la fase 1. Como mínimo se prevén:
@@ -777,7 +806,6 @@ Proveedor de pagos: **Wompi** (Colombia). Lumen no almacena datos de tarjeta: el
 **Archivos actuales afectados**
 
 - `frontend/src/routes/registro.tsx`
-- `frontend/src/routes/super.planes.tsx`
 - `frontend/src/components/app-shell.tsx`
 - `frontend/src/routes/icfes-bloqueado.tsx`
 - `frontend/src/lib/icfes-guard.ts`

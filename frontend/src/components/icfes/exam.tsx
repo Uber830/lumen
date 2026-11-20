@@ -269,7 +269,7 @@ function IcfesIndividualResult({
 
       <SectionCard title="Puntaje">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl bg-primary-soft p-5">
+          <div className="rounded-lg bg-primary-soft p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">
               Puntaje global
             </p>
@@ -278,7 +278,7 @@ function IcfesIndividualResult({
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Escala 0 – 500</p>
           </div>
-          <div className="rounded-xl border border-border p-5">
+          <div className="rounded-lg border border-border p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Correctas
             </p>
@@ -287,7 +287,7 @@ function IcfesIndividualResult({
               <span className="text-lg text-muted-foreground">/{result.question_count}</span>
             </p>
           </div>
-          <div className="rounded-xl border border-border p-5">
+          <div className="rounded-lg border border-border p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Acierto
             </p>

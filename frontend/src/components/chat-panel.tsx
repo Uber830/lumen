@@ -256,7 +256,7 @@ export function ChatPanel({
                 <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
                   <p
                     className={cn(
-                      "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm",
+                      "max-w-[75%] rounded-lg px-4 py-2.5 text-sm",
                       mine
                         ? "rounded-br-md bg-primary text-primary-foreground"
                         : "rounded-bl-md border border-border bg-card",

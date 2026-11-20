@@ -256,7 +256,7 @@ function Personalizacion() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="mt-1.5 flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/40 px-4 py-8 text-center hover:bg-muted"
+              className="mt-1.5 flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 px-4 py-8 text-center hover:bg-muted"
             >
               {logoUrl ? (
                 <img
@@ -338,8 +338,8 @@ function Personalizacion() {
                   onClick={() => setColor(c.value)}
                   className={
                     selected
-                      ? "size-12 rounded-xl ring-2 ring-offset-2 ring-offset-background"
-                      : "size-12 rounded-xl border border-border"
+                      ? "size-12 rounded-lg ring-2 ring-offset-2 ring-offset-background"
+                      : "size-12 rounded-lg border border-border"
                   }
                   style={{
                     backgroundColor: c.value,
@@ -350,7 +350,7 @@ function Personalizacion() {
             })}
           </div>
 
-          <div className="mt-6 rounded-xl border border-border p-5">
+          <div className="mt-6 rounded-lg border border-border p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Vista previa
             </p>
@@ -359,11 +359,11 @@ function Personalizacion() {
                 <img
                   src={logoUrl}
                   alt="Logo del colegio"
-                  className="size-10 shrink-0 rounded-xl bg-card object-contain p-0.5 ring-1 ring-border"
+                  className="size-10 shrink-0 rounded-lg bg-card object-contain p-0.5 ring-1 ring-border"
                 />
               ) : (
                 <span
-                  className="grid size-10 place-items-center rounded-xl text-white"
+                  className="grid size-10 place-items-center rounded-lg text-white"
                   style={{ backgroundColor: effectiveColor }}
                 >
                   <GraduationCap className="size-5" strokeWidth={1.75} />
@@ -408,7 +408,7 @@ function Personalizacion() {
               type="button"
               onClick={() => bannerRef.current?.click()}
               disabled={uploading !== null}
-              className="mt-1.5 flex w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/40 px-4 py-6 text-center hover:bg-muted disabled:opacity-60"
+              className="mt-1.5 flex w-full flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/40 px-4 py-6 text-center hover:bg-muted disabled:opacity-60"
             >
               {data.banner_url ? (
                 <img

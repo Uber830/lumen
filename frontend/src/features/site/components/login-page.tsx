@@ -249,7 +249,7 @@ export function LoginPage({
                     checked={rememberMe}
                     disabled={sending}
                     onChange={(event) => setRememberMe(event.target.checked)}
-                    className="size-4 rounded-idx border border-line-2 accent-[var(--accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    className="size-4 rounded-idx border border-line-2 accent-[var(--brand)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                   />
                   Recordarme en este equipo
                 </label>

@@ -1,12 +1,20 @@
-import { cn } from "@/lib/utils";
+import { StatusPill } from "@/components/ui-kit";
 import type { ReactNode } from "react";
 
+/**
+ * The badge of a state.
+ *
+ * It is the pill of the design system with the point of its color, so
+ * the whole panel speaks the same language: a state is a point and a
+ * word, never a piece of text alone.
+ */
+
 const toneMap = {
-  success: "bg-success-soft text-success",
-  warning: "bg-warning-soft text-warning-foreground",
-  danger: "bg-destructive-soft text-destructive",
-  info: "bg-primary-soft text-primary",
-  neutral: "bg-muted text-muted-foreground",
+  success: "success",
+  warning: "warning",
+  danger: "danger",
+  info: "info",
+  neutral: "muted",
 } as const;
 
 export type Tone = keyof typeof toneMap;
@@ -20,17 +28,7 @@ export function StatusBadge({
   tone?: Tone;
   className?: string;
 }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
-        toneMap[tone],
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
+  return <StatusPill label={String(children)} tone={toneMap[tone]} className={className} />;
 }
 
 export function toneForEstado(estado: string): Tone {

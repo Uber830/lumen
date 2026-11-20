@@ -3,10 +3,10 @@
 @import "tw-animate-css";
 
 /*
- * Self-hosted typefaces. The public site (El Índice) is set in Space
- * Grotesk and IBM Plex Mono; they are bundled instead of pulled from a
- * CDN so the first paint does not wait on a third party. Only the
- * latin subset is bundled: the site is written in Spanish.
+ * Self-hosted typefaces. The public site (El Índice) and the panel are
+ * set in Space Grotesk and IBM Plex Mono; they are bundled instead of
+ * pulled from a CDN so the first paint does not wait on a third party.
+ * Only the latin subset is bundled: the site is written in Spanish.
  */
 @import "@fontsource/space-grotesk/latin-400.css";
 @import "@fontsource/space-grotesk/latin-500.css";
@@ -14,30 +14,29 @@
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
-/* The scope class of the public site and its design tokens. */
+/* The scope class of the public site and its own rules. */
 @import "./features/site/site.css";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
  * Lumen design system.
- * Primary: indigo/blue. Success: green. Warning: amber. Danger: red.
+ *
+ * There is only one design: the one of «El Índice», the public site.
+ * The panel wears the same palette, the same typefaces and the same
+ * square corners, in its light and its dark theme. The tokens below are
+ * the single source of truth for both.
  */
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: calc(var(--radius) - 1px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  /*
-   * El Índice — the public site's palette. The values are declared in
-   * the `.idx-site` scope (src/features/site/site.css), so the panel
-   * keeps its own colors and only the public site uses these.
-   */
-  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
@@ -46,9 +45,9 @@
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-2: var(--line-2);
-  --color-brand: var(--accent);
-  --color-brand-soft: var(--accent-soft);
-  --color-brand-line: var(--accent-line);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-line: var(--brand-line);
   --radius-idx: 4px;
 
   --color-background: var(--background);
@@ -90,97 +89,137 @@
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --shadow-card: 0 1px 2px oklch(0.2 0.05 265 / 0.04), 0 8px 24px oklch(0.2 0.05 265 / 0.06);
-  --shadow-lift: 0 2px 4px oklch(0.2 0.05 265 / 0.06), 0 16px 40px oklch(0.2 0.05 265 / 0.1);
+  /*
+   * The cards do not float: they are separated by a hairline. The
+   * shadow is only for what really floats — a drawer, a dialog, a
+   * toast.
+   */
+  --shadow-card: none;
+  --shadow-lift: 0 12px 32px -12px rgba(10, 13, 19, 0.28);
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.985 0.004 260);
-  --foreground: oklch(0.24 0.035 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.035 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.035 265);
-  --primary: oklch(0.52 0.19 268);
-  --primary-foreground: oklch(0.99 0.005 260);
-  --primary-soft: oklch(0.95 0.03 268);
-  --secondary: oklch(0.955 0.01 260);
-  --secondary-foreground: oklch(0.3 0.04 265);
-  --muted: oklch(0.96 0.008 260);
-  --muted-foreground: oklch(0.53 0.03 260);
-  --accent: oklch(0.94 0.035 250);
-  --accent-foreground: oklch(0.32 0.08 265);
-  --success: oklch(0.6 0.14 155);
-  --success-foreground: oklch(0.99 0.005 160);
-  --success-soft: oklch(0.94 0.05 155);
-  --warning: oklch(0.75 0.15 75);
-  --warning-foreground: oklch(0.25 0.06 75);
-  --warning-soft: oklch(0.95 0.06 85);
-  --destructive: oklch(0.58 0.21 25);
-  --destructive-foreground: oklch(0.99 0.005 25);
-  --destructive-soft: oklch(0.95 0.04 25);
-  --border: oklch(0.915 0.012 258);
-  --input: oklch(0.915 0.012 258);
-  --ring: oklch(0.52 0.19 268);
-  --chart-1: oklch(0.52 0.19 268);
-  --chart-2: oklch(0.65 0.15 220);
-  --chart-3: oklch(0.6 0.14 155);
-  --chart-4: oklch(0.75 0.15 75);
-  --chart-5: oklch(0.58 0.21 25);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.35 0.03 265);
-  --sidebar-primary: oklch(0.52 0.19 268);
-  --sidebar-primary-foreground: oklch(0.99 0.005 260);
-  --sidebar-accent: oklch(0.95 0.03 268);
-  --sidebar-accent-foreground: oklch(0.4 0.14 268);
-  --sidebar-border: oklch(0.925 0.012 258);
-  --sidebar-ring: oklch(0.52 0.19 268);
+  --radius: 0.375rem;
+
+  /* superficies */
+  --bg: #fcfcfd;
+  --paper: #f3f4f7;
+  --paper-2: #eaecf1;
+  /* tinta */
+  --ink: #0a0d13;
+  --ink-2: #565e6e;
+  --ink-3: #8b93a3;
+  /* líneas */
+  --line: #dfe3ea;
+  --line-2: #c6ccd8;
+  /* acento: el azul es el único color de marca */
+  --brand: #1a4cf0;
+  --brand-soft: rgba(26, 76, 240, 0.08);
+  --brand-line: rgba(26, 76, 240, 0.32);
+  --brand-solid: #1a4cf0;
+  --brand-solid-hover: #1239bd;
+  /* estados: cada uno con su tinta, su fondo y su línea */
+  --ok-fg: #145c39;
+  --ok-bg: rgba(31, 122, 77, 0.1);
+  --ok-line: rgba(31, 122, 77, 0.4);
+  --warn-fg: #6d4700;
+  --warn-bg: rgba(138, 90, 0, 0.1);
+  --warn-line: rgba(138, 90, 0, 0.4);
+  --bad-fg: #8a2f27;
+  --bad-bg: rgba(161, 59, 50, 0.1);
+  --bad-line: rgba(161, 59, 50, 0.4);
+  /* la cabecera de las tablas: una banda oscura con texto claro */
+  --head-bg: #0a0d13;
+  --head-fg: #fcfcfd;
+  /* el texto sobre el botón de tinta */
+  --on-ink: #fcfcfd;
+  --ink-hover: #1c2230;
+
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--bg);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --primary-soft: var(--brand-soft);
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--paper-2);
+  --accent-foreground: var(--ink);
+  --success: var(--ok-fg);
+  --success-foreground: #ffffff;
+  --success-soft: var(--ok-bg);
+  --warning: var(--warn-fg);
+  --warning-foreground: var(--ink);
+  --warning-soft: var(--warn-bg);
+  --destructive: var(--bad-fg);
+  --destructive-foreground: #ffffff;
+  --destructive-soft: var(--bad-bg);
+  --border: var(--line);
+  --input: var(--line-2);
+  --ring: var(--brand);
+  --chart-1: #1a4cf0;
+  --chart-2: #0f9b8e;
+  --chart-3: #1f7a4d;
+  --chart-4: #8a5a00;
+  --chart-5: #a13b32;
+  --sidebar: var(--bg);
+  --sidebar-foreground: var(--ink-2);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--paper-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-hover: var(--paper);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--brand);
 }
 
 .dark {
-  --background: oklch(0.19 0.025 265);
-  --foreground: oklch(0.97 0.005 250);
-  --card: oklch(0.24 0.03 265);
-  --card-foreground: oklch(0.97 0.005 250);
-  --popover: oklch(0.24 0.03 265);
-  --popover-foreground: oklch(0.97 0.005 250);
-  --primary: oklch(0.68 0.16 268);
-  --primary-foreground: oklch(0.18 0.04 265);
-  --primary-soft: oklch(0.3 0.07 268);
-  --secondary: oklch(0.29 0.03 265);
-  --secondary-foreground: oklch(0.97 0.005 250);
-  --muted: oklch(0.29 0.03 265);
-  --muted-foreground: oklch(0.72 0.02 258);
-  --accent: oklch(0.32 0.05 265);
-  --accent-foreground: oklch(0.95 0.01 250);
-  --success: oklch(0.68 0.14 155);
-  --success-foreground: oklch(0.18 0.04 160);
-  --success-soft: oklch(0.3 0.06 155);
-  --warning: oklch(0.8 0.14 80);
-  --warning-foreground: oklch(0.2 0.05 75);
-  --warning-soft: oklch(0.32 0.06 80);
-  --destructive: oklch(0.68 0.18 25);
-  --destructive-foreground: oklch(0.18 0.04 25);
-  --destructive-soft: oklch(0.32 0.08 25);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.68 0.16 268);
-  --chart-1: oklch(0.68 0.16 268);
-  --chart-2: oklch(0.72 0.13 220);
-  --chart-3: oklch(0.68 0.14 155);
-  --chart-4: oklch(0.8 0.14 80);
-  --chart-5: oklch(0.68 0.18 25);
-  --sidebar: oklch(0.22 0.03 265);
-  --sidebar-foreground: oklch(0.9 0.01 250);
-  --sidebar-primary: oklch(0.68 0.16 268);
-  --sidebar-primary-foreground: oklch(0.18 0.04 265);
-  --sidebar-accent: oklch(0.3 0.05 268);
-  --sidebar-accent-foreground: oklch(0.95 0.01 250);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.68 0.16 268);
+  --bg: #0b0e14;
+  --paper: #12161f;
+  --paper-2: #1a202b;
+  --ink: #edf0f5;
+  --ink-2: #a7afbe;
+  --ink-3: #767f8f;
+  --line: #232a36;
+  --line-2: #333b4a;
+  --brand: #4c7bff;
+  --brand-soft: rgba(76, 123, 255, 0.12);
+  --brand-line: rgba(76, 123, 255, 0.4);
+  /* el botón de acento se oscurece para que el texto blanco se lea */
+  --brand-solid: #2f5fe0;
+  --brand-solid-hover: #3f6ce8;
+  --ok-fg: #8fd9b2;
+  --ok-bg: rgba(31, 122, 77, 0.22);
+  --ok-line: rgba(31, 122, 77, 0.55);
+  --warn-fg: #e3b55e;
+  --warn-bg: rgba(138, 90, 0, 0.22);
+  --warn-line: rgba(138, 90, 0, 0.55);
+  --bad-fg: #f0a49c;
+  --bad-bg: rgba(161, 59, 50, 0.22);
+  --bad-line: rgba(161, 59, 50, 0.55);
+  --head-bg: #161c27;
+  --head-fg: #edf0f5;
+  --on-ink: #0b0e14;
+  --ink-hover: #ffffff;
+
+  --primary-foreground: #ffffff;
+  --success-foreground: #0b0e14;
+  --warning-foreground: #0b0e14;
+  --destructive-foreground: #0b0e14;
+  --chart-1: #4c7bff;
+  --chart-2: #2dd4bf;
+  --chart-3: #2bd98a;
+  --chart-4: #f5a524;
+  --chart-5: #f05d5e;
+  --shadow-lift: 0 12px 32px -12px rgba(0, 0, 0, 0.72);
 }
 
 @layer base {
@@ -194,11 +233,49 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+   * The focus is always visible: the reader has to know where the
+   * keyboard is. The outline uses the brand, the same as the site.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
 }
 
 @utility surface-card {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+}
+
+/*
+ * The header of a table: a dark band, as in the public site. It is the
+ * one place where the ink is inverted.
+ */
+@utility table-head-band {
+  background-color: var(--head-bg);
+  color: var(--head-fg);
+}
+
+@utility code-cell {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * The motion is decoration: the reader who asked for less motion gets
+ * none.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
