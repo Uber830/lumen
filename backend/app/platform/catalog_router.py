@@ -45,6 +45,7 @@ from app.platform.catalog_schemas import (
     PatchMaterialRequest,
     SchoolCatalogItem,
     SchoolDetail,
+    SchoolMaterialAccessRequest,
     SchoolPage,
     SchoolRef,
     SchoolSummary,
@@ -934,6 +935,62 @@ async def read_school(
         short_code=school.short_code,
         city=school.city,
         status=school.status,
+        plan=row.get("plan"),
+        students=row.get("students", 0),
+        teachers=row.get("teachers", 0),
+        covered=row.get("covered", 0),
+        total=total,
+        catalog=[SchoolCatalogItem(**item) for item in access],
+    )
+
+
+@router.put("/schools/{school_id}/materials/{material_id}", response_model=SchoolDetail)
+async def set_school_material_access(
+    school_id: uuid.UUID,
+    material_id: uuid.UUID,
+    body: SchoolMaterialAccessRequest,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolDetail:
+    """Enable or disable one material for one school.
+
+    It is the switch of the sheet of a school: the piece enters or
+    leaves the catalog the institution sees. A published piece that
+    leaves a school asks for a confirmation first.
+    """
+    school = await session.get(School, school_id)
+    if school is None:
+        raise NotFoundError("The school does not exist.")
+    material = await _load_material(session, material_id)
+
+    current_rows = await session.execute(
+        select(MaterialSchool.school_id).where(MaterialSchool.material_id == material.id)
+    )
+    current = [school_id for (school_id,) in current_rows.all()]
+
+    wanted = [*current, school_id] if body.enabled else [id for id in current if id != school_id]
+    await _replace_schools(
+        session,
+        material=material,
+        wanted=wanted,
+        confirm=body.confirm,
+        actor_id=context.user_id,
+    )
+    await session.commit()
+
+    refreshed = await session.get(School, school_id)
+    assert refreshed is not None
+    figures = await catalog.school_figures(session, [refreshed.id])
+    row = figures.get(refreshed.id, {})
+    total = await catalog.total_materials(session)
+    access = await catalog.school_catalog_access(session, refreshed.id)
+
+    return SchoolDetail(
+        id=refreshed.id,
+        name=refreshed.name,
+        short_code=refreshed.short_code,
+        city=refreshed.city,
+        status=refreshed.status,
         plan=row.get("plan"),
         students=row.get("students", 0),
         teachers=row.get("teachers", 0),

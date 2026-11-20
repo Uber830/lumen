@@ -208,6 +208,17 @@ class PatchMaterialRequest(BaseModel):
         return None if value is None else _one_of(value, VISIBLE_TO, "visible_to")
 
 
+class SchoolMaterialAccessRequest(BaseModel):
+    """Whether a school can see a material.
+
+    `confirm` is sent again when the server asks for it: a published
+    piece that leaves a school needs the confirmation.
+    """
+
+    enabled: bool
+    confirm: bool = False
+
+
 class StatusRequest(BaseModel):
     """The body of POST /v1/platform/catalog/{id}/status."""
 
@@ -369,6 +380,7 @@ class CatalogOptions(BaseModel):
 __all__ = [
     "SchoolCatalogItem",
     "SchoolDetail",
+    "SchoolMaterialAccessRequest",
     "AuditEntryOut",
     "AuditPage",
     "CatalogOptions",
