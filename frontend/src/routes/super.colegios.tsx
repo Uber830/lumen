@@ -167,9 +167,7 @@ function Colegios() {
                 </caption>
                 <thead className="table-head-band">
                   <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                    <th scope="col" className="w-10 px-5 py-3">
-                      <span className="sr-only">Seleccionar</span>
-                    </th>
+                    <th scope="col" aria-label="Seleccionar" className="w-10 px-5 py-3" />
                     <th scope="col" className="px-5 py-3 font-semibold">
                       Colegio
                     </th>
@@ -188,9 +186,11 @@ function Colegios() {
                     <th scope="col" className="px-5 py-3 font-semibold">
                       Estado
                     </th>
-                    <th scope="col" className="px-5 py-3 text-right font-semibold">
-                      <span className="sr-only">Acciones</span>
-                    </th>
+                    <th
+                      scope="col"
+                      aria-label="Acciones"
+                      className="px-5 py-3 text-right font-semibold"
+                    />
                   </tr>
                 </thead>
                 <tbody>
