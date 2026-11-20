@@ -93,6 +93,7 @@ export function SectionCard({
   title,
   description,
   actions,
+  leading,
   children,
   className,
   bodyClassName,
@@ -100,17 +101,22 @@ export function SectionCard({
   title?: string;
   description?: string;
   actions?: ReactNode;
+  /** What goes before the title: a link to the screen of the block. */
+  leading?: ReactNode;
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
 }) {
   return (
     <section className={cn("surface-card overflow-hidden", className)}>
-      {(title || actions) && (
+      {(title || actions || leading) && (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            {title && <h2 className="truncate text-[15px] font-semibold">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+          <div className="flex min-w-0 items-center gap-3">
+            {leading}
+            <div className="min-w-0">
+              {title && <h2 className="truncate text-[15px] font-semibold">{title}</h2>}
+              {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+            </div>
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
@@ -462,7 +468,7 @@ export function MeterRow({
 }) {
   const percent = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="grid grid-cols-[150px_1fr_54px] items-center gap-3 py-1.5 text-sm">
+    <div className="grid grid-cols-[128px_1fr_48px] items-center gap-3 py-1 text-sm">
       <span className="truncate">{label}</span>
       <span className="h-2 overflow-hidden rounded-full bg-muted">
         <span

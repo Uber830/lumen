@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, Building2, GraduationCap, Users } from "lucide-react";
+import { BookOpen, Building2, ChevronRight, GraduationCap, Users } from "lucide-react";
 
 import {
   MeterRow,
@@ -60,15 +60,6 @@ function SuperDashboard() {
       <PageHeader
         title="Panel global"
         subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
-        actions={
-          <Link
-            to="/super/catalogo"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            <BookOpen className="size-4" strokeWidth={1.9} aria-hidden />
-            Abrir el catálogo
-          </Link>
-        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -102,62 +93,89 @@ function SuperDashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <SectionCard title="Catálogo editorial" description="El material por estado y por área">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-            Por estado
-          </p>
-          {Object.keys(byStatus).length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">Todavía no hay material.</p>
-          ) : (
-            STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
-              <MeterRow
-                key={status}
-                label={MATERIAL_STATUS_LABEL[status]}
-                value={byStatus[status] ?? 0}
-                max={maxStatus}
-              />
-            ))
-          )}
+        <SectionCard
+          title="Catálogo editorial"
+          description="El material por estado y por área"
+          leading={
+            <Link
+              to="/super/catalogo"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+            >
+              Abrir catálogo
+              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
+            </Link>
+          }
+        >
+          <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+                Por estado
+              </p>
+              {Object.keys(byStatus).length === 0 ? (
+                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+              ) : (
+                STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
+                  <MeterRow
+                    key={status}
+                    label={MATERIAL_STATUS_LABEL[status]}
+                    value={byStatus[status] ?? 0}
+                    max={maxStatus}
+                  />
+                ))
+              )}
+            </div>
 
-          <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-            Por área
-          </p>
-          {Object.keys(byArea).length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">Todavía no hay material.</p>
-          ) : (
-            Object.entries(byArea)
-              .sort((a, b) => b[1] - a[1])
-              .map(([area, count]) => (
-                <MeterRow key={area} label={area} value={count} max={maxArea} />
-              ))
-          )}
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+                Por área
+              </p>
+              {Object.keys(byArea).length === 0 ? (
+                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+              ) : (
+                Object.entries(byArea)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([area, count]) => (
+                    <MeterRow key={area} label={area} value={count} max={maxArea} />
+                  ))
+              )}
+            </div>
+          </div>
         </SectionCard>
 
         <SectionCard
           title="Cobertura del catálogo"
           description="Qué colegio ve qué parte del catálogo"
+          actions={
+            <Link
+              to="/super/colegios"
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Ver todos
+            </Link>
+          }
+          bodyClassName="p-0"
         >
           {coverage.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
+            <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
           ) : (
             <ul className="flex flex-col">
-              {coverage.map((school) => (
+              {coverage.slice(0, 6).map((school) => (
                 <li
                   key={school.school_id}
-                  className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0"
+                  className="flex items-center gap-3 border-b border-border px-5 py-2 last:border-b-0"
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{school.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {school.short_code} · {school.students} estudiantes
-                    </span>
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{school.name}</span>
                   <StatusPill
                     label={`${school.covered} de ${school.total}`}
                     tone={school.covered === school.total ? "success" : "muted"}
                   />
                 </li>
               ))}
+              {coverage.length > 6 && (
+                <li className="px-5 py-2 text-xs text-muted-foreground">
+                  y {coverage.length - 6} colegios más
+                </li>
+              )}
             </ul>
           )}
         </SectionCard>
