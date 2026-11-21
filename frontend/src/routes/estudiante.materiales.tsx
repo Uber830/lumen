@@ -1,15 +1,6 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useState } from "react";
-import {
-  CheckCircle2,
-  Circle,
-  Download,
-  ExternalLink,
-  FileText,
-  Link2,
-  Loader2,
-  Video,
-} from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, FileText, Link2, Video } from "lucide-react";
 
 import { PageHeader, SectionCard, StatCard } from "@/components/ui-kit";
 import { StatusBadge } from "@/components/status-badge";
@@ -19,7 +10,6 @@ import {
   useMyContentProgress,
   useUnmarkContentCompleted,
 } from "@/features/student/use-my-content";
-import { BUCKETS, createSignedUrl } from "@/lib/storage/files";
 
 export const Route = createFileRoute("/estudiante/materiales")({
   head: () => ({
@@ -55,9 +45,6 @@ function Materiales() {
   const mark = useMarkContentCompleted(schoolId ?? "");
   const unmark = useUnmarkContentCompleted(schoolId ?? "");
 
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-
   if (!schoolId) {
     return (
       <div className="surface-card mx-auto max-w-md p-8 text-center">
@@ -72,19 +59,6 @@ function Materiales() {
   const items = content.data ?? [];
   const completedIds = new Set((progress.data ?? []).map((row) => row.content_item_id));
   const completedCount = items.filter((item) => completedIds.has(item.id)).length;
-
-  async function openStoredFile(itemId: string, path: string) {
-    setDownloadingId(itemId);
-    setDownloadError(null);
-    try {
-      const url = await createSignedUrl(BUCKETS.classContent, path, 120);
-      window.open(url, "_blank", "noopener");
-    } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : "No se pudo abrir el archivo.");
-    } finally {
-      setDownloadingId(null);
-    }
-  }
 
   return (
     <>
@@ -106,13 +80,11 @@ function Materiales() {
         />
       </div>
 
-      {downloadError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {downloadError}
-        </p>
-      ) : null}
-
-      <SectionCard title="Material disponible" bodyClassName="p-0">
+      <SectionCard
+        title="Material disponible"
+        description="El material vive dentro de la plataforma: se consulta aquí y no se descarga."
+        bodyClassName="p-0"
+      >
         {content.isLoading ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">Cargando materiales...</p>
         ) : content.error ? (
@@ -151,9 +123,16 @@ function Materiales() {
                           {item.body}
                         </p>
                       ) : null}
+                      {!item.external_url && item.storage_path ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Disponible dentro de la plataforma.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-2">
+                      {/* El material se consulta en la plataforma: no se
+                          descarga. Solo el enlace externo se abre. */}
                       {item.external_url ? (
                         <a
                           href={item.external_url}
@@ -163,20 +142,6 @@ function Materiales() {
                         >
                           <ExternalLink className="size-3.5" /> Abrir
                         </a>
-                      ) : item.storage_path ? (
-                        <button
-                          type="button"
-                          onClick={() => void openStoredFile(item.id, item.storage_path as string)}
-                          disabled={downloadingId === item.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-60"
-                        >
-                          {downloadingId === item.id ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            <Download className="size-3.5" />
-                          )}
-                          Descargar
-                        </button>
                       ) : null}
 
                       <button
