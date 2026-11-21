@@ -68,10 +68,10 @@ export function StatCard({
   tone?: keyof typeof statTone;
 }) {
   return (
-    <div className="surface-card relative overflow-hidden p-5">
+    <div className="surface-card relative overflow-hidden p-4">
       <span className={cn("absolute inset-x-0 bottom-0 h-0.5", statAccent[tone])} aria-hidden />
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
         {Icon && (
           <span
             className={cn(
@@ -83,8 +83,8 @@ export function StatCard({
           </span>
         )}
       </div>
-      <p className="mt-3 text-[29px] font-bold leading-none tracking-[-0.03em]">{value}</p>
-      {delta && <p className="mt-1.5 text-xs text-muted-foreground">{delta}</p>}
+      <p className="mt-2 text-[26px] font-bold leading-none tracking-[-0.03em]">{value}</p>
+      {delta && <p className="mt-1 text-[11px] text-muted-foreground">{delta}</p>}
     </div>
   );
 }
