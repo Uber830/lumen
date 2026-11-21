@@ -17,11 +17,7 @@ import { MaterialPanel } from "@/features/platform/material-panel";
 import { SchoolsOfMaterial } from "@/features/platform/schools-of-material";
 import { UploadWizard } from "@/features/platform/upload-wizard";
 import { useCatalog, useCatalogOptions, usePlatformSchools } from "@/lib/platform/hooks";
-import {
-  MATERIAL_STATUS_LABEL,
-  MATERIAL_STATUS_TONE,
-  type MaterialSummary,
-} from "@/lib/platform/types";
+import { MATERIAL_STATUS_LABEL, MATERIAL_STATUS_TONE } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/super/catalogo")({
@@ -52,7 +48,8 @@ function Catalogo() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [accessOf, setAccessOf] = useState<MaterialSummary | null>(null);
+  // The id of the material whose schools are open in the dialog.
+  const [accessOf, setAccessOf] = useState<string | null>(null);
 
   const options = useCatalogOptions();
   const schools = usePlatformSchools({ per_page: 50 });
@@ -252,7 +249,7 @@ function Catalogo() {
                               <button
                                 key={school.id}
                                 type="button"
-                                onClick={() => setAccessOf(item)}
+                                onClick={() => setAccessOf(item.id)}
                                 title="Ver todos los colegios con acceso"
                                 className="inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
                               >
@@ -261,7 +258,7 @@ function Catalogo() {
                             ))}
                             <ExtraCount
                               count={item.schools_extra}
-                              onClick={() => setAccessOf(item)}
+                              onClick={() => setAccessOf(item.id)}
                             />
                           </div>
                         )}
@@ -294,12 +291,13 @@ function Catalogo() {
         )}
       </section>
 
-      <SchoolsOfMaterial materialId={accessOf?.id ?? null} onClose={() => setAccessOf(null)} />
+      <SchoolsOfMaterial materialId={accessOf} onClose={() => setAccessOf(null)} />
 
       <MaterialPanel
         key={openId ?? "none"}
         materialId={openId}
         onClose={() => setOpenId(null)}
+        onShowSchools={() => setAccessOf(openId)}
         className={cn("w-full sm:max-w-lg")}
       />
 

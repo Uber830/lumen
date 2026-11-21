@@ -228,6 +228,19 @@ export const MATERIAL_STATUS_TONE: Record<
   archived: "danger",
 };
 
+/**
+ * What each state means for the school that gets the piece.
+ *
+ * The state names say where the piece is; these lines say what the
+ * school can expect from it.
+ */
+export const MATERIAL_STATUS_HINT: Record<MaterialStatus, string> = {
+  draft: "Se puede seguir completando",
+  review: "Pendiente de visto bueno",
+  published: "Visible en los cursos",
+  archived: "Retirado del catálogo",
+};
+
 // =============================================================================
 // The support desk
 // -----------------------------------------------------------------------------
