@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, loadEnv } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { devtools } from "@tanstack/devtools-vite";
@@ -20,6 +22,11 @@ export default defineConfig(({ command }) => ({
   resolve: {
     // `@/*` alias is picked up from tsconfig.json's `paths` field.
     tsconfigPaths: true,
+    // `tsconfig.json` excludes `src/components/ui/**` (the shadcn
+    // components), and the path mapping does not reach the files it
+    // excludes. The alias is declared here as well so those components
+    // resolve `@/lib/utils` in every environment.
+    alias: [{ find: /^@\//, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
     dedupe: [
       "react",
       "react-dom",

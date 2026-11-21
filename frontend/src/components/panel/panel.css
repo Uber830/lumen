@@ -1,0 +1,117 @@
+/* =============================================================================
+ * The panel of the school administrator.
+ * -----------------------------------------------------------------------------
+ * The scope class of the whole application panel: the school admin, the
+ * teacher and the student. The public site keeps its own palette (the
+ * "El Índice" scope, features/site/site.css).
+ *
+ * The palette is the one of the product: a dark surface, one accent for
+ * the school, and a colour for every state. The card separates from the
+ * background with a border, not with a shadow: the shadow is only for
+ * the floating things (the drawer, the dropdown, the toast).
+ *
+ * The school's own primary colour replaces `--primary` in the instance of
+ * that school (see lib/school/theme.ts). The default blue is the one
+ * below.
+ * ============================================================================= */
+
+.lumen-panel {
+  /* The surfaces, from the deepest to the closest to the reader. */
+  --background: #080d1a;
+  --foreground: #e9eff9;
+  --card: #101a2e;
+  --card-foreground: #e9eff9;
+  --popover: #15223b;
+  --popover-foreground: #e9eff9;
+  --secondary: #1c2c4b;
+  --secondary-foreground: #e9eff9;
+  --muted: #0b1222;
+  --muted-foreground: #a0b2ce;
+  --accent: #15223b;
+  --accent-foreground: #e9eff9;
+
+  /* The school accent. It is replaced by the school's own colour. */
+  --primary: #2e8fff;
+  --primary-foreground: #ffffff;
+  --primary-soft: rgba(46, 143, 255, 0.13);
+
+  /* The states. Each one has a tint, for the pills and the alerts. */
+  --success: #2bd98a;
+  --success-foreground: #e9eff9;
+  --success-soft: rgba(43, 217, 138, 0.13);
+  --warning: #f5a524;
+  --warning-foreground: #e9eff9;
+  --warning-soft: rgba(245, 165, 36, 0.13);
+  --destructive: #f05d5e;
+  --destructive-foreground: #e9eff9;
+  --destructive-soft: rgba(240, 93, 94, 0.13);
+  --teal: #2dd4bf;
+  --teal-foreground: #e9eff9;
+  --teal-soft: rgba(45, 212, 191, 0.13);
+
+  /* The lines. There are two: the one that separates and the one that
+     marks an active control. */
+  --border: rgba(150, 175, 220, 0.13);
+  --input: rgba(150, 175, 220, 0.26);
+  --ring: #2e8fff;
+
+  /* The rail. */
+  --sidebar: #0b1222;
+  --sidebar-foreground: #a0b2ce;
+  --sidebar-primary: #2e8fff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #15223b;
+  --sidebar-accent-foreground: #e9eff9;
+  --sidebar-border: rgba(150, 175, 220, 0.13);
+  --sidebar-ring: #2e8fff;
+
+  /* The type. One sans for the text and one monospaced for the codes
+     and the dates. */
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* The radius: 16 px for the cards and the modals, 12 px for the
+     fields and the buttons, 20 px for the floating things. */
+  --radius: 0.75rem;
+
+  /* The shadow is only for the floating things. */
+  --shadow-lift: 0 12px 32px -12px rgba(2, 6, 16, 0.85);
+
+  /* The panel is dark: the text does not follow the theme of the site. */
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/*
+ * The tertiary text and the monospaced codes. The identifiers and the
+ * dates are the ones that have to be read character by character.
+ */
+.lumen-panel .font-mono,
+.lumen-panel code,
+.lumen-panel kbd {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/*
+ * The scrollbar of the panel, in the colour of the lines.
+ */
+.lumen-panel * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 175, 220, 0.18) transparent;
+}
+
+.lumen-panel *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.lumen-panel *::-webkit-scrollbar-thumb {
+  background: rgba(150, 175, 220, 0.18);
+  border-radius: 20px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

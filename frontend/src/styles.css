@@ -4,18 +4,28 @@
 
 /*
  * Self-hosted typefaces. The public site (El Índice) is set in Space
- * Grotesk and IBM Plex Mono; they are bundled instead of pulled from a
- * CDN so the first paint does not wait on a third party. Only the
- * latin subset is bundled: the site is written in Spanish.
+ * Grotesk and IBM Plex Mono; the application panel is set in Outfit
+ * and JetBrains Mono. They are bundled instead of pulled from a CDN
+ * so the first paint does not wait on a third party. Only the latin
+ * subset is bundled: everything is written in Spanish.
  */
 @import "@fontsource/space-grotesk/latin-400.css";
 @import "@fontsource/space-grotesk/latin-500.css";
 @import "@fontsource/space-grotesk/latin-700.css";
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/outfit/latin-400.css";
+@import "@fontsource/outfit/latin-500.css";
+@import "@fontsource/outfit/latin-600.css";
+@import "@fontsource/outfit/latin-700.css";
+@import "@fontsource/jetbrains-mono/latin-400.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
 
 /* The scope class of the public site and its design tokens. */
 @import "./features/site/site.css";
+
+/* The scope class of the application panel: its palette and its type. */
+@import "./components/panel/panel.css";
 
 @custom-variant dark (&:is(.dark *));
 
