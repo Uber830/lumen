@@ -2,7 +2,7 @@ import { AlertTriangle, Check, FileText, History, Link2, Trash2, X } from "lucid
 import { useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
-import { ExtraCount, StatusPill, Tag } from "@/components/ui-kit";
+import { StatusPill, Tag } from "@/components/ui-kit";
 import { useChangeMaterialStatus, useDeleteMaterial, useMaterial } from "@/lib/platform/hooks";
 import {
   MATERIAL_STATUS_HINT,
@@ -17,22 +17,18 @@ import { cn } from "@/lib/utils";
  *
  * It shows the metadata, the state of the piece, the schools that can
  * see it and the history. The access is not changed from here: the
- * panel says which schools have it and the list of all of them opens
- * in the dialog of the catalog. The switch per school lives in the
- * sheet of the school (Colegios → Gestionar), where the piece is
+ * panel says which schools have it. The switch per school lives in
+ * the sheet of the school (Colegios → Gestionar), where the piece is
  * listed with the rest of the catalog.
  */
 
 export function MaterialPanel({
   materialId,
   onClose,
-  onShowSchools,
   className,
 }: {
   materialId: string | null;
   onClose: () => void;
-  /** Opens the list of every school that has access to the piece. */
-  onShowSchools?: () => void;
   className?: string;
 }) {
   const material = useMaterial(materialId);
@@ -189,14 +185,13 @@ export function MaterialPanel({
                     Este material todavía no tiene colegio con acceso.
                   </p>
                 ) : (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {schools.slice(0, 2).map((school) => (
-                      <Tag key={school.id}>{school.name}</Tag>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {schools.map((school) => (
+                      <li key={school.id}>
+                        <Tag>{school.name}</Tag>
+                      </li>
                     ))}
-                    {schools.length > 2 && (
-                      <ExtraCount count={schools.length - 2} onClick={onShowSchools} />
-                    )}
-                  </div>
+                  </ul>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">
                   El acceso se modifica en Colegios → Gestionar: allí está el interruptor de cada
