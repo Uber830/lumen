@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, Building2, ChevronRight, GraduationCap, Users } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, Users } from "lucide-react";
 
 import {
   MeterRow,
@@ -99,14 +99,13 @@ function SuperDashboard() {
           leading={
             <Link
               to="/super/catalogo"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+              className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
               Abrir catálogo
-              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
             </Link>
           }
         >
-          <div>
+          <div className="max-h-[18.5rem] overflow-y-auto pr-1">
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
               Por estado
             </p>
@@ -146,10 +145,9 @@ function SuperDashboard() {
           leading={
             <Link
               to="/super/colegios"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+              className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
               Ver todos
-              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
             </Link>
           }
           bodyClassName="p-0"
@@ -157,7 +155,7 @@ function SuperDashboard() {
           {coverage.length === 0 ? (
             <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
           ) : (
-            <ul className="flex flex-col">
+            <ul className="flex max-h-[21rem] flex-col overflow-y-auto">
               {coverage.map((school) => (
                 <li
                   key={school.school_id}
