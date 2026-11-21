@@ -393,3 +393,57 @@ class SchoolIdentityUpdate(BaseModel):
     primary_color: str | None = None
 
 
+class AdminPermissionOut(BaseModel):
+    """One thing the rank of an administrator may do."""
+
+    permission: str
+    label: str
+
+
+class AdminOut(BaseModel):
+    """One administrator of the school, with its rank."""
+
+    membership_id: str
+    user_id: str
+    full_name: str
+    email: str | None = None
+    joined_at: datetime
+    # principal or secundario.
+    admin_role: str = "secundario"
+    # activo or inactivo.
+    status: str = "activo"
+    account_activated: bool = False
+    # What this rank may do, spelled out instead of implicit.
+    permissions: list[AdminPermissionOut] = Field(default_factory=list)
+
+
+class AdminInviteIn(BaseModel):
+    """The invitation of an administrator of the school."""
+
+    email: str
+    full_name: str
+    # principal or secundario. The school keeps one principal.
+    admin_role: str = "secundario"
+
+
+class AdminRankIn(BaseModel):
+    """The new rank of an administrator."""
+
+    admin_role: str
+
+
+class AdminInviteOut(BaseModel):
+    """The answer of an invitation.
+
+    The activation token travels back to the administrator: there is no
+    email provider yet, and the link is what the new administrator
+    uses to set their password.
+    """
+
+    user_id: str
+    email: str
+    membership_id: str
+    admin_role: str
+    activation_token: str | None = None
+
+

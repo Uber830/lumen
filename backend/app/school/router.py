@@ -17,17 +17,21 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
 from app.core.context import Membership, RequestContext
-from app.core.errors import NotFoundError
-from app.db.enums import SchoolRole
+from app.core.errors import ConflictError, NotFoundError
+from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import community, cycles, identity, operations
+from app.school import community, cycles, identity, operations, team
 from app.school.schemas import (
+    AdminInviteIn,
+    AdminInviteOut,
+    AdminOut,
+    AdminRankIn,
     AdminSchoolOut,
     AdminUserOut,
     AssignmentOut,
@@ -406,5 +410,109 @@ async def upload_school_logo(
 
     identity_data = await identity.get_identity(session, membership.school_id)
     return SchoolIdentityOut.model_validate(identity_data)
+
+
+@router.get("/admins", response_model=list[AdminOut])
+async def list_school_admins(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[AdminOut]:
+    """The team of administrators of the school, with its rank."""
+    membership = _require_admin(context)
+    admins = await team.list_admins(session, membership.school_id)
+    return [AdminOut.model_validate(admin) for admin in admins]
+
+
+@router.post("/admins/invite", response_model=AdminInviteOut, status_code=201)
+async def invite_school_admin(
+    body: AdminInviteIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminInviteOut:
+    """Invite an administrator to the team.
+
+    Only the principal does it: inviting a colleague is a decision of
+    the school, not of its helper.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
+
+    from app.auth.operations import issue_activation_token
+    from app.db.enums import SchoolAdminRole, SchoolRole
+    from app.users.operations import create_invited_user
+
+    rank = SchoolAdminRole(body.admin_role)
+
+    try:
+        user, admin_membership = await create_invited_user(
+            session,
+            email=body.email,
+            full_name=body.full_name,
+            role=SchoolRole.SCHOOL_ADMIN,
+            school_id=membership.school_id,
+        )
+    except ConflictError as error:
+        raise ConflictError(
+            "Ya existe un administrador con ese correo en tu colegio.",
+            code="duplicate_email",
+        ) from error
+
+    # The invitation chooses the rank: the school decides who runs it.
+    admin_membership.admin_role = rank
+
+    # The activation link: there is no email provider yet, and the
+    # administrator passes it to the colleague.
+    activation_token, _expires_at = await issue_activation_token(session, user.id)
+    await session.commit()
+
+    return AdminInviteOut(
+        user_id=str(user.id),
+        email=user.email,
+        membership_id=str(admin_membership.id),
+        admin_role=rank.value,
+        activation_token=activation_token,
+    )
+
+
+@router.patch("/admins/{membership_id}", response_model=AdminOut)
+async def update_school_admin(
+    membership_id: uuid.UUID,
+    body: AdminRankIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminOut:
+    """Change the rank of an administrator.
+
+    The last principal cannot be demoted.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
+
+    rank = SchoolAdminRole(body.admin_role)
+    await team.set_rank(session, membership.school_id, membership_id, rank)
+
+    admins = await team.list_admins(session, membership.school_id)
+    for admin in admins:
+        if admin["membership_id"] == str(membership_id):
+            return AdminOut.model_validate(admin)
+
+    raise NotFoundError("Administrator not found.")
+
+
+@router.delete("/admins/{membership_id}", status_code=204)
+async def remove_school_admin(
+    membership_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Remove an administrator from the team.
+
+    The last principal cannot be removed.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
+
+    await team.remove(session, membership.school_id, membership_id)
+    return Response(status_code=204)
 
 
