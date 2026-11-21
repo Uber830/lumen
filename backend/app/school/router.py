@@ -26,13 +26,14 @@ from app.core.errors import NotFoundError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import operations
+from app.school import community, operations
 from app.school.schemas import (
     AdminSchoolOut,
     AdminUserOut,
     CurrentPeriodOut,
     MaterialDetailOut,
     MaterialPage,
+    MemberPage,
     SchoolAdminMe,
     SchoolOverview,
 )
@@ -181,5 +182,62 @@ async def school_overview(
     membership = _require_admin(context)
     overview = await operations.get_overview(session, membership.school_id)
     return SchoolOverview.model_validate(overview)
+
+
+@router.get("/teachers", response_model=MemberPage)
+async def list_school_teachers(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    q: Annotated[str | None, Query(description="Nombre o correo del docente")] = None,
+    status: Annotated[str | None, Query(description="activo o inactivo")] = None,
+    course_id: Annotated[uuid.UUID | None, Query(description="Curso del filtro")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> MemberPage:
+    """The teachers of the school, with their access to the content.
+
+    The search, the filters and the pagination run in the server: the
+    list of a school with hundreds of teachers is never pulled into the
+    browser to be filtered there.
+    """
+    membership = _require_admin(context)
+    page_data = await community.list_teachers(
+        session,
+        membership.school_id,
+        query=q,
+        status=status,
+        course_id=course_id,
+        page=page,
+        per_page=per_page,
+    )
+    return MemberPage.model_validate(page_data)
+
+
+@router.get("/students", response_model=MemberPage)
+async def list_school_students(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    q: Annotated[str | None, Query(description="Nombre o correo del estudiante")] = None,
+    status: Annotated[str | None, Query(description="activo o inactivo")] = None,
+    course_id: Annotated[uuid.UUID | None, Query(description="Curso del filtro")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> MemberPage:
+    """The students of the school, with their course and their average.
+
+    The average is `null` when the student has no grades: it is not a
+    zero.
+    """
+    membership = _require_admin(context)
+    page_data = await community.list_students(
+        session,
+        membership.school_id,
+        query=q,
+        status=status,
+        course_id=course_id,
+        page=page,
+        per_page=per_page,
+    )
+    return MemberPage.model_validate(page_data)
 
 

@@ -229,3 +229,56 @@ __all__ = [
 ]
 
 
+class TeacherListItem(BaseModel):
+    """One teacher of the school, with its access to the content."""
+
+    membership_id: str
+    user_id: str
+    full_name: str | None = None
+    email: str | None = None
+    joined_at: datetime
+    revoked_at: datetime | None = None
+    account_activated: bool = False
+    # The courses the teacher teaches and the subjects of each one.
+    courses: list[str] = Field(default_factory=list)
+    subjects: list[str] = Field(default_factory=list)
+    # `activado` or `pendiente`: one signal, not two loose badges.
+    access: str = "pendiente"
+    # Why the access is pending, in the words of the panel.
+    access_reason: str | None = None
+    # `activo` or `inactivo`: whether the member belongs to the school.
+    status: str = "activo"
+
+
+class StudentListItem(BaseModel):
+    """One student of the school, with its course and its average."""
+
+    membership_id: str
+    user_id: str
+    full_name: str | None = None
+    email: str | None = None
+    joined_at: datetime
+    revoked_at: datetime | None = None
+    account_activated: bool = False
+    courses: list[str] = Field(default_factory=list)
+    # `null` when the student has no grades: it is not a zero.
+    average: float | None = None
+    access: str = "pendiente"
+    access_reason: str | None = None
+    status: str = "activo"
+
+
+class MemberPage(BaseModel):
+    """A page of the community of the school.
+
+    The page comes from the server: the list is never pulled into the
+    browser to be filtered there.
+    """
+
+    items: list[TeacherListItem | StudentListItem] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
+
+
