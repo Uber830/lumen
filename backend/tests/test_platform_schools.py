@@ -185,6 +185,26 @@ async def test_it_rejects_an_unknown_plan(client, engine, platform_admin):
     assert response.status_code == 404
 
 
+async def test_it_assigns_the_default_plan_when_none_is_chosen(client, engine, platform_admin):
+    """The plans are not managed: the school gets the default one."""
+    await _seed_plans(engine)
+
+    payload = _payload()
+    payload.pop("plan_code")
+
+    response = client.post("/v1/platform/schools", headers=platform_admin, json=payload)
+    assert response.status_code == 201, response.text
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        entitlement = await session.execute(
+            select(Entitlement).where(
+                Entitlement.school_id == uuid.UUID(response.json()["school_id"])
+            )
+        )
+        # The cheapest active plan of the catalog.
+        assert entitlement.scalar_one().plan_code == "basico"
+
+
 async def test_it_rejects_a_taken_short_code(client, engine, platform_admin):
     """A short code that is already in use is a 409."""
     await _seed_plans(engine)
