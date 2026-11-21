@@ -14,9 +14,14 @@ import {
   Toolbar,
 } from "@/components/ui-kit";
 import { MaterialPanel } from "@/features/platform/material-panel";
+import { SchoolsOfMaterial } from "@/features/platform/schools-of-material";
 import { UploadWizard } from "@/features/platform/upload-wizard";
 import { useCatalog, useCatalogOptions, usePlatformSchools } from "@/lib/platform/hooks";
-import { MATERIAL_STATUS_LABEL, MATERIAL_STATUS_TONE } from "@/lib/platform/types";
+import {
+  MATERIAL_STATUS_LABEL,
+  MATERIAL_STATUS_TONE,
+  type MaterialSummary,
+} from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/super/catalogo")({
@@ -47,6 +52,7 @@ function Catalogo() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [accessOf, setAccessOf] = useState<MaterialSummary | null>(null);
 
   const options = useCatalogOptions();
   const schools = usePlatformSchools({ per_page: 50 });
@@ -241,12 +247,23 @@ function Catalogo() {
                         {item.schools.length === 0 ? (
                           <span className="text-muted-foreground">Ninguno</span>
                         ) : (
-                          <span className="flex flex-wrap items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {item.schools.slice(0, 2).map((school) => (
-                              <Tag key={school.id}>{schoolNames.get(school.id) ?? school.name}</Tag>
+                              <button
+                                key={school.id}
+                                type="button"
+                                onClick={() => setAccessOf(item)}
+                                title="Ver todos los colegios con acceso"
+                                className="inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
+                              >
+                                {schoolNames.get(school.id) ?? school.name}
+                              </button>
                             ))}
-                            <ExtraCount count={item.schools_extra} />
-                          </span>
+                            <ExtraCount
+                              count={item.schools_extra}
+                              onClick={() => setAccessOf(item)}
+                            />
+                          </div>
                         )}
                       </td>
                       <td className="px-5 py-3">
@@ -276,6 +293,8 @@ function Catalogo() {
           </>
         )}
       </section>
+
+      <SchoolsOfMaterial materialId={accessOf?.id ?? null} onClose={() => setAccessOf(null)} />
 
       <MaterialPanel
         key={openId ?? "none"}

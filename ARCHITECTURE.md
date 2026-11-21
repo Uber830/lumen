@@ -184,6 +184,8 @@ un prefijo que solo ese rol puede usar.
 | `material_schools` | Qué colegio ve qué pieza, y desde cuándo. |
 | `material_history` | Los movimientos de cada pieza, para que el panel diga qué pasó. |
 | `audit_log` | Los avisos de la red: acceso dado o quitado, cambio de estado. |
+| `support_cases` | Los casos que abren los colegios, con su nivel y su estado. |
+| `support_messages` | La conversación de cada caso, un mensaje por turno. |
 
 Las reglas las decide el backend, no el frontend:
 
@@ -195,6 +197,16 @@ Las reglas las decide el backend, no el frontend:
 - Las transiciones posibles las devuelve el endpoint (`available_transitions`);
   el panel nunca las adivina.
 - La cobertura de un colegio cuenta **solo el material publicado**.
+- Un caso de soporte vive en tres estados: `open`, `waiting` y `resolved`.
+  Responderlo lo devuelve a `waiting` —un colegio que escribió otra vez no
+  recibió la respuesta— y cerrarlo lo deja en `resolved`.
+
+El material de la editorial se guarda **en el disco del servidor** mientras el
+proyecto no tiene un bucket: `PLATFORM_STORAGE_DIR` (por defecto
+`backend/var/materiales`) es la carpeta donde se escribe. El catálogo solo
+guarda la clave del archivo, nunca su dirección, así que mover el material a
+la nube después es cambiar el adaptador de `app/platform/storage.py` y nada
+más.
 
 El rol de plataforma **no administra los planes de los colegios**: no hay
 sección de planes en su menú. El plan de un colegio lo ve su administración
@@ -484,6 +496,8 @@ Variables privadas del backend:
 
 - `DATABASE_URL` (el Postgres de Supabase; se recomienda el pooler)
 - `JWT_SECRET` (firma los access tokens que emite el backend)
+- `PLATFORM_STORAGE_DIR` (la carpeta donde se guarda el material del
+  catálogo mientras vive en el disco; por defecto `backend/var/materiales`)
 - `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (Storage, Realtime y el webhook)
 - `SUPABASE_JWT_SECRET` (firma los tokens de una hora que el navegador
   usa para Storage y Realtime; **no** autentica peticiones a la API)

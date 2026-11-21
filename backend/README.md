@@ -4,8 +4,9 @@ La API de Lumen. Es la dueña de la autenticación, la autorización y de cada
 regla de negocio: el navegador solo habla con este servicio.
 
 Postgres es el almacén de datos y el backend se conecta a él directamente con
-asyncpg. Supabase Storage y Realtime siguen en uso para los archivos y el
-chat en vivo.
+asyncpg. El material del catálogo se guarda en el disco del servidor
+(`PLATFORM_STORAGE_DIR`) hasta que el proyecto tenga un bucket; Supabase
+Realtime sigue en uso para el chat en vivo.
 
 - [Arranque rápido](#arranque-rápido)
 - [Layout](#layout)
@@ -58,7 +59,8 @@ ver que las migraciones no se aplicaron.
 | `JWT_SECRET` | firma los tokens de acceso (obligatoria) |
 | `CORS_ALLOWED_ORIGINS` | orígenes permitidos, separados por comas |
 | `COOKIE_DOMAIN` | solo si el frontend y la API viven en subdominios distintos |
-| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Storage y Realtime |
+| `PLATFORM_STORAGE_DIR` | la carpeta del material del catálogo (por defecto `backend/var/materiales`) |
+| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Realtime |
 | `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | la puerta del login (5 por minuto) |
 | `LOGIN_LOCK_THRESHOLD`, `LOGIN_LOCK_MINUTES` | el bloqueo de la cuenta (10 fallos, 15 min) |
 
@@ -165,9 +167,18 @@ que devuelve el enlace de activación del administrador.
 | DELETE | `/v1/platform/catalog/{id}` | borrar un material (solo en borrador) |
 | POST | `/v1/platform/catalog/{id}/status` | publicar, archivar o desarchivar |
 | PUT | `/v1/platform/catalog/{id}/schools` | reemplazar los colegios con acceso |
+| POST | `/v1/platform/catalog/{id}/schools` | darle acceso a más colegios, sin quitarlo a nadie |
 | POST | `/v1/platform/uploads` | subir un archivo del catálogo |
+| GET | `/v1/platform/files/{file_id}` | descargar un archivo del catálogo |
 | DELETE | `/v1/platform/uploads/{file_id}` | quitar un archivo subido y no usado |
 | GET | `/v1/platform/schools` | los colegios de la red, con su cobertura |
+| GET | `/v1/platform/schools/{id}` | un colegio y su cobertura, pieza por pieza |
+| PUT | `/v1/platform/schools/{id}/materials/{material_id}` | encender o apagar una pieza para un colegio |
+| GET | `/v1/platform/case-options` | los catálogos cerrados del escritorio: niveles, estados y canales |
+| GET | `/v1/platform/cases` | los casos de soporte, con filtros y paginación |
+| GET | `/v1/platform/cases/{id}` | un caso con su conversación y los movimientos de la plataforma |
+| POST | `/v1/platform/cases/{id}/messages` | responder un caso |
+| POST | `/v1/platform/cases/{id}/resolve` | cerrar un caso |
 | GET | `/v1/platform/audit` | la traza de los eventos críticos |
 
 ### Académico
@@ -356,10 +367,12 @@ aplican en ese orden. Eso incluye la tabla de identidad que usa el backend
 (`public.users`, que sustituye a `auth.users`) y sus tablas de sesión.
 
 El backend comprueba el esquema al arrancar y se niega a levantar si falta
-una migración:
+una migración. La comprobación mira **tablas y columnas**: una base que tiene
+la tabla `schools` pero no la columna `mission` es una base desfasada, y antes
+solo se enteraba la API cuando una consulta fallaba con un 500:
 
 ```
-The database is missing 3 table(s): refresh_tokens, ...
+The database is missing 1 column(s): schools.mission.
 The SQL migrations have not been applied. Apply them with psql (see
 scripts/dev-db.sh) or with the migration tool of your database.
 ```
@@ -367,10 +380,25 @@ scripts/dev-db.sh) or with the migration tool of your database.
 `GET /ready` informa de lo mismo, así que un despliegue que se saltó las
 migraciones aparece como no disponible en vez de responder 500 a todo.
 
+### Actualizar una base que ya existe
+
+`./scripts/dev-db.sh reset` reconstruye la base desde cero y **borra los
+datos**. Cuando la base ya tiene lo que importa y solo le falta una
+migración nueva, el comando es `migrate`:
+
+```sh
+./scripts/dev-db.sh migrate
+```
+
+Aplica únicamente las migraciones pendientes y conserva las filas. El
+script lleva su propio registro (`lumen_schema_migrations`) en la base, así
+que no vuelve a aplicar lo que ya está.
+
 Para escribir una migración nueva:
 
 1. se escribe el SQL en `backend/migrations/<fecha>_<qué>.sql`;
-2. se corre `./scripts/dev-db.sh reset` desde la raíz;
+2. se corre `./scripts/dev-db.sh migrate` desde la raíz (o `reset` si la
+   base de desarrollo se puede perder);
 3. `backend/tests/test_schema_drift.py` compara los modelos con las
    migraciones y `backend/tests/test_migrations.py` las aplica en una base
    limpia: un desajuste rompe el build en vez de aparecer en runtime.

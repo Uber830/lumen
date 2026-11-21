@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, Building2, ChevronRight, GraduationCap, Users } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, Users } from "lucide-react";
 
 import {
   MeterRow,
@@ -32,6 +32,15 @@ export const Route = createFileRoute("/super/")({
 
 const STATUS_ORDER: MaterialStatus[] = ["published", "review", "draft", "archived"];
 
+/**
+ * How many schools fit in the coverage card.
+ *
+ * The card has a fixed height and no scroll bar: the schools that do
+ * not fit are not drawn. The list of all of them, with the filters,
+ * is one click away in "Ver todos".
+ */
+const MAX_COVERAGE = 12;
+
 function SuperDashboard() {
   const metrics = usePlatformMetrics();
 
@@ -62,7 +71,7 @@ function SuperDashboard() {
         subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Colegios en la red"
           value={String(data?.schools ?? 0)}
@@ -92,40 +101,39 @@ function SuperDashboard() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
+          className="flex h-[39.5rem] flex-col"
           title="Catálogo editorial"
           description="El material por estado y por área"
+          bodyClassName="min-h-0 flex-1 overflow-hidden"
           leading={
             <Link
               to="/super/catalogo"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+              className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
               Abrir catálogo
-              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
             </Link>
           }
         >
-          <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-                Por estado
-              </p>
-              {Object.keys(byStatus).length === 0 ? (
-                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
-              ) : (
-                STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
-                  <MeterRow
-                    key={status}
-                    label={MATERIAL_STATUS_LABEL[status]}
-                    value={byStatus[status] ?? 0}
-                    max={maxStatus}
-                  />
-                ))
-              )}
-            </div>
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+              Por estado
+            </p>
+            {Object.keys(byStatus).length === 0 ? (
+              <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+            ) : (
+              STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
+                <MeterRow
+                  key={status}
+                  label={MATERIAL_STATUS_LABEL[status]}
+                  value={byStatus[status] ?? 0}
+                  max={maxStatus}
+                />
+              ))
+            )}
 
-            <div>
+            <div className="mt-4 border-t border-border pt-4">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
                 Por área
               </p>
@@ -143,26 +151,27 @@ function SuperDashboard() {
         </SectionCard>
 
         <SectionCard
+          className="flex h-[39.5rem] flex-col"
           title="Cobertura del catálogo"
           description="Qué colegio ve qué parte del catálogo"
-          actions={
+          leading={
             <Link
               to="/super/colegios"
-              className="text-xs font-semibold text-primary hover:underline"
+              className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
               Ver todos
             </Link>
           }
-          bodyClassName="p-0"
+          bodyClassName="min-h-0 flex-1 overflow-hidden p-0"
         >
           {coverage.length === 0 ? (
             <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
           ) : (
             <ul className="flex flex-col">
-              {coverage.slice(0, 6).map((school) => (
+              {coverage.slice(0, MAX_COVERAGE).map((school) => (
                 <li
                   key={school.school_id}
-                  className="flex items-center gap-3 border-b border-border px-5 py-2 last:border-b-0"
+                  className="flex items-center gap-3 border-b border-border px-5 py-2.5 last:border-b-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm">{school.name}</span>
                   <StatusPill
@@ -171,11 +180,6 @@ function SuperDashboard() {
                   />
                 </li>
               ))}
-              {coverage.length > 6 && (
-                <li className="px-5 py-2 text-xs text-muted-foreground">
-                  y {coverage.length - 6} colegios más
-                </li>
-              )}
             </ul>
           )}
         </SectionCard>

@@ -31,7 +31,6 @@ import { Route as AdminIcfesResultadosRouteImport } from './routes/admin.icfes-r
 import { Route as AdminIcfesSimulacrosRouteImport } from './routes/admin.icfes-simulacros'
 import { Route as AdminPeriodosRouteImport } from './routes/admin.periodos'
 import { Route as AdminPersonalizacionRouteImport } from './routes/admin.personalizacion'
-import { Route as AdminPlanesRouteImport } from './routes/admin.planes'
 import { Route as AdminSoporteRouteImport } from './routes/admin.soporte'
 import { Route as DocenteIndexRouteImport } from './routes/docente.index'
 import { Route as DocenteCalificacionesRouteImport } from './routes/docente.calificaciones'
@@ -163,11 +162,6 @@ const AdminPersonalizacionRoute = AdminPersonalizacionRouteImport.update({
   path: '/personalizacion',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminPlanesRoute = AdminPlanesRouteImport.update({
-  id: '/planes',
-  path: '/planes',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminSoporteRoute = AdminSoporteRouteImport.update({
   id: '/soporte',
   path: '/soporte',
@@ -291,7 +285,6 @@ export interface FileRoutesByFullPath {
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
-  '/admin/planes': typeof AdminPlanesRoute
   '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
@@ -331,7 +324,6 @@ export interface FileRoutesByTo {
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
-  '/admin/planes': typeof AdminPlanesRoute
   '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
@@ -377,7 +369,6 @@ export interface FileRoutesById {
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
-  '/admin/planes': typeof AdminPlanesRoute
   '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
@@ -424,7 +415,6 @@ export interface FileRouteTypes {
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
-    | '/admin/planes'
     | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
@@ -464,7 +454,6 @@ export interface FileRouteTypes {
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
-    | '/admin/planes'
     | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
@@ -509,7 +498,6 @@ export interface FileRouteTypes {
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
-    | '/admin/planes'
     | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
@@ -701,13 +689,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPersonalizacionRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/planes': {
-      id: '/admin/planes'
-      path: '/planes'
-      fullPath: '/admin/planes'
-      preLoaderRoute: typeof AdminPlanesRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/soporte': {
       id: '/admin/soporte'
       path: '/soporte'
@@ -864,7 +845,6 @@ interface AdminRouteChildren {
   AdminIcfesSimulacrosRoute: typeof AdminIcfesSimulacrosRoute
   AdminPeriodosRoute: typeof AdminPeriodosRoute
   AdminPersonalizacionRoute: typeof AdminPersonalizacionRoute
-  AdminPlanesRoute: typeof AdminPlanesRoute
   AdminSoporteRoute: typeof AdminSoporteRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -882,7 +862,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIcfesSimulacrosRoute: AdminIcfesSimulacrosRoute,
   AdminPeriodosRoute: AdminPeriodosRoute,
   AdminPersonalizacionRoute: AdminPersonalizacionRoute,
-  AdminPlanesRoute: AdminPlanesRoute,
   AdminSoporteRoute: AdminSoporteRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

@@ -12,10 +12,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.operations import create_user, issue_activation_token
-from app.schools.operations import bootstrap_school
+from app.db.models.identity import Plan
+from app.schools.operations import BootstrapError, bootstrap_school
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,15 +31,35 @@ class ProvisionedSchool:
     activation_expires_at: datetime
 
 
+async def default_plan_code(session: AsyncSession) -> str:
+    """The plan a school gets when the team does not choose one.
+
+    The plans are not managed yet: a new school starts with the
+    cheapest active plan, and the one that comes first by code when
+    two of them cost the same.
+    """
+    result = await session.execute(
+        select(Plan.code)
+        .where(Plan.is_active.is_(True))
+        .order_by(Plan.price_cents, Plan.code)
+        .limit(1)
+    )
+    code = result.scalar_one_or_none()
+    if code is None:
+        raise BootstrapError("P0002", "there is no active plan to assign")
+    return code
+
+
 async def provision_school(
     session: AsyncSession,
     *,
     school_name: str,
     short_code: str,
-    plan_code: str,
+    plan_code: str | None,
     admin_email: str,
     admin_name: str,
     trial_days: int,
+    city: str | None = None,
 ) -> ProvisionedSchool:
     """Create a school, its administrator and the activation link.
 
@@ -56,6 +78,11 @@ async def provision_school(
         full_name=admin_name,
     )
 
+    # The plan is optional: when the team does not pick one, the
+    # school gets the default one.
+    if not plan_code or not plan_code.strip():
+        plan_code = await default_plan_code(session)
+
     result = await bootstrap_school(
         session,
         user_id=admin.id,
@@ -63,6 +90,7 @@ async def provision_school(
         short_code=short_code,
         plan_code=plan_code,
         trial_days=trial_days,
+        city=city,
     )
 
     token, expires_at = await issue_activation_token(session, admin.id)

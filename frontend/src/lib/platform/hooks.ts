@@ -21,12 +21,17 @@ import {
 import { ApiError, api, apiBaseUrl } from "@/lib/api/client";
 import type {
   AuditEntry,
+  CaseDetail,
+  CaseOptions,
+  CaseSummary,
   CatalogOptions,
   CreateMaterialInput,
   MaterialDetail,
   MaterialStatus,
   Page,
   PlatformMetrics,
+  RegisteredSchool,
+  SchoolDetail,
   SchoolSummary,
   UploadResult,
 } from "@/lib/platform/types";
@@ -37,7 +42,11 @@ export const platformKeys = {
   catalog: (filters: CatalogFilters) => ["platform", "catalog", filters] as const,
   material: (id: string | null) => ["platform", "material", id ?? "none"] as const,
   schools: (filters: SchoolFilters) => ["platform", "schools", filters] as const,
+  school: (id: string | null) => ["platform", "school", id ?? "none"] as const,
   audit: (filters: AuditFilters) => ["platform", "audit", filters] as const,
+  cases: (filters: CaseFilters) => ["platform", "cases", filters] as const,
+  case: (id: string | null) => ["platform", "case", id ?? "none"] as const,
+  caseOptions: ["platform", "case-options"] as const,
 };
 
 export interface CatalogFilters {
@@ -51,7 +60,6 @@ export interface CatalogFilters {
 
 export interface SchoolFilters {
   q?: string;
-  plan?: string;
   status?: string;
   page?: number;
   per_page?: number;
@@ -61,6 +69,15 @@ export interface AuditFilters {
   level?: string;
   school_id?: string;
   event_type?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface CaseFilters {
+  q?: string;
+  status?: string;
+  level?: string;
+  school_id?: string;
   page?: number;
   per_page?: number;
 }
@@ -79,7 +96,7 @@ export function usePlatformMetrics(enabled = true): UseQueryResult<PlatformMetri
   });
 }
 
-/** The closed catalogs: types, areas, grades and plans. */
+/** The closed catalogs: types, areas, grades and statuses. */
 export function useCatalogOptions(): UseQueryResult<CatalogOptions, Error> {
   return useQuery({
     queryKey: platformKeys.options,
@@ -125,7 +142,6 @@ export function usePlatformSchools(
     queryFn: () =>
       api.get<Page<SchoolSummary>>("/v1/platform/schools", {
         q: filters.q || undefined,
-        plan: filters.plan || undefined,
         status: filters.status || undefined,
         page: filters.page ?? 1,
         per_page: filters.per_page ?? 8,
@@ -267,6 +283,156 @@ export function useUploadFile(): UseMutationResult<UploadResult, Error, File> {
 export function useDeleteUpload(): UseMutationResult<void, Error, string> {
   return useMutation({
     mutationFn: (id) => api.delete<void>(`/v1/platform/uploads/${id}`),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The schools
+// ---------------------------------------------------------------------------
+
+/** One school with its figures and its coverage of the catalog. */
+export function useSchool(id: string | null): UseQueryResult<SchoolDetail, Error> {
+  return useQuery({
+    queryKey: platformKeys.school(id),
+    queryFn: () => api.get<SchoolDetail>(`/v1/platform/schools/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** The school that is registered, with the activation of its administrator. */
+export function useRegisterSchool(): UseMutationResult<
+  RegisteredSchool,
+  Error,
+  {
+    school_name: string;
+    short_code: string;
+    admin_email: string;
+    admin_name: string;
+    city?: string | null;
+  }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input) => api.post<RegisteredSchool>("/v1/platform/schools", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/**
+ * Give access to a material to more schools.
+ *
+ * Nobody loses access here: the schools that already had it keep it.
+ */
+export function useGrantMaterialSchools(): UseMutationResult<
+  MaterialDetail,
+  ApiError,
+  { id: string; school_ids: string[] }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, school_ids }) =>
+      api.post<MaterialDetail>(`/v1/platform/catalog/${id}/schools`, { school_ids }),
+    onSuccess: (material) => {
+      qc.setQueryData(platformKeys.material(material.id), material);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/**
+ * Enable or disable one material for one school.
+ *
+ * It is the switch of the sheet of a school. The server answers 409
+ * when a published material loses a school and the change was not
+ * confirmed: the caller asks the user and sends the same request with
+ * `confirm: true`.
+ */
+export function useSetSchoolMaterialAccess(): UseMutationResult<
+  SchoolDetail,
+  ApiError,
+  { schoolId: string; materialId: string; enabled: boolean; confirm?: boolean }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ schoolId, materialId, enabled, confirm }) =>
+      api.put<SchoolDetail>(`/v1/platform/schools/${schoolId}/materials/${materialId}`, {
+        enabled,
+        confirm: confirm ?? false,
+      }),
+    onSuccess: (school) => {
+      qc.setQueryData(platformKeys.school(school.id), school);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The support desk
+// ---------------------------------------------------------------------------
+
+/** The closed catalogs of the desk: levels, states and channels. */
+export function useCaseOptions(): UseQueryResult<CaseOptions, Error> {
+  return useQuery({
+    queryKey: platformKeys.caseOptions,
+    queryFn: () => api.get<CaseOptions>("/v1/platform/case-options"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The cases of the desk, filtered and paginated. */
+export function useCases(filters: CaseFilters): UseQueryResult<Page<CaseSummary>, Error> {
+  return useQuery({
+    queryKey: platformKeys.cases(filters),
+    queryFn: () =>
+      api.get<Page<CaseSummary>>("/v1/platform/cases", {
+        q: filters.q || undefined,
+        status: filters.status || undefined,
+        level: filters.level || undefined,
+        school_id: filters.school_id || undefined,
+        page: filters.page ?? 1,
+        per_page: filters.per_page ?? 8,
+      }),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** One case with its conversation and the movements of the platform. */
+export function useCase(id: string | null): UseQueryResult<CaseDetail, Error> {
+  return useQuery({
+    queryKey: platformKeys.case(id),
+    queryFn: () => api.get<CaseDetail>(`/v1/platform/cases/${id}`),
+    enabled: !!id,
+  });
+}
+
+/** Answer a case. The case goes back to "en_espera". */
+export function useAnswerCase(): UseMutationResult<
+  CaseDetail,
+  Error,
+  { id: string; body: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }) =>
+      api.post<CaseDetail>(`/v1/platform/cases/${id}/messages`, { body }),
+    onSuccess: (updated) => {
+      qc.setQueryData(platformKeys.case(updated.id), updated);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/** Close a case. */
+export function useResolveCase(): UseMutationResult<CaseDetail, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post<CaseDetail>(`/v1/platform/cases/${id}/resolve`),
+    onSuccess: (updated) => {
+      qc.setQueryData(platformKeys.case(updated.id), updated);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
   });
 }
 

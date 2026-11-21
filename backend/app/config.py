@@ -95,6 +95,20 @@ class Settings(BaseSettings):
     database_echo: bool = False
 
     # -----------------------------------------------------------------------
+    # The files of the catalog
+    # -----------------------------------------------------------------------
+    # Where the material lives while the platform has no object storage.
+    # The path is relative to the backend folder when it is not
+    # absolute: `var/materiales` keeps the files inside the project,
+    # out of the way of the code.
+    #
+    # The catalog only stores the key of a file, never its address, so
+    # moving the files to a bucket later is a matter of changing the
+    # adapter in `app/platform/storage.py` and pointing this setting at
+    # the new destination.
+    platform_storage_dir: str = "var/materiales"
+
+    # -----------------------------------------------------------------------
     # Supabase (Storage + Realtime only)
     # -----------------------------------------------------------------------
     # The project URL and keys are still needed for Storage uploads and

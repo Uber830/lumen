@@ -599,6 +599,30 @@ async def test_the_access_is_changed_when_it_is_confirmed(
     assert "access_changed" not in [entry["action"] for entry in same.json()["history"]]
 
 
+async def test_the_access_is_given_to_more_schools_without_taking_it_away(
+    client, platform_admin, engine, created_materials, catalog_school, three_schools
+) -> None:
+    """Enabling a piece for several schools keeps the ones that had it."""
+    material = await _make_material(
+        engine,
+        created_materials,
+        status="published",
+        school_ids=[catalog_school],
+    )
+    another = three_schools[0]
+
+    response = client.post(
+        f"/v1/platform/catalog/{material.id}/schools",
+        headers=platform_admin,
+        json={"school_ids": [str(another)]},
+    )
+
+    assert response.status_code == 200, response.text
+    schools = {school["id"] for school in response.json()["schools"]}
+    assert str(catalog_school) in schools
+    assert str(another) in schools
+
+
 async def test_the_access_of_a_draft_is_changed_without_a_confirmation(
     client, platform_admin, engine, created_materials, catalog_school
 ) -> None:
@@ -673,6 +697,45 @@ async def test_the_schools_carry_their_coverage(client, platform_admin) -> None:
     for row in body["items"]:
         assert "covered" in row
         assert row["total"] >= row["covered"]
+
+
+async def test_the_school_sheet_carries_the_catalog_with_its_access(
+    client, platform_admin, catalog_school, created_materials, engine
+) -> None:
+    """The drawer of a school lists the catalog and says what it sees."""
+    await _make_material(
+        engine,
+        created_materials,
+        title="Material con acceso",
+        status="published",
+        school_ids=[catalog_school],
+    )
+    await _make_material(
+        engine,
+        created_materials,
+        title="Material sin acceso",
+        status="published",
+    )
+
+    response = client.get(f"/v1/platform/schools/{catalog_school}", headers=platform_admin)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"].startswith("Catalogo Colegio")
+    assert body["total"] == len(body["catalog"])
+
+    access = {item["title"]: item["enabled"] for item in body["catalog"]}
+    assert access["Material con acceso"] is True
+    assert access["Material sin acceso"] is False
+
+
+async def test_the_school_sheet_of_a_school_that_does_not_exist_is_a_404(
+    client, platform_admin
+) -> None:
+    """A school that was never registered has no sheet."""
+    response = client.get(f"/v1/platform/schools/{uuid.uuid4()}", headers=platform_admin)
+
+    assert response.status_code == 404
 
 
 async def test_the_audit_trail_is_paginated(client, platform_admin) -> None:

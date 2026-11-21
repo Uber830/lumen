@@ -582,6 +582,7 @@ async def school_coverage(
                 "school_id": school.id,
                 "name": school.name,
                 "short_code": school.short_code,
+                "city": school.city,
                 "status": school.status,
                 "plan": school_figures_row.get("plan"),
                 "students": school_figures_row.get("students", 0),
@@ -591,6 +592,51 @@ async def school_coverage(
             }
         )
     return coverage
+
+
+async def school_catalog_access(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+) -> list[dict[str, Any]]:
+    """The whole catalog, with the access of one school.
+
+    The drawer of the school lists every piece and says whether the
+    school can see it: the switch of each one is right there.
+    """
+    result = await session.execute(
+        select(
+            Material.id,
+            Material.ref,
+            Material.title,
+            Material.type,
+            Material.area,
+            Material.state,
+        ).order_by(Material.ref)
+    )
+    rows = result.all()
+
+    access = await session.execute(
+        select(MaterialSchool.material_id).where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+        )
+    )
+    enabled = {material_id for (material_id,) in access.all()}
+
+    return [
+        {
+            "id": material_id,
+            "code": ref,
+            "title": title,
+            "type": material_type,
+            "area": area,
+            # The state of the database is told in the vocabulary of the
+            # API: the frontend of the platform does not change.
+            "status": status_of(state),
+            "enabled": material_id in enabled,
+        }
+        for material_id, ref, title, material_type, area, state in rows
+    ]
 
 
 async def list_schools(
@@ -637,6 +683,7 @@ async def list_schools(
                 "id": school.id,
                 "name": school.name,
                 "short_code": school.short_code,
+                "city": school.city,
                 "status": school.status,
                 "plan": school_figures_row.get("plan"),
                 "students": school_figures_row.get("students", 0),

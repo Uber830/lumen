@@ -137,6 +137,8 @@ __all__ = [
     "StudentEnrollment",
     "Subject",
     "Subscription",
+    "SupportCase",
+    "SupportMessage",
     "Task",
     "TaskSubmission",
     "TeacherAssignment",

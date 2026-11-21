@@ -208,6 +208,17 @@ class PatchMaterialRequest(BaseModel):
         return None if value is None else _one_of(value, VISIBLE_TO, "visible_to")
 
 
+class SchoolMaterialAccessRequest(BaseModel):
+    """Whether a school can see a material.
+
+    `confirm` is sent again when the server asks for it: a published
+    piece that leaves a school needs the confirmation.
+    """
+
+    enabled: bool
+    confirm: bool = False
+
+
 class StatusRequest(BaseModel):
     """The body of POST /v1/platform/catalog/{id}/status."""
 
@@ -270,12 +281,44 @@ class SchoolSummary(BaseModel):
     id: UUID
     name: str
     short_code: str
+    city: str | None = None
     status: str
     plan: str | None = None
     students: int = 0
     teachers: int = 0
     covered: int = 0
     total: int = 0
+
+
+class SchoolCatalogItem(BaseModel):
+    """One material of the catalog, as the school drawer shows it.
+
+    `enabled` says whether the school can see it right now.
+    """
+
+    id: UUID
+    code: str
+    title: str
+    type: str
+    area: str
+    status: str
+    enabled: bool
+
+
+class SchoolDetail(BaseModel):
+    """One school with its figures and its coverage of the catalog."""
+
+    id: UUID
+    name: str
+    short_code: str
+    city: str | None = None
+    status: str
+    plan: str | None = None
+    students: int = 0
+    teachers: int = 0
+    covered: int = 0
+    total: int = 0
+    catalog: list[SchoolCatalogItem] = Field(default_factory=list)
 
 
 class SchoolPage(BaseModel):
@@ -335,6 +378,9 @@ class CatalogOptions(BaseModel):
 
 
 __all__ = [
+    "SchoolCatalogItem",
+    "SchoolDetail",
+    "SchoolMaterialAccessRequest",
     "AuditEntryOut",
     "AuditPage",
     "CatalogOptions",
