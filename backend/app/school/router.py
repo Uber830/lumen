@@ -26,8 +26,10 @@ from app.core.errors import ConflictError, NotFoundError
 from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import community, cycles, identity, operations, team
+from app.school import community, cycles, icfes, identity, operations, team
 from app.school.schemas import (
+    ActivationCreatedOut,
+    ActivationIn,
     AdminInviteIn,
     AdminInviteOut,
     AdminOut,
@@ -37,6 +39,7 @@ from app.school.schemas import (
     AssignmentOut,
     CourseOut,
     CurrentPeriodOut,
+    IcfesSimulatorsOut,
     MaterialDetailOut,
     MaterialPage,
     MemberPage,
@@ -47,6 +50,7 @@ from app.school.schemas import (
     SchoolIdentityOut,
     SchoolIdentityUpdate,
     SchoolOverview,
+    SimulatorResultsOut,
     SubjectOut,
 )
 
@@ -514,5 +518,57 @@ async def remove_school_admin(
 
     await team.remove(session, membership.school_id, membership_id)
     return Response(status_code=204)
+
+
+@router.get("/icfes", response_model=IcfesSimulatorsOut)
+async def list_school_simulators(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> IcfesSimulatorsOut:
+    """The simulators the platform team enabled for the school.
+
+    The school sees only what it received: a simulator that is not
+    enabled for it does not exist here, not even as a draft.
+    """
+    membership = _require_admin(context)
+    data = await icfes.list_simulators(session, membership.school_id)
+    return IcfesSimulatorsOut.model_validate(data)
+
+
+@router.post("/icfes/{simulator_id}/activations", response_model=ActivationCreatedOut)
+async def activate_school_simulator(
+    simulator_id: uuid.UUID,
+    body: ActivationIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ActivationCreatedOut:
+    """Activate a simulator in some courses of the school.
+
+    The school activates what the platform enabled: it cannot create,
+    edit or enable a simulator. The courses and the deadline are the
+    only things it decides.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ICFES_ACTIVATE)
+    created = await icfes.activate(
+        session,
+        membership.school_id,
+        simulator_id,
+        body.course_ids,
+        body.deadline,
+    )
+    return ActivationCreatedOut.model_validate(created)
+
+
+@router.get("/icfes/{simulator_id}/results", response_model=SimulatorResultsOut)
+async def school_simulator_results(
+    simulator_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SimulatorResultsOut:
+    """The result of a simulator in each course it runs in."""
+    membership = _require_admin(context)
+    results = await icfes.simulator_results(session, membership.school_id, simulator_id)
+    return SimulatorResultsOut.model_validate(results)
 
 

@@ -63,6 +63,8 @@ class SchoolPermission(StrEnum):
 
     # The results of the simulations.
     ICFES_READ = "icfes.read"
+    # The school activates in its courses what the platform enabled.
+    ICFES_ACTIVATE = "icfes.activate"
 
     # The visible identity of the school: name, shield and colour.
     CUSTOMIZATION_READ = "customization.read"
@@ -88,6 +90,7 @@ _COMMON_PERMISSIONS: tuple[SchoolPermission, ...] = (
     SchoolPermission.ASSIGNMENTS_WRITE,
     SchoolPermission.PERIODS_READ,
     SchoolPermission.ICFES_READ,
+    SchoolPermission.ICFES_ACTIVATE,
     SchoolPermission.CUSTOMIZATION_READ,
     SchoolPermission.ADMINS_READ,
 )
@@ -123,6 +126,7 @@ PERMISSION_LABELS: dict[SchoolPermission, str] = {
     SchoolPermission.PERIODS_READ: "Ver los períodos académicos",
     SchoolPermission.PERIODS_CLOSE: "Cerrar un período académico",
     SchoolPermission.ICFES_READ: "Ver los simulacros y sus resultados",
+    SchoolPermission.ICFES_ACTIVATE: "Activar simulacros en los cursos del colegio",
     SchoolPermission.CUSTOMIZATION_READ: "Ver la identidad del colegio",
     SchoolPermission.CUSTOMIZATION_WRITE: "Cambiar la identidad del colegio",
     SchoolPermission.ADMINS_READ: "Ver el equipo de administradores",

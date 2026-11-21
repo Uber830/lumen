@@ -447,3 +447,99 @@ class AdminInviteOut(BaseModel):
     activation_token: str | None = None
 
 
+class SimulatorActivationOut(BaseModel):
+    """One course where a simulator of the school runs."""
+
+    course_id: str
+    course_name: str
+    deadline: date
+    activated_at: datetime
+
+
+class SimulatorOut(BaseModel):
+    """A simulator of the catalog that the platform enabled for the school."""
+
+    id: str
+    code: str
+    name: str
+    grade: str
+    question_count: int = 0
+    duration_min: int = 0
+    scheduled_at: date | None = None
+    # publicado, en_curso or cerrado.
+    status: str = "publicado"
+    # Null until the exam is corrected.
+    average_score: float | None = None
+    enabled_at: datetime | None = None
+    activated: bool = False
+    activations: list[SimulatorActivationOut] = Field(default_factory=list)
+
+
+class GradeAverageOut(BaseModel):
+    """The average score of a grade, on the scale of the exam."""
+
+    grade: str
+    average_score: float
+
+
+class IcfesKpisOut(BaseModel):
+    """The indicators of the ICFES view."""
+
+    available: int = 0
+    not_activated: int = 0
+    activated: int = 0
+    activated_courses: int = 0
+    averages_by_grade: list[GradeAverageOut] = Field(default_factory=list)
+    max_score: int = 500
+
+
+class IcfesSimulatorsOut(BaseModel):
+    """The simulators enabled for the school, with their indicators."""
+
+    items: list[SimulatorOut] = Field(default_factory=list)
+    kpis: IcfesKpisOut = Field(default_factory=IcfesKpisOut)
+
+
+class ActivationIn(BaseModel):
+    """What the school asks for when it activates a simulator."""
+
+    # The courses where the simulator runs. One or more.
+    course_ids: list[uuid.UUID] = Field(min_length=1)
+    deadline: date
+
+
+class ActivationCreatedOut(BaseModel):
+    """The answer of an activation."""
+
+    simulator_id: str
+    courses: list[str] = Field(default_factory=list)
+    deadline: date
+
+
+class SimulatorResultCourseOut(BaseModel):
+    """The result of a simulator in one of its courses."""
+
+    course_id: str
+    course_name: str
+    deadline: date
+    activated_at: datetime
+    students: int = 0
+    average_score: float | None = None
+
+
+class SimulatorResultsOut(BaseModel):
+    """A simulator with the result of each course it runs in."""
+
+    id: str
+    code: str
+    name: str
+    grade: str
+    question_count: int = 0
+    duration_min: int = 0
+    scheduled_at: date | None = None
+    status: str = "publicado"
+    average_score: float | None = None
+    max_score: int = 500
+    courses: list[SimulatorResultCourseOut] = Field(default_factory=list)
+
+
