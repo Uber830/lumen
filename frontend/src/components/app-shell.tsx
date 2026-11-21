@@ -1,6 +1,7 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BarChart3,
+  Bell,
   BookOpen,
   Building2,
   CalendarRange,
@@ -10,87 +11,187 @@ import {
   FileCheck2,
   FolderOpen,
   GraduationCap,
+  Inbox,
+  Info,
   LayoutDashboard,
+  Link2,
   ListChecks,
   LogOut,
   Menu,
   MessageSquare,
   Palette,
-  PanelLeftClose,
-  PanelLeftOpen,
   PieChart,
   ShieldCheck,
   Target,
-  Users,
   UserSquare2,
+  Users,
   X,
 } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth/browser";
 import type { SessionContext } from "@/lib/auth/functions";
 import { useEntitlement } from "@/lib/billing/hooks";
 import { useSchool } from "@/lib/school/hooks";
+import { useSchoolOverview } from "@/lib/school/overview";
+import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
-import {
-  getServerSidebarCollapsed,
-  getStoredSidebarCollapsed,
-  setSidebarCollapsed,
-  subscribeSidebar,
-} from "@/lib/sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 type SchoolPlan = "Basico" | "Estandar" | "Premium" | "Sin plan";
 
 export type AppShellRole = "super" | "admin" | "docente" | "estudiante";
 
-type NavItem = { label: string; to: string; icon: LucideIcon; icfes?: boolean };
+type NavItem = {
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  /** The counter of the rail: the material the school has available. */
+  badge?: "material" | "support";
+  /** The entry only shows up when the school has the ICFES entitlement. */
+  icfes?: boolean;
+};
 
-const NAV: Record<AppShellRole, NavItem[]> = {
-  super: [
-    { label: "Dashboard", to: "/super", icon: LayoutDashboard },
-    { label: "Colegios", to: "/super/colegios", icon: Building2 },
-    { label: "Planes", to: "/super/planes", icon: CreditCard },
-    { label: "Mi perfil", to: "/perfil", icon: UserSquare2 },
-  ],
+type NavGroup = { label: string; items: NavItem[] };
+
+/**
+ * The rail of each role.
+ *
+ * The groups say what the section is about: the operation of the day,
+ * the academic structure, the configuration of the school and the
+ * support. "Mi perfil" is not here: it lives in the menu of the user,
+ * at the top right.
+ */
+const NAV: Record<AppShellRole, NavGroup[]> = {
   admin: [
-    { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-    { label: "Docentes", to: "/admin/docentes", icon: Users },
-    { label: "Estudiantes", to: "/admin/estudiantes", icon: GraduationCap },
-    { label: "Cursos y materias", to: "/admin/cursos", icon: BookOpen },
-    { label: "Asignaciones", to: "/admin/asignaciones", icon: ClipboardList },
-    { label: "Periodos", to: "/admin/periodos", icon: CalendarRange },
-    { label: "Banco ICFES", to: "/admin/icfes", icon: ListChecks, icfes: true },
-    { label: "Simulacros ICFES", to: "/admin/icfes-simulacros", icon: Target, icfes: true },
-    { label: "Resultados ICFES", to: "/admin/icfes-resultados", icon: PieChart, icfes: true },
-    { label: "Personalizacion", to: "/admin/personalizacion", icon: Palette },
-    { label: "Administradores", to: "/admin/administradores", icon: ShieldCheck },
-    { label: "Mi perfil", to: "/perfil", icon: UserSquare2 },
+    {
+      label: "Operación",
+      items: [
+        { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+        { label: "Contenido", to: "/admin/contenido", icon: BookOpen, badge: "material" },
+      ],
+    },
+    {
+      label: "Gestión académica",
+      items: [
+        { label: "Docentes", to: "/admin/docentes", icon: Users },
+        { label: "Estudiantes", to: "/admin/estudiantes", icon: GraduationCap },
+        { label: "Cursos y materias", to: "/admin/cursos", icon: BookOpen },
+        { label: "Asignaciones", to: "/admin/asignaciones", icon: Link2 },
+        { label: "Períodos", to: "/admin/periodos", icon: CalendarRange },
+      ],
+    },
+    {
+      // The simulators of the school are the ones the platform enabled:
+      // the school activates them by course. The rest of the ICFES work
+      // (the bank, the builder and the aggregate results) stays for the
+      // roles that author the exams.
+      label: "ICFES",
+      items: [
+        { label: "Simulacros del colegio", to: "/admin/icfes-colegio", icon: Target, icfes: true },
+        { label: "Banco de preguntas", to: "/admin/icfes", icon: ListChecks, icfes: true },
+        { label: "Crear simulacro", to: "/admin/icfes-simulacros", icon: ListChecks, icfes: true },
+        { label: "Resultados", to: "/admin/icfes-resultados", icon: PieChart, icfes: true },
+      ],
+    },
+    {
+      label: "Configuración",
+      items: [
+        { label: "Personalización", to: "/admin/personalizacion", icon: Palette },
+        { label: "Administradores", to: "/admin/administradores", icon: ShieldCheck },
+      ],
+    },
+    {
+      label: "Apoyo",
+      items: [{ label: "Soporte", to: "/admin/soporte", icon: Inbox, badge: "support" }],
+    },
+  ],
+  super: [
+    {
+      label: "Operación",
+      items: [
+        { label: "Dashboard", to: "/super", icon: LayoutDashboard },
+        { label: "Colegios", to: "/super/colegios", icon: Building2 },
+        { label: "Planes", to: "/super/planes", icon: CreditCard },
+      ],
+    },
   ],
   docente: [
-    { label: "Mis materias", to: "/docente", icon: BookOpen },
-    { label: "Materia", to: "/docente/materia", icon: FileCheck2 },
-    { label: "Calificaciones", to: "/docente/calificaciones", icon: BarChart3 },
-    { label: "Banco ICFES", to: "/docente/icfes", icon: ListChecks, icfes: true },
-    { label: "Simulacros ICFES", to: "/docente/icfes-simulacros", icon: Target, icfes: true },
-    { label: "Resultados ICFES", to: "/docente/icfes-resultados", icon: PieChart, icfes: true },
-    { label: "Mensajes", to: "/docente/chat", icon: MessageSquare },
-    { label: "Mi perfil", to: "/perfil", icon: UserSquare2 },
+    {
+      label: "Mi trabajo",
+      items: [
+        { label: "Mis materias", to: "/docente", icon: BookOpen },
+        { label: "Materia", to: "/docente/materia", icon: FileCheck2 },
+        { label: "Calificaciones", to: "/docente/calificaciones", icon: BarChart3 },
+        { label: "Mensajes", to: "/docente/chat", icon: MessageSquare },
+      ],
+    },
+    {
+      label: "Pruebas",
+      items: [
+        { label: "Banco ICFES", to: "/docente/icfes", icon: ListChecks, icfes: true },
+        { label: "Simulacros ICFES", to: "/docente/icfes-simulacros", icon: Target, icfes: true },
+        { label: "Resultados ICFES", to: "/docente/icfes-resultados", icon: PieChart, icfes: true },
+      ],
+    },
   ],
   estudiante: [
-    { label: "Mis clases", to: "/estudiante", icon: BookOpen },
-    { label: "Materiales", to: "/estudiante/materiales", icon: FolderOpen },
-    { label: "Evaluaciones", to: "/estudiante/evaluaciones", icon: FileCheck2 },
-    { label: "Simulacros ICFES", to: "/estudiante/icfes", icon: Target, icfes: true },
-    { label: "Tareas", to: "/estudiante/tareas", icon: ClipboardList },
-    { label: "Mis notas", to: "/estudiante/notas", icon: BarChart3 },
-    { label: "Mensajes", to: "/estudiante/chat", icon: MessageSquare },
-    { label: "Mi perfil", to: "/perfil", icon: UserSquare2 },
+    {
+      label: "Mi colegio",
+      items: [
+        { label: "Mis clases", to: "/estudiante", icon: BookOpen },
+        { label: "Materiales", to: "/estudiante/materiales", icon: FolderOpen },
+        { label: "Tareas", to: "/estudiante/tareas", icon: ClipboardList },
+        { label: "Mis notas", to: "/estudiante/notas", icon: BarChart3 },
+        { label: "Mensajes", to: "/estudiante/chat", icon: MessageSquare },
+      ],
+    },
+    {
+      label: "Pruebas",
+      items: [{ label: "Simulacros ICFES", to: "/estudiante/icfes", icon: Target, icfes: true }],
+    },
   ],
 };
+
+/** What each role is allowed to do, told in the foot of the rail. */
+const ROLE_NOTES: Record<AppShellRole, { title: string; note: string }> = {
+  admin: {
+    title: "Administrador de colegio",
+    note: "Administras la comunidad del colegio. El material lo carga el equipo de plataforma y tú ves lo que quedó habilitado.",
+  },
+  docente: {
+    title: "Docente",
+    note: "Consultas y descargas el material habilitado para tus cursos. No puedes cargar ni archivar material.",
+  },
+  estudiante: {
+    title: "Estudiante",
+    note: "Accedes al material publicado para tus cursos, tareas y calificaciones.",
+  },
+  super: {
+    title: "Plataforma",
+    note: "Cargas el material de la editorial y defines qué colegio puede ver cada cosa.",
+  },
+};
+
+/*
+ * The rail has three shapes, decided by the width of the screen:
+ *
+ *   from 1180 px   the labels are shown
+ *   900 to 1180    the rail is a strip of icons
+ *   below 900      the rail is a drawer, opened from the top bar
+ */
+const ICON_ONLY = "max-[1179px]:hidden";
+const ICON_ONLY_ITEM = "max-[1179px]:justify-center max-[1179px]:px-0";
 
 function initials(name: string): string {
   return name
@@ -104,232 +205,239 @@ function initials(name: string): string {
 
 function Brand({
   role,
-  plan,
   schoolName,
   logoUrl,
-  collapsed,
 }: {
   role: AppShellRole;
-  plan: SchoolPlan;
   schoolName: string | null;
   logoUrl: string | null;
-  collapsed: boolean;
 }) {
-  const title = role === "super" ? "Lumen Platform" : (schoolName ?? "Lumen");
   // The platform brand is Lumen's own: it does not wear the logo of
   // the school the super admin happens to belong to.
   const showLogo = role !== "super" && Boolean(logoUrl);
   const mark = showLogo ? (
     <img
       src={logoUrl ?? ""}
-      alt={`Logo de ${title}`}
-      className="size-9 shrink-0 rounded-xl bg-card object-contain p-0.5 ring-1 ring-border"
+      alt={`Escudo de ${schoolName ?? "el colegio"}`}
+      className="size-[38px] shrink-0 rounded-[11px] bg-card object-cover"
+      loading="lazy"
+      width={38}
+      height={38}
     />
   ) : (
-    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-      <GraduationCap className="size-5" strokeWidth={1.75} />
+    <span className="grid size-[38px] shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-primary to-[#1B4FD1]">
+      <GraduationCap className="size-5 text-white" strokeWidth={1.9} />
     </span>
   );
 
-  // Folded, only the mark is left: the name would not fit.
-  if (collapsed) {
-    return (
-      <div className="flex justify-center">
-        <span title={title}>{mark}</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]">
       {mark}
       <div className="min-w-0">
-        <p className="truncate text-sm font-bold leading-tight">{title}</p>
-        <p className="truncate text-xs text-muted-foreground">Lumen · {plan}</p>
+        <p className="truncate text-[15.5px] font-bold leading-tight tracking-[-0.01em]">Lumen</p>
+        <p className={cn("truncate text-[11.5px] leading-tight text-muted-foreground", ICON_ONLY)}>
+          {role === "super" ? "Panel de plataforma" : (schoolName ?? "Colegio")}
+        </p>
       </div>
     </div>
   );
 }
 
-function NavList({
+function NavGroups({
   role,
   icfesEnabled,
+  materialCount,
+  supportCount,
   onNavigate,
-  collapsed,
 }: {
   role: AppShellRole;
   icfesEnabled: boolean;
+  materialCount: number | null;
+  supportCount: number | null;
   onNavigate?: () => void;
-  collapsed: boolean;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const items = NAV[role].filter((item) => !item.icfes || icfesEnabled);
-  const plainItems = items.filter((item) => !item.icfes);
-  const icfesItems = items.filter((item) => item.icfes);
-
-  // The ICFES views live in one collapsible block. It opens by itself
-  // when the user is already inside one of them, and the choice the user
-  // makes is kept for the page they are on.
-  const insideIcfes = icfesItems.some(
-    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
-  );
-  const [icfesChoice, setIcfesChoice] = useState<{ path: string; open: boolean } | null>(null);
-  const icfesOpen = icfesChoice?.path === pathname ? icfesChoice.open : insideIcfes;
-
-  const linkClass = (active: boolean) =>
-    cn(
-      "flex items-center rounded-lg text-sm font-medium transition-colors",
-      collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
-      active
-        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-        : "text-sidebar-foreground hover:bg-muted hover:text-sidebar-foreground",
-    );
-
-  // Folded, there is no room for the ICFES block: its views become
-  // regular icons, one after the other.
-  if (collapsed) {
-    return (
-      <nav className="flex flex-col gap-1">
-        {items.map((item) => {
-          const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={onNavigate}
-              title={item.label}
-              aria-label={item.label}
-              className={linkClass(active)}
-            >
-              <item.icon className="size-4.5 shrink-0" strokeWidth={1.75} />
-            </Link>
-          );
-        })}
-      </nav>
-    );
-  }
+  const groups = NAV[role];
 
   return (
-    <nav className="flex flex-col gap-1">
-      {plainItems.map((item) => {
-        const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+    <nav className="flex flex-col">
+      {groups.map((group) => {
+        const items = group.items.filter((item) => !item.icfes || icfesEnabled);
+        if (items.length === 0) return null;
         return (
-          <Link key={item.to} to={item.to} onClick={onNavigate} className={linkClass(active)}>
-            <item.icon className="size-4.5 shrink-0" strokeWidth={1.75} />
-            <span className="truncate">{item.label}</span>
-          </Link>
-        );
-      })}
-
-      {icfesItems.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setIcfesChoice({ path: pathname, open: !icfesOpen })}
-            aria-expanded={icfesOpen}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
-              insideIcfes
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground hover:bg-muted hover:text-sidebar-foreground",
-            )}
-          >
-            <ListChecks className="size-4.5 shrink-0" strokeWidth={1.75} />
-            <span className="flex-1 truncate text-left">ICFES</span>
-            <ChevronDown
-              className={cn("size-4 shrink-0 transition-transform", icfesOpen && "rotate-180")}
-              strokeWidth={1.75}
-              aria-hidden
-            />
-          </button>
-
-          {icfesOpen && (
-            <ul className="ml-4 space-y-1 border-l border-sidebar-border pl-3">
-              {icfesItems.map((item) => {
+          <div key={group.label} className="mb-[18px]">
+            <p
+              className={cn(
+                "px-[10px] pb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-muted-foreground",
+                ICON_ONLY,
+              )}
+            >
+              {group.label}
+            </p>
+            <ul className="space-y-0.5">
+              {items.map((item) => {
                 const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                // The counter only shows up where there is a real queue
+                // of work: the material the school has, and the cases
+                // that are still open.
+                const count =
+                  item.badge === "material"
+                    ? materialCount
+                    : item.badge === "support"
+                      ? supportCount
+                      : null;
                 return (
                   <li key={item.to}>
                     <Link
                       to={item.to}
                       onClick={onNavigate}
+                      title={item.label}
+                      aria-label={item.label}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        "flex w-full items-center gap-[11px] rounded-[10px] border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
+                        ICON_ONLY_ITEM,
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/80 hover:bg-muted hover:text-sidebar-foreground",
+                          ? "border-sidebar-border bg-sidebar-accent font-medium text-white"
+                          : "text-sidebar-foreground hover:bg-white/[0.045] hover:text-foreground",
                       )}
                     >
-                      <item.icon className="size-4 shrink-0" strokeWidth={1.75} />
-                      <span className="truncate">{item.label.replace(" ICFES", "")}</span>
+                      <item.icon
+                        className={cn(
+                          "size-[17px] shrink-0 opacity-85",
+                          active && "text-primary opacity-100",
+                        )}
+                        strokeWidth={1.9}
+                        aria-hidden
+                      />
+                      <span className={cn("truncate", ICON_ONLY)}>{item.label}</span>
+                      {count !== null && count > 0 && (
+                        <span
+                          className={cn(
+                            "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-[#7FB8FF]",
+                            ICON_ONLY,
+                          )}
+                        >
+                          {count}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
               })}
             </ul>
-          )}
-        </>
-      )}
+          </div>
+        );
+      })}
     </nav>
   );
 }
 
-/** The bottom of the sidebar: the theme, the fold and the way out. */
-function SidebarFooter({
-  onSignOut,
-  signingOut,
-  collapsed,
-  onToggleCollapsed,
-}: {
-  onSignOut: () => void;
-  signingOut: boolean;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
-}) {
+/** The foot of the rail: what the role of the session can do. */
+function RoleNote({ role }: { role: AppShellRole }) {
+  const note = ROLE_NOTES[role];
   return (
-    <div className="mt-4 space-y-1 border-t border-sidebar-border pt-3">
-      {collapsed ? (
-        <div className="flex flex-col items-center gap-1">
-          <ThemeToggle variant="icon-only" />
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label="Expandir la barra lateral"
-            title="Expandir la barra lateral"
-            className="grid size-9 place-items-center rounded-lg text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <PanelLeftOpen className="size-4.5" strokeWidth={1.75} />
-          </button>
-        </div>
-      ) : (
-        <>
-          <ThemeToggle variant="menu" />
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label="Contraer la barra lateral"
-            title="Contraer la barra lateral"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <PanelLeftClose className="size-4.5" strokeWidth={1.75} />
-            <span className="flex-1 text-left">Contraer menú</span>
-          </button>
-        </>
-      )}
-      <button
-        type="button"
-        onClick={onSignOut}
-        disabled={signingOut}
-        aria-label="Cerrar sesion"
-        title="Cerrar sesion"
-        className={cn(
-          "flex w-full items-center rounded-lg text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:cursor-not-allowed disabled:opacity-60",
-          collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5",
-        )}
-      >
-        <LogOut className="size-4.5" strokeWidth={1.75} />
-        {!collapsed && (signingOut ? "Cerrando..." : "Cerrar sesion")}
-      </button>
+    <div className="border-t border-sidebar-border p-3">
+      <div className="flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground">
+        <Info
+          className="mt-0.5 size-[15px] shrink-0 text-[#2DD4BF]"
+          strokeWidth={1.9}
+          aria-hidden
+        />
+        <p className={cn("min-w-0 leading-snug", ICON_ONLY)}>
+          <span className="font-semibold text-sidebar-foreground">{note.title}</span>
+          <br />
+          {note.note}
+        </p>
+      </div>
     </div>
+  );
+}
+
+/** The menu of the user: the profile and the way out. */
+function UserMenu({
+  session,
+  role,
+  displayName,
+  caption,
+  signingOut,
+  onSignOut,
+}: {
+  session: SessionContext;
+  role: AppShellRole;
+  displayName: string;
+  caption: string;
+  signingOut: boolean;
+  onSignOut: () => void;
+}) {
+  const avatar = session.profile?.avatar_url;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-[9px] rounded-xl border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-[rgba(150,175,220,.26)]"
+        >
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={`Foto de ${displayName}`}
+              className="size-8 shrink-0 rounded-[9px] object-cover"
+              loading="lazy"
+              width={32}
+              height={32}
+            />
+          ) : (
+            <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-primary to-[#6D4BE0] text-[12px] font-bold text-white">
+              {initials(displayName)}
+            </span>
+          )}
+          <span className="hidden min-w-0 text-left leading-tight sm:block">
+            <span className="block truncate text-[12.8px] font-semibold">{displayName}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">{caption}</span>
+          </span>
+          <ChevronDown
+            className="size-3.5 shrink-0 text-muted-foreground"
+            strokeWidth={1.9}
+            aria-hidden
+          />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[232px]">
+        <DropdownMenuLabel>Sesión</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/perfil">
+            <UserSquare2 className="size-4" strokeWidth={1.9} aria-hidden />
+            Mi perfil y seguridad
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/perfil">
+            <Bell className="size-4" strokeWidth={1.9} aria-hidden />
+            Notificaciones
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/perfil">
+            <Palette className="size-4" strokeWidth={1.9} aria-hidden />
+            Preferencias
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={(event: Event) => {
+            event.preventDefault();
+            onSignOut();
+          }}
+          disabled={signingOut}
+        >
+          <LogOut className="size-4" strokeWidth={1.9} aria-hidden />
+          {signingOut ? "Cerrando..." : "Cerrar sesión"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -345,17 +453,15 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  // The sidebar can be folded into a narrow strip of icons. It is a
-  // personal preference: it lives in the browser and is remembered.
-  const collapsed = useSyncExternalStore(
-    subscribeSidebar,
-    getStoredSidebarCollapsed,
-    getServerSidebarCollapsed,
-  );
-  const toggleCollapsed = () => setSidebarCollapsed(!collapsed);
-
   const entitlement = useEntitlement(session.primarySchoolId);
   const school = useSchool(session.primarySchoolId);
+  // The counter of the rail: how much material the school has
+  // available. The dashboard reads the same query, so the panel asks
+  // for it once.
+  const overview = useSchoolOverview(role === "admin" ? session.primarySchoolId : null);
+  // The counter of the support: the cases of the school that are still
+  // open. The query is off for the roles that do not have the channel.
+  const supportCases = useSchoolSupportCases(role === "admin");
 
   // The school's branding comes with the session, so the server already
   // knows it when it renders the page. The live query (useSchool) keeps
@@ -383,19 +489,6 @@ export function AppShell({
     sessionBrand?.name ||
     schoolName;
 
-  // Derive the plan label and ICFES-enabled flag from the entitlement
-  // snapshot. Phase 5 commits 7/8 keep the fallback "Sin plan" / false
-  // until the Wompi webhook writes the first row.
-  const plan: SchoolPlan = ((): SchoolPlan => {
-    if (!entitlement.data) return "Sin plan";
-    const status = entitlement.data.status;
-    if (status !== "active" && status !== "trial") return "Sin plan";
-    const code = entitlement.data.plan_code.toLowerCase();
-    if (code === "basico") return "Basico";
-    if (code === "estandar") return "Estandar";
-    if (code === "premium") return "Premium";
-    return "Sin plan";
-  })();
   const icfesEnabled = Boolean(
     entitlement.data &&
     (entitlement.data.status === "active" || entitlement.data.status === "trial") &&
@@ -404,7 +497,7 @@ export function AppShell({
 
   const displayName = session.profile?.full_name ?? session.user.email ?? "Usuario";
   const caption = (() => {
-    if (role === "super") return "Super Admin";
+    if (role === "super") return "Equipo Lumen";
     if (role === "admin") return "Administrador";
     if (role === "docente") return "Docente";
     return "Estudiante";
@@ -421,8 +514,11 @@ export function AppShell({
     }
   }
 
+  const materialCount = overview.data?.material.available ?? null;
+  const supportCount = supportCases.data ? openCaseCount(supportCases.data) : null;
+
   return (
-    <div className="min-h-screen w-full bg-background">
+    <div className="lumen-panel min-h-screen w-full bg-background">
       {/* The school's colour, painted with the page: the first frame is
           already in the school's colour, so there is no flash of the
           default theme while the browser catches up. */}
@@ -430,102 +526,96 @@ export function AppShell({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar lg:flex",
-          collapsed ? "w-16 p-2" : "w-64 p-4",
+          "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar",
+          "min-[900px]:flex",
+          "w-[270px] max-[1179px]:w-[68px]",
         )}
       >
-        <Brand
-          role={role}
-          plan={plan}
-          schoolName={resolvedSchoolName}
-          logoUrl={logoUrl}
-          collapsed={collapsed}
-        />
-        <div className="mt-6 flex-1 overflow-y-auto">
-          <NavList role={role} icfesEnabled={icfesEnabled} collapsed={collapsed} />
+        <Brand role={role} schoolName={resolvedSchoolName} logoUrl={logoUrl} />
+        <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
+          <NavGroups
+            role={role}
+            icfesEnabled={icfesEnabled}
+            materialCount={materialCount}
+            supportCount={supportCount}
+          />
         </div>
-        <SidebarFooter
-          onSignOut={onSignOut}
-          signingOut={signingOut}
-          collapsed={collapsed}
-          onToggleCollapsed={toggleCollapsed}
-        />
+        <RoleNote role={role} />
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-40 max-[899px]:block hidden">
           <button
-            aria-label="Cerrar menu"
-            className="absolute inset-0 bg-foreground/40"
+            aria-label="Cerrar menú"
+            className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-72 flex-col bg-sidebar p-4">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-              <Brand
-                role={role}
-                plan={plan}
-                schoolName={resolvedSchoolName}
-                logoUrl={logoUrl}
-                collapsed={false}
-              />
+          <div className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-sidebar">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+              <Brand role={role} schoolName={resolvedSchoolName} logoUrl={logoUrl} />
               <button
-                aria-label="Cerrar menu"
-                className="grid size-9 shrink-0 place-items-center rounded-lg hover:bg-muted"
+                aria-label="Cerrar menú"
+                className="mt-[18px] grid size-9 shrink-0 place-items-center rounded-lg hover:bg-sidebar-accent"
                 onClick={() => setOpen(false)}
               >
-                <X className="size-5" />
+                <X className="size-5" strokeWidth={1.9} />
               </button>
             </div>
-            <div className="mt-6 flex-1 overflow-y-auto">
-              <NavList
+            <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
+              <NavGroups
                 role={role}
                 icfesEnabled={icfesEnabled}
-                collapsed={false}
+                materialCount={materialCount}
+                supportCount={supportCount}
                 onNavigate={() => setOpen(false)}
               />
             </div>
-            <SidebarFooter
-              onSignOut={onSignOut}
-              signingOut={signingOut}
-              collapsed={false}
-              onToggleCollapsed={toggleCollapsed}
-            />
+            <RoleNote role={role} />
           </div>
         </div>
       )}
 
-      <div className={cn("lg:pl-64", collapsed && "lg:pl-16")}>
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-border bg-card/85 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="min-[900px]:pl-[270px] max-[1179px]:pl-[68px]">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-6">
           <button
-            aria-label="Abrir menu"
-            className="grid size-10 place-items-center rounded-lg hover:bg-muted lg:hidden"
+            aria-label="Abrir menú"
+            className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground hover:text-foreground min-[900px]:hidden"
             onClick={() => setOpen(true)}
           >
-            <Menu className="size-5" />
+            <Menu className="size-[18px]" strokeWidth={1.9} />
           </button>
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <NotificationBell userId={session.user.id} />
-            <div className="flex items-center gap-2.5">
-              {session.profile?.avatar_url ? (
-                <img
-                  src={session.profile.avatar_url}
-                  alt={`Foto de perfil de ${displayName}`}
-                  className="size-9 shrink-0 rounded-full object-cover ring-1 ring-border"
+
+          {/* The bar shows the context of the session, not a search: the
+              search of the panel lives inside each table. */}
+          <div className="flex min-w-0 items-center gap-2.5 text-[13px] text-muted-foreground">
+            <span className="truncate text-[14px] font-semibold text-foreground">
+              {role === "super" ? "Panel de plataforma" : (resolvedSchoolName ?? "Colegio")}
+            </span>
+            {session.currentPeriod && (
+              <>
+                <span
+                  className="size-[5px] shrink-0 rounded-full bg-muted-foreground/60"
+                  aria-hidden
                 />
-              ) : (
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-bold text-primary">
-                  {initials(displayName)}
-                </span>
-              )}
-              <div className="hidden min-w-0 md:block">
-                <p className="truncate text-sm font-semibold leading-tight">{displayName}</p>
-                <p className="truncate text-xs text-muted-foreground">{caption}</p>
-              </div>
-            </div>
+                <span className="truncate">{session.currentPeriod}</span>
+              </>
+            )}
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+            <NotificationBell userId={session.user.id} />
+            <UserMenu
+              session={session}
+              role={role}
+              displayName={displayName}
+              caption={caption}
+              signingOut={signingOut}
+              onSignOut={onSignOut}
+            />
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-7">
           <Outlet />
         </main>
       </div>
