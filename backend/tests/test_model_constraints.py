@@ -53,6 +53,9 @@ _TABLES_WITH_NAMED_CONSTRAINTS = {
     "icfes_attempts",
     "icfes_scores",
     "icfes_simulation_questions",
+    "icfes_simulators",
+    "icfes_simulator_schools",
+    "icfes_activations",
     "material_courses",
     "material_schools",
     "notification_preferences",
@@ -60,6 +63,8 @@ _TABLES_WITH_NAMED_CONSTRAINTS = {
     "school_memberships",
     "schools",
     "student_enrollments",
+    "support_cases",
+    "support_messages",
     "subjects",
     "subscriptions",
     "task_submissions",
@@ -78,6 +83,17 @@ def _migration_unique_constraints() -> dict[str, dict[str, tuple[str, ...]]]:
             # Track the table the statements apply to.
             current_table: str | None = None
             for line in sql.split("\n"):
+                # A constraint added with `alter table` belongs to the
+                # table of that statement, not to the last table that
+                # was created.
+                alter_match = re.match(
+                    r"\s*alter table (?:if exists )?(?:public\.)?(\w+)",
+                    line,
+                    re.IGNORECASE,
+                )
+                if alter_match:
+                    current_table = alter_match.group(1)
+
                 table_match = re.match(
                     r"\s*(?:create table (?:if not exists )?)?(?:public\.)?(\w+)\s*\(",
                     line,

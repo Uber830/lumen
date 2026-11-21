@@ -154,13 +154,22 @@ create trigger school_memberships_assign_admin_role
   for each row execute function public.assign_school_admin_role();
 
 -- A teacher or a student is never an administrator, and an
--- administrator always has a rank.
-alter table public.school_memberships
-  add constraint school_memberships_admin_role_ck
-  check (
-    (role = 'school_admin' and admin_role is not null)
-    or (role <> 'school_admin' and admin_role is null)
-  );
+-- administrator always has a rank. The constraint is only added when it
+-- is not there yet: a database where this migration was applied and
+-- then stopped halfway does not fail again.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'school_memberships_admin_role_ck'
+  ) then
+    alter table public.school_memberships
+      add constraint school_memberships_admin_role_ck
+      check (
+        (role = 'school_admin' and admin_role is not null)
+        or (role <> 'school_admin' and admin_role is null)
+      );
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- The closure of an academic period
@@ -247,6 +256,170 @@ create table if not exists public.materials (
 comment on table public.materials is
   'The material of the editorial catalog, uploaded by the platform team.';
 
+-- ---------------------------------------------------------------------------
+-- The shape of the catalog is decided here
+--
+-- Another branch of the project (the team of the platform) also declares a
+-- table called `materials`, with its own columns: `code`, `type`, `status`
+-- and the files in a table of their own. `create table if not exists` does
+-- not touch a table that already exists, so when that migration ran first
+-- this one would find a catalog it does not understand and the panel of the
+-- school would break.
+--
+-- The decision is that **this shape is the one that stays**: the catalog of
+-- the material keeps the file in the piece itself and names its columns
+-- `ref`, `kind` and `state`. So this block brings a catalog that arrived in
+-- the other shape to this one: the columns are added, the data that the
+-- other shape holds is brought over, and the constraints of this shape are
+-- put in place. It is idempotent: on a database where this migration ran
+-- first, it does nothing.
+-- ---------------------------------------------------------------------------
+alter table public.materials add column if not exists ref text;
+alter table public.materials add column if not exists kind text;
+alter table public.materials add column if not exists storage_path text;
+alter table public.materials add column if not exists file_name text;
+alter table public.materials add column if not exists file_size_bytes bigint;
+alter table public.materials add column if not exists state text;
+
+do $$
+declare
+  tiene_code boolean := false;
+  tiene_type boolean := false;
+  tiene_status boolean := false;
+  tiene_files boolean := false;
+begin
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'code'
+  ) into tiene_code;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'type'
+  ) into tiene_type;
+
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'status'
+  ) into tiene_status;
+
+  select exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'material_files'
+  ) into tiene_files;
+
+  -- The short code: the one of the other shape, or one built from the id.
+  if tiene_code then
+    update public.materials set ref = code where ref is null;
+  end if;
+  update public.materials
+  set ref = 'C-' || upper(left(replace(id::text, '-', ''), 8))
+  where ref is null;
+
+  -- The kind of the file: the type of the other shape, translated.
+  if tiene_type then
+    update public.materials
+    set kind = case type
+      when 'Libro' then 'epub'
+      when 'Documento' then 'docx'
+      when 'Multimedia' then 'mp4'
+      else 'pdf'
+    end
+    where kind is null;
+  end if;
+  update public.materials set kind = 'pdf' where kind is null;
+
+  -- The state: the status of the other shape, translated.
+  if tiene_status then
+    update public.materials
+    set state = case status
+      when 'review' then 'en_revision'
+      when 'published' then 'publicado'
+      when 'archived' then 'archivado'
+      else 'borrador'
+    end
+    where state is null;
+  end if;
+  update public.materials set state = 'borrador' where state is null;
+
+  -- The file: the primary one of the other shape, when it had its own table.
+  if tiene_files then
+    update public.materials m
+    set storage_path = f.storage_key,
+        file_name = f.file_name,
+        file_size_bytes = f.size_bytes
+    from public.material_files f
+    where f.material_id = m.id
+      and (f.is_primary or not exists (
+        select 1 from public.material_files other
+        where other.material_id = m.id and other.is_primary
+      ))
+      and m.storage_path is null;
+  end if;
+end $$;
+
+-- Each value has one name only. The columns of the other shape are
+-- dropped once their values are in `ref`, `kind` and `state`: two
+-- columns with the same value drift apart the moment one of the two
+-- teams writes a new material.
+--
+-- The team of the platform adapts its queries to these names: `ref` for
+-- the code, `kind` for the type of the file and `state` for the state
+-- of the piece. The rest of its columns (the grades, the visibility, the
+-- order of the landing) stay as they are.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'code'
+  ) then
+    alter table public.materials drop column code;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'type'
+  ) then
+    alter table public.materials drop column type;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'materials' and column_name = 'status'
+  ) then
+    alter table public.materials drop column status;
+  end if;
+end $$;
+
+-- The constraints of this shape, when the table arrived in the other one.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'materials_ref_uq'
+  ) then
+    alter table public.materials add constraint materials_ref_uq unique (ref);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'materials_kind_ck'
+  ) then
+    alter table public.materials add constraint materials_kind_ck
+      check (kind in ('pdf', 'docx', 'epub', 'mp4', 'zip'));
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'materials_state_ck'
+  ) then
+    alter table public.materials add constraint materials_state_ck
+      check (state in ('borrador', 'en_revision', 'publicado', 'archivado'));
+  end if;
+end $$;
+
+alter table public.materials alter column ref set not null;
+alter table public.materials alter column kind set not null;
+alter table public.materials alter column state set not null;
+alter table public.materials alter column state set default 'borrador';
+
 create index if not exists materials_state_idx on public.materials (state);
 create index if not exists materials_area_idx on public.materials (area);
 
@@ -263,6 +436,49 @@ create table if not exists public.material_schools (
   enabled_at  timestamptz not null default now(),
   constraint material_schools_material_school_uq unique (material_id, school_id)
 );
+
+-- The access of a school to a material has one shape: a row with its own
+-- id, the flag that says whether the access is on, and the moment it was
+-- archived for that school. A table that arrived in another shape (with
+-- the pair of columns as its key) is brought to this one.
+alter table public.material_schools add column if not exists id uuid;
+alter table public.material_schools add column if not exists enabled boolean;
+alter table public.material_schools add column if not exists archived_at timestamptz;
+
+update public.material_schools set id = gen_random_uuid() where id is null;
+update public.material_schools set enabled = true where enabled is null;
+
+alter table public.material_schools alter column id set default gen_random_uuid();
+alter table public.material_schools alter column id set not null;
+alter table public.material_schools alter column enabled set default true;
+alter table public.material_schools alter column enabled set not null;
+
+do $$
+begin
+  -- The key of the table is its own id, and the pair of columns keeps
+  -- saying that a school sees a material only once.
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'material_schools_pkey'
+      and pg_get_constraintdef(oid) not like '%(id)%'
+  ) then
+    alter table public.material_schools drop constraint material_schools_pkey;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'material_schools_pkey'
+  ) then
+    alter table public.material_schools
+      add constraint material_schools_pkey primary key (id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'material_schools_material_school_uq'
+  ) then
+    alter table public.material_schools
+      add constraint material_schools_material_school_uq unique (material_id, school_id);
+  end if;
+end $$;
 
 comment on table public.material_schools is
   'The schools with access to a material. A school only sees what is enabled for it.';
