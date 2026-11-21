@@ -149,7 +149,9 @@ async def list_cases(
                 school_name=schools.get(case.school_id) if case.school_id else None,
                 message_count=counts.get(case.id, (0, None))[0],
                 last_message_at=counts.get(case.id, (0, None))[1],
-                opened_by_name=openers.get(case.opened_by, "Colegio") if case.opened_by else "Colegio",
+                opened_by_name=openers.get(case.opened_by, "Colegio")
+                if case.opened_by
+                else "Colegio",
             )
         )
     return rows, count
@@ -188,10 +190,7 @@ async def actor_names(
         .join(Profile, Profile.id == User.id, isouter=True)
         .where(User.id.in_(user_ids))
     )
-    return {
-        user_id: full_name or email or "Colegio"
-        for user_id, full_name, email in result.all()
-    }
+    return {user_id: full_name or email or "Colegio" for user_id, full_name, email in result.all()}
 
 
 async def get_case(session: AsyncSession, case_id: uuid.UUID) -> CaseThread | None:
