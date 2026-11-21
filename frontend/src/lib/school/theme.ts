@@ -55,11 +55,18 @@ export function primaryColorStyle(color: string | null): string {
 }
 
 /**
- * Derive a soft tint from an oklch(L C H) string: push lightness up
- * and chroma down. Returns null when the string is not parseable, so
- * the base --primary-soft stays in effect.
+ * Derive a soft tint from the primary colour.
+ *
+ * The colour of a school is a hexadecimal one, and the tint is the
+ * same colour mixed with the background: `color-mix` does it in the
+ * browser, with whatever colour it is given. The oklch colours of the
+ * base stylesheet keep their own derivation.
  */
 function softVariant(color: string): string | null {
+  if (/^#[0-9a-f]{3,8}$/i.test(color.trim())) {
+    return `color-mix(in oklab, ${color} 14%, transparent)`;
+  }
+
   const match = /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i.exec(color);
   if (!match) return null;
   const chroma = Number(match[2]);
