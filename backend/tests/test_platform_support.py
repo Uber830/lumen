@@ -78,21 +78,18 @@ def a_case(engine, case_school) -> Iterator[uuid.UUID]:
                 SupportCase(
                     id=case_id,
                     code=f"SOL-T{case_id.hex[:6].upper()}",
-                    subject="El material no aparece en el curso",
-                    detail="El docente no ve el material en su curso.",
+                    title="El material no aparece en el curso",
+                    category="problema_tecnico",
                     school_id=case_school,
-                    requester_name="Julio Ramírez",
-                    requester_role="Docente",
-                    channel="web_form",
-                    level="urgent",
-                    status="open",
+                    channel="formulario_web",
+                    level="urgente",
+                    status="abierto",
                 )
             )
             session.add(
                 SupportMessage(
                     case_id=case_id,
-                    author_name="Julio Ramírez",
-                    author_role="Docente",
+                    author_role="colegio",
                     body="El material de álgebra no me aparece en el curso 7° A.",
                 )
             )
@@ -125,9 +122,10 @@ def test_the_closed_catalogs_of_the_desk_are_served(client, platform_admin) -> N
 
     assert response.status_code == 200
     body = response.json()
-    assert body["levels"] == ["info", "warning", "urgent"]
-    assert body["statuses"] == ["open", "waiting", "resolved"]
-    assert "web_form" in body["channels"]
+    assert body["levels"] == ["info", "aviso", "urgente"]
+    assert body["statuses"] == ["abierto", "en_espera", "resuelto"]
+    assert "formulario_web" in body["channels"]
+    assert "problema_tecnico" in body["categories"]
 
 
 async def test_the_listing_shows_a_page_and_the_total(client, platform_admin, a_case) -> None:
@@ -145,11 +143,11 @@ async def test_the_listing_can_be_filtered_by_state_and_level(
     client, platform_admin, a_case
 ) -> None:
     """The filters of the desk are the ones the backend knows."""
-    opened = client.get("/v1/platform/cases?status=open&level=urgent", headers=platform_admin)
+    opened = client.get("/v1/platform/cases?status=abierto&level=urgente", headers=platform_admin)
     assert opened.status_code == 200
     assert any(item["id"] == str(a_case) for item in opened.json()["items"])
 
-    resolved = client.get("/v1/platform/cases?status=resolved", headers=platform_admin)
+    resolved = client.get("/v1/platform/cases?status=resuelto", headers=platform_admin)
     assert resolved.status_code == 200
     assert all(item["id"] != str(a_case) for item in resolved.json()["items"])
 
@@ -165,7 +163,7 @@ async def test_the_detail_carries_the_conversation_and_the_audit(
     assert body["code"].startswith("SOL-")
     assert body["school_name"].startswith("Soporte Colegio")
     assert len(body["messages"]) == 1
-    assert body["messages"][0]["author_role"] == "Docente"
+    assert body["messages"][0]["author_role"] == "colegio"
     assert isinstance(body["audit"], list)
     assert body["can_resolve"] is True
 
@@ -182,9 +180,9 @@ async def test_the_answer_is_written_and_the_case_goes_to_waiting(
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "waiting"
+    assert body["status"] == "en_espera"
     assert len(body["messages"]) == 2
-    assert body["messages"][-1]["author_role"] == "Plataforma"
+    assert body["messages"][-1]["author_role"] == "plataforma"
 
 
 async def test_a_blank_answer_is_refused(client, platform_admin, a_case) -> None:
@@ -204,7 +202,7 @@ async def test_a_closed_case_opens_again_when_the_school_writes(
     """A school that writes again did not get its answer."""
     closed = client.post(f"/v1/platform/cases/{a_case}/resolve", headers=platform_admin)
     assert closed.status_code == 200
-    assert closed.json()["status"] == "resolved"
+    assert closed.json()["status"] == "resuelto"
 
     answered = client.post(
         f"/v1/platform/cases/{a_case}/messages",
@@ -212,7 +210,7 @@ async def test_a_closed_case_opens_again_when_the_school_writes(
         json={"body": "Volvemos a abrir el caso."},
     )
     assert answered.status_code == 200
-    assert answered.json()["status"] == "waiting"
+    assert answered.json()["status"] == "en_espera"
 
 
 async def test_a_case_is_closed_with_the_time_it_was_closed(client, platform_admin, a_case) -> None:
@@ -221,7 +219,7 @@ async def test_a_case_is_closed_with_the_time_it_was_closed(client, platform_adm
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "resolved"
+    assert body["status"] == "resuelto"
     assert body["can_resolve"] is False
 
 

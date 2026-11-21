@@ -3,7 +3,7 @@
 The backend reads columns that the SQL migrations add with
 `alter table ... add column`. A database where the table exists but
 the column does not used to start happily and fail later with an
-opaque 500 (`column "schools.mission" does not exist`). The check now
+opaque 500 (`column "schools.display_name" does not exist`). The check now
 compares the columns of the models with the columns of the database,
 so the drift is reported before the first request.
 
@@ -37,13 +37,13 @@ def test_a_complete_database_is_ok() -> None:
 def test_a_missing_column_is_reported() -> None:
     """A column that is not there is named in the report."""
     present = _complete_database()
-    present["schools"].discard("mission")
+    present["schools"].discard("display_name")
 
     status = status_of(present)
 
     assert not status.ok
-    assert status.missing_columns == ("schools.mission",)
-    assert "schools.mission" in status.message()
+    assert status.missing_columns == ("schools.display_name",)
+    assert "schools.display_name" in status.message()
 
 
 def test_a_missing_table_is_reported() -> None:
@@ -61,7 +61,7 @@ def test_a_missing_table_is_reported() -> None:
 def test_the_columns_come_from_the_models() -> None:
     """The check reads the models, so it cannot drift apart from them."""
     assert "schools" in REQUIRED_COLUMNS
-    assert "mission" in REQUIRED_COLUMNS["schools"]
+    assert "display_name" in REQUIRED_COLUMNS["schools"]
     assert "city" in REQUIRED_COLUMNS["schools"]
     assert "support_cases" in REQUIRED_COLUMNS
     assert REQUIRED_TABLES
