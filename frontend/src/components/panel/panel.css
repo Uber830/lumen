@@ -122,6 +122,84 @@
 }
 
 /*
+ * On a phone the table becomes a stack of cards.
+ *
+ * Each row is a card and each cell carries the label of its column, so
+ * a value is never a mystery: the label comes from the header of the
+ * table (see the PanelTable component).
+ */
+@media (max-width: 767px) {
+  .lumen-panel table,
+  .lumen-panel tbody,
+  .lumen-panel tr,
+  .lumen-panel td {
+    display: block;
+    width: 100%;
+  }
+
+  .lumen-panel thead {
+    /* The header is read by the screen reader and by the label of the
+       card; on the screen it would only repeat what each line says. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lumen-panel tbody tr {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+  }
+
+  .lumen-panel tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .lumen-panel tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    border: 0;
+    padding: 5px 14px;
+    text-align: right;
+  }
+
+  .lumen-panel tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--muted-foreground);
+    font-size: 10.6px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  /* The cell of the name of the row comes first and it is the title of
+     the card: it does not need a label. */
+  .lumen-panel tbody td:first-child {
+    display: block;
+    text-align: left;
+  }
+
+  .lumen-panel tbody td:first-child::before {
+    content: none;
+  }
+
+  /* The actions of the row: they are at the foot of the card. */
+  .lumen-panel tbody td:last-child {
+    justify-content: flex-start;
+    padding-top: 9px;
+  }
+
+  .lumen-panel tbody td:last-child::before {
+    content: none;
+  }
+}
+
+/*
  * The scrollbar of the panel, in the colour of the lines.
  */
 .lumen-panel * {

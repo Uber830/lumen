@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Children, cloneElement, isValidElement, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -308,6 +308,105 @@ export function Toolbar({ children, className }: { children: ReactNode; classNam
 export function TableShell({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("overflow-x-auto", className)}>{children}</div>;
 }
+
+/**
+ * The text of a header cell, to label the cell of the row.
+ *
+ * The label of a column can be hidden behind a screen-reader only
+ * span, so the text is looked for in the whole subtree.
+ */
+function textOf(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join(" ");
+  if (isValidElement(node)) {
+    const props = node.props as { children?: ReactNode };
+    return textOf(props.children);
+  }
+  return "";
+}
+
+/**
+ * The table of the panel.
+ *
+ * On a wide screen it is a table. Under 768 px it becomes a stack of
+ * cards, one per row, and every card carries the label of its column:
+ * a phone reader needs to know what each value means.
+ *
+ * The labels come from the header of the table itself, so a column can
+ * be renamed in one place and the mobile view follows.
+ */
+export function PanelTable({ children, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
+  // The caption can come first, so the header and the body are looked
+  // for by their type and not by their position.
+  const head = Children.toArray(children).find(
+    (child) => isValidElement(child) && child.type === "thead",
+  );
+  const body = Children.toArray(children).find(
+    (child) => isValidElement(child) && child.type === "tbody",
+  );
+  // The caption describes the table for the screen reader.
+  const caption = Children.toArray(children).find(
+    (child) => isValidElement(child) && child.type === "caption",
+  );
+
+  const labels: string[] = [];
+  if (isValidElement(head)) {
+    const headProps = head.props as { children?: ReactNode };
+    Children.forEach(Children.toArray(headProps.children), (row) => {
+      if (!isValidElement(row)) return;
+      const rowProps = row.props as { children?: ReactNode };
+      Children.forEach(Children.toArray(rowProps.children), (cell) => {
+        if (!isValidElement(cell)) return;
+        const cellProps = cell.props as { children?: ReactNode };
+        labels.push(textOf(cellProps.children).trim());
+      });
+    });
+  }
+
+  const labelledBody = isValidElement(body)
+    ? cloneElement(
+        body as React.ReactElement<{ children?: ReactNode }>,
+        undefined,
+        (() => {
+          const rows = Children.toArray((body.props as { children?: ReactNode }).children);
+          return Children.map(rows, (row) => {
+            if (!isValidElement(row)) return row;
+            const rowProps = row.props as { children?: ReactNode };
+            const cells = Children.toArray(rowProps.children);
+            let index = 0;
+            const labelled = Children.map(cells, (cell) => {
+              if (!isValidElement(cell)) return cell;
+              const cellProps = cell.props as { "data-label"?: string };
+              const label = labels[index] ?? cellProps["data-label"];
+              index += 1;
+              return cloneElement(cell as React.ReactElement<Record<string, unknown>>, {
+                "data-label": label,
+              });
+            });
+            return cloneElement(
+              row as React.ReactElement<Record<string, unknown>>,
+              undefined,
+              labelled,
+            );
+          });
+        })(),
+      )
+    : body;
+
+  return (
+    <table {...props}>
+      {caption}
+      {head}
+      {labelledBody}
+    </table>
+  );
+}
+
+export const tableHeadClass =
+  "sticky top-0 z-[1] border-b border-border bg-secondary px-[14px] py-[11px] text-left text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground";
+
+export const tableCellClass =
+  "border-b border-[rgba(150,175,220,.08)] px-[14px] py-[13px] text-[13.4px] align-middle";
 
 /**
  * The page numbers to show: all of them when there are few, and a

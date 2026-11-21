@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CollapsibleCard, Pagination } from "@/components/ui-kit";
+import { CollapsibleCard, Pagination, PanelTable } from "@/components/ui-kit";
 
 // React needs to know it is running inside a test to allow `act`.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -119,5 +119,50 @@ describe("Pagination", () => {
       root.unmount();
     });
     container.remove();
+  });
+});
+
+describe("PanelTable", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("labels each cell with the column it belongs to", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <PanelTable className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th scope="col">Material</th>
+              <th scope="col">Área</th>
+              <th scope="col">
+                <span className="sr-only">Acciones</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Guide de álgebra</td>
+              <td>Matemáticas</td>
+              <td>
+                <button type="button">Ver</button>
+              </td>
+            </tr>
+          </tbody>
+        </PanelTable>,
+      );
+    });
+
+    const cells = container.querySelectorAll("tbody td");
+    expect(cells).toHaveLength(3);
+    expect(cells[0].getAttribute("data-label")).toBe("Material");
+    expect(cells[1].getAttribute("data-label")).toBe("Área");
+    // The label of a column that is hidden behind a screen reader only
+    // span is read the same way.
+    expect(cells[2].getAttribute("data-label")).toBe("Acciones");
   });
 });
