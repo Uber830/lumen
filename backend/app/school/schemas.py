@@ -543,3 +543,63 @@ class SimulatorResultsOut(BaseModel):
     courses: list[SimulatorResultCourseOut] = Field(default_factory=list)
 
 
+class SupportMessageOut(BaseModel):
+    """One message of the thread of a case."""
+
+    id: str
+    author_id: str | None = None
+    # colegio or plataforma.
+    author_role: str = "colegio"
+    author_name: str = ""
+    body: str
+    created_at: datetime
+
+
+class SupportCaseSummaryOut(BaseModel):
+    """One request of the school, as it appears in the list."""
+
+    id: str
+    code: str
+    title: str
+    category: str = "otro"
+    channel: str = "formulario_colegio"
+    level: str = "info"
+    # abierto, en_espera or resuelto.
+    status: str = "abierto"
+    opened_at: datetime
+    opened_by: str | None = None
+    opened_by_name: str = "Colegio"
+    # How many messages the thread has.
+    messages: int = 0
+
+
+class SupportCaseOut(BaseModel):
+    """One request of the school, with its thread."""
+
+    id: str
+    code: str
+    title: str
+    category: str = "otro"
+    channel: str = "formulario_colegio"
+    level: str = "info"
+    status: str = "abierto"
+    opened_at: datetime
+    resolved_at: datetime | None = None
+    opened_by: str | None = None
+    opened_by_name: str = "Colegio"
+    messages: list[SupportMessageOut] = Field(default_factory=list)
+
+
+class SupportCaseIn(BaseModel):
+    """What the school writes when it opens a request."""
+
+    title: str
+    # problema_tecnico, solicitud_material, duda_acceso or otro.
+    category: str = "otro"
+    body: str
+
+
+class SupportMessageIn(BaseModel):
+    """What the school adds to the thread of a case."""
+
+    body: str

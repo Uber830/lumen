@@ -26,7 +26,7 @@ from app.core.errors import ConflictError, NotFoundError
 from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import community, cycles, icfes, identity, operations, team
+from app.school import community, cycles, icfes, identity, operations, support, team
 from app.school.schemas import (
     ActivationCreatedOut,
     ActivationIn,
@@ -52,6 +52,10 @@ from app.school.schemas import (
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
+    SupportCaseIn,
+    SupportCaseOut,
+    SupportCaseSummaryOut,
+    SupportMessageIn,
 )
 
 router = APIRouter(prefix="/v1/school", tags=["school"])
@@ -572,3 +576,79 @@ async def school_simulator_results(
     return SimulatorResultsOut.model_validate(results)
 
 
+@router.get("/support/cases", response_model=list[SupportCaseSummaryOut])
+async def list_school_support_cases(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[SupportCaseSummaryOut]:
+    """The requests of the school to the support team."""
+    membership = _require_admin(context)
+    cases = await support.list_cases(session, membership.school_id)
+    return [SupportCaseSummaryOut.model_validate(case) for case in cases]
+
+
+@router.get("/support/cases/{case_id}", response_model=SupportCaseOut)
+async def get_school_support_case(
+    case_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SupportCaseOut:
+    """One request of the school, with its thread.
+
+    A case of another school answers 404: the endpoint must not confirm
+    that it exists.
+    """
+    membership = _require_admin(context)
+    case = await support.get_case(session, membership.school_id, case_id)
+    return SupportCaseOut.model_validate(case)
+
+
+@router.post("/support/cases", response_model=SupportCaseOut, status_code=201)
+async def open_school_support_case(
+    body: SupportCaseIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SupportCaseOut:
+    """Open a request to the support team.
+
+    The thread starts with the message of the administrator. The school
+    does not resolve the case: that is the platform team's decision.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.SUPPORT_WRITE)
+    case = await support.create_case(
+        session,
+        membership.school_id,
+        context.user_id,
+        title=body.title,
+        category=body.category,
+        body=body.body,
+    )
+    return SupportCaseOut.model_validate(case)
+
+
+@router.post("/support/cases/{case_id}/messages", response_model=SupportCaseOut)
+async def add_school_support_message(
+    case_id: uuid.UUID,
+    body: SupportMessageIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SupportCaseOut:
+    """Add information to the thread of a request.
+
+    The case has to belong to the school of the session: a school
+    never writes in the thread of another one.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.SUPPORT_WRITE)
+    case = await support.add_message(
+        session,
+        membership.school_id,
+        case_id,
+        context.user_id,
+        body.body,
+    )
+    return SupportCaseOut.model_validate(case)
+
+
+__all__ = ["router"]
