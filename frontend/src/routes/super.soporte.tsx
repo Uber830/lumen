@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Download, Send } from "lucide-react";
+import { Check, Send } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +12,7 @@ import {
   Tag,
   Toolbar,
 } from "@/components/ui-kit";
+import { AuditEventPanel } from "@/features/platform/audit-event-panel";
 import { CaseComposer } from "@/features/platform/case-composer";
 import { CasePanel } from "@/features/platform/case-panel";
 import {
@@ -28,12 +29,12 @@ import {
   CASE_LEVEL_TONE,
   CASE_STATUS_LABEL,
   CASE_STATUS_TONE,
+  type AuditEntry,
   type CaseChannel,
   type CaseLevel,
   type CaseStatus,
   type CaseSummary,
 } from "@/lib/platform/types";
-import { downloadCsv } from "@/lib/csv";
 
 export const Route = createFileRoute("/super/soporte")({
   head: () => ({
@@ -85,6 +86,8 @@ function Soporte() {
   const [auditLevel, setAuditLevel] = useState("");
   const [auditSchool, setAuditSchool] = useState("");
   const [auditPage, setAuditPage] = useState(1);
+  // The event whose detail is open, if any.
+  const [auditEvent, setAuditEvent] = useState<AuditEntry | null>(null);
 
   const schools = usePlatformSchools({ per_page: 50 });
   const caseOptions = useCaseOptions();
@@ -113,23 +116,6 @@ function Soporte() {
       await resolve.mutateAsync(item.id);
     }
     setSelected([]);
-  }
-
-  function exportCases() {
-    downloadCsv(
-      "soporte.csv",
-      ["Caso", "Asunto", "Colegio", "Solicita", "Canal", "Nivel", "Estado", "Recibido"],
-      items.map((item) => [
-        item.code,
-        item.subject,
-        item.school_name ?? "",
-        item.requester_name,
-        CASE_CHANNEL_LABEL[item.channel as CaseChannel] ?? item.channel,
-        CASE_LEVEL_LABEL[item.level as CaseLevel] ?? item.level,
-        CASE_STATUS_LABEL[item.status as CaseStatus] ?? item.status,
-        new Date(item.created_at).toLocaleString("es-CO"),
-      ]),
-    );
   }
 
   return (
@@ -230,17 +216,14 @@ function Soporte() {
               <p className="text-xs text-muted-foreground">
                 {cases.isLoading ? "Cargando…" : `${total} caso(s)`}
               </p>
-              <button
-                type="button"
-                onClick={exportCases}
-                disabled={items.length === 0}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-muted disabled:opacity-50"
-              >
-                <Download className="size-3.5" strokeWidth={1.9} aria-hidden />
-                Exportar CSV
-              </button>
             </div>
           </Toolbar>
+
+          <p className="border-b border-border px-5 py-2.5 text-xs text-muted-foreground">
+            Todo caso entra como <b className="text-foreground">Abierto</b>. Al responderlo queda{" "}
+            <b className="text-foreground">En espera</b> (ya le respondimos y esperamos al colegio);
+            al marcarlo como resuelto queda <b className="text-foreground">Resuelto</b>.
+          </p>
 
           {selected.length > 0 && (
             <div className="flex flex-wrap items-center gap-3 border-b border-border bg-primary-soft px-5 py-2.5">
@@ -420,6 +403,11 @@ function Soporte() {
             </p>
           </Toolbar>
 
+          <p className="border-b border-border px-5 py-2.5 text-xs text-muted-foreground">
+            Haz clic en un evento para ver su detalle. Los que vienen de un caso de soporte muestran
+            también la conversación del ticket.
+          </p>
+
           {audit.isLoading ? (
             <SkeletonRows rows={6} columns={4} />
           ) : (audit.data?.items.length ?? 0) === 0 ? (
@@ -450,11 +438,19 @@ function Soporte() {
                   </thead>
                   <tbody>
                     {audit.data?.items.map((entry) => (
-                      <tr key={entry.id} className="border-t border-border hover:bg-muted/40">
+                      <tr
+                        key={entry.id}
+                        className="cursor-pointer border-t border-border hover:bg-muted/40"
+                        onClick={() => setAuditEvent(entry)}
+                      >
                         <td className="px-5 py-3">
-                          <span className="block font-medium">
+                          <button
+                            type="button"
+                            onClick={() => setAuditEvent(entry)}
+                            className="text-left font-medium hover:text-primary"
+                          >
                             {auditEventLabel(entry.event_type)}
-                          </span>
+                          </button>
                           <span className="code-cell mt-0.5 block text-ink-3">
                             {Object.entries(entry.detail)
                               .map(([key, value]) => `${key}: ${String(value)}`)
@@ -494,13 +490,25 @@ function Soporte() {
       )}
 
       <CasePanel
-        key={openId ?? "none"}
+        key={openId ?? "sin-caso"}
         caseId={openId}
         onClose={() => setOpenId(null)}
         onReply={(id) => {
           const target = items.find((item) => item.id === id);
           setReplyTo(target ? [target] : []);
         }}
+      />
+
+      <AuditEventPanel
+        key={auditEvent?.id ?? "sin-evento"}
+        event={auditEvent}
+        schoolName={
+          auditEvent?.school_id
+            ? (schools.data?.items.find((school) => school.id === auditEvent.school_id)?.name ??
+              null)
+            : null
+        }
+        onClose={() => setAuditEvent(null)}
       />
 
       <CaseComposer
