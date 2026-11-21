@@ -29,13 +29,7 @@ import {
   setSidebarCollapsed,
   subscribeSidebar,
 } from "@/lib/sidebar";
-import {
-  getServerTheme,
-  getStoredTheme,
-  setTheme,
-  subscribeTheme,
-  type ThemePreference,
-} from "@/lib/theme";
+import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 import { NAV, isCurrentPath, type AppShellRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -254,7 +248,7 @@ function NavList({
   );
 }
 
-/** The bottom of the sidebar: the theme of the app and the way out. */
+/** The bottom of the sidebar: the way out. */
 function SidebarFooter({
   onSignOut,
   signingOut,
@@ -268,7 +262,6 @@ function SidebarFooter({
 }) {
   return (
     <div className="mt-4 space-y-1 border-t border-sidebar-border pt-3">
-      <ThemePicker collapsed={collapsed} />
       <button
         type="button"
         onClick={onToggleCollapsed}
@@ -311,61 +304,6 @@ const THEME_CHOICES: { value: ThemePreference; label: string; icon: LucideIcon }
   { value: "dark", label: "Oscuro", icon: Moon },
   { value: "system", label: "Sistema", icon: Monitor },
 ];
-
-/**
- * The theme of the app, at the foot of the sidebar.
- *
- * The preference is personal and lives in the browser, so the picker
- * is always at hand: folded it walks through the three choices with a
- * single button, open it shows the three icons.
- */
-function ThemePicker({ collapsed }: { collapsed: boolean }) {
-  const theme = useSyncExternalStore(subscribeTheme, getStoredTheme, getServerTheme);
-  const current = THEME_CHOICES.find((choice) => choice.value === theme);
-
-  if (collapsed) {
-    const next: ThemePreference =
-      theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
-    return (
-      <button
-        type="button"
-        onClick={() => setTheme(next)}
-        title={`Tema: ${current?.label ?? "Sistema"}`}
-        aria-label={`Tema: ${current?.label ?? "Sistema"}. Cambiar el tema`}
-        className="flex w-full items-center justify-center rounded-lg px-0 py-2.5 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      >
-        {current && <current.icon className="size-4.5" strokeWidth={1.9} aria-hidden />}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      role="group"
-      aria-label="Tema de la aplicación"
-      className="mb-2 flex items-center gap-1 rounded-lg bg-muted px-1.5 py-1"
-    >
-      {THEME_CHOICES.map((choice) => (
-        <button
-          key={choice.value}
-          type="button"
-          onClick={() => setTheme(choice.value)}
-          aria-pressed={theme === choice.value}
-          title={choice.label}
-          className={cn(
-            "flex flex-1 items-center justify-center rounded-md px-2 py-1.5 transition-colors",
-            theme === choice.value
-              ? "bg-card text-foreground shadow-sm"
-              : "text-sidebar-foreground/70 hover:bg-sidebar-hover hover:text-sidebar-foreground",
-          )}
-        >
-          <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
-          <span className="sr-only">{choice.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /**
  * The menu of the user: the profile, the preferences and the way out.
