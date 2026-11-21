@@ -282,3 +282,47 @@ class MemberPage(BaseModel):
     pages: int = Field(default=0, ge=0)
 
 
+class CourseOut(BaseModel):
+    """One course of the school, with the structure it holds."""
+
+    id: str
+    name: str
+    grade_label: str
+    subject_count: int = 0
+    teacher_count: int = 0
+    student_count: int = 0
+    status: str = "activo"
+
+
+class SubjectOut(BaseModel):
+    """One subject of the school, with the courses it is taught in."""
+
+    id: str
+    name: str
+    area: str | None = None
+    course_count: int = 0
+    courses: list[str] = Field(default_factory=list)
+
+
+class AssignmentOut(BaseModel):
+    """One assignment: a teacher, a course and a subject.
+
+    `visible_materials_count` says how many pieces of material that
+    teacher sees through this assignment. It is counted in the server:
+    the published material of the area of the subject, enabled for the
+    school, that applies to the course.
+    """
+
+    id: str
+    teacher_id: str
+    teacher_name: str | None = None
+    teacher_email: str | None = None
+    teacher_avatar_url: str | None = None
+    course_id: str
+    course_name: str
+    subject_id: str
+    subject_name: str
+    subject_area: str | None = None
+    visible_materials_count: int = 0
+
+

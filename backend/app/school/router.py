@@ -26,16 +26,19 @@ from app.core.errors import NotFoundError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import community, operations
+from app.school import community, cycles, operations
 from app.school.schemas import (
     AdminSchoolOut,
     AdminUserOut,
+    AssignmentOut,
+    CourseOut,
     CurrentPeriodOut,
     MaterialDetailOut,
     MaterialPage,
     MemberPage,
     SchoolAdminMe,
     SchoolOverview,
+    SubjectOut,
 )
 
 router = APIRouter(prefix="/v1/school", tags=["school"])
@@ -239,5 +242,50 @@ async def list_school_students(
         per_page=per_page,
     )
     return MemberPage.model_validate(page_data)
+
+
+@router.get("/courses", response_model=list[CourseOut])
+async def list_school_courses(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CourseOut]:
+    """The courses of the school, with how much structure they hold."""
+    membership = _require_admin(context)
+    courses = await community.list_courses(session, membership.school_id)
+    return [CourseOut.model_validate(course) for course in courses]
+
+
+@router.get("/subjects", response_model=list[SubjectOut])
+async def list_school_subjects(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[SubjectOut]:
+    """The subjects of the school, with the courses they are taught in."""
+    membership = _require_admin(context)
+    subjects = await community.list_subjects(session, membership.school_id)
+    return [SubjectOut.model_validate(subject) for subject in subjects]
+
+
+@router.get("/assignments", response_model=list[AssignmentOut])
+async def list_school_assignments(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    teacher_id: Annotated[uuid.UUID | None, Query(description="Docente del filtro")] = None,
+    course_id: Annotated[uuid.UUID | None, Query(description="Curso del filtro")] = None,
+) -> list[AssignmentOut]:
+    """The assignments of the school, with the material each one sees.
+
+    The count of visible material is computed in the server: it is the
+    published material of the area of the subject, enabled for the
+    school, that applies to the course of the assignment.
+    """
+    membership = _require_admin(context)
+    assignments = await cycles.list_assignments(
+        session,
+        membership.school_id,
+        teacher_id=teacher_id,
+        course_id=course_id,
+    )
+    return [AssignmentOut.model_validate(assignment) for assignment in assignments]
 
 
