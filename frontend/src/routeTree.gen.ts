@@ -21,15 +21,18 @@ import { Route as SuperRouteImport } from './routes/super'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAdministradoresRouteImport } from './routes/admin.administradores'
 import { Route as AdminAsignacionesRouteImport } from './routes/admin.asignaciones'
+import { Route as AdminContenidoRouteImport } from './routes/admin.contenido'
 import { Route as AdminCursosRouteImport } from './routes/admin.cursos'
 import { Route as AdminDocentesRouteImport } from './routes/admin.docentes'
 import { Route as AdminEstudiantesRouteImport } from './routes/admin.estudiantes'
 import { Route as AdminIcfesRouteImport } from './routes/admin.icfes'
+import { Route as AdminIcfesColegioRouteImport } from './routes/admin.icfes-colegio'
 import { Route as AdminIcfesResultadosRouteImport } from './routes/admin.icfes-resultados'
 import { Route as AdminIcfesSimulacrosRouteImport } from './routes/admin.icfes-simulacros'
 import { Route as AdminPeriodosRouteImport } from './routes/admin.periodos'
 import { Route as AdminPersonalizacionRouteImport } from './routes/admin.personalizacion'
 import { Route as AdminPlanesRouteImport } from './routes/admin.planes'
+import { Route as AdminSoporteRouteImport } from './routes/admin.soporte'
 import { Route as DocenteIndexRouteImport } from './routes/docente.index'
 import { Route as DocenteCalificacionesRouteImport } from './routes/docente.calificaciones'
 import { Route as DocenteChatRouteImport } from './routes/docente.chat'
@@ -109,6 +112,11 @@ const AdminAsignacionesRoute = AdminAsignacionesRouteImport.update({
   path: '/asignaciones',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminContenidoRoute = AdminContenidoRouteImport.update({
+  id: '/contenido',
+  path: '/contenido',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCursosRoute = AdminCursosRouteImport.update({
   id: '/cursos',
   path: '/cursos',
@@ -127,6 +135,11 @@ const AdminEstudiantesRoute = AdminEstudiantesRouteImport.update({
 const AdminIcfesRoute = AdminIcfesRouteImport.update({
   id: '/icfes',
   path: '/icfes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminIcfesColegioRoute = AdminIcfesColegioRouteImport.update({
+  id: '/icfes-colegio',
+  path: '/icfes-colegio',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminIcfesResultadosRoute = AdminIcfesResultadosRouteImport.update({
@@ -152,6 +165,11 @@ const AdminPersonalizacionRoute = AdminPersonalizacionRouteImport.update({
 const AdminPlanesRoute = AdminPlanesRouteImport.update({
   id: '/planes',
   path: '/planes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSoporteRoute = AdminSoporteRouteImport.update({
+  id: '/soporte',
+  path: '/soporte',
   getParentRoute: () => AdminRoute,
 } as any)
 const DocenteIndexRoute = DocenteIndexRouteImport.update({
@@ -257,15 +275,18 @@ export interface FileRoutesByFullPath {
   '/super': typeof SuperRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
+  '/admin/contenido': typeof AdminContenidoRoute
   '/admin/cursos': typeof AdminCursosRoute
   '/admin/docentes': typeof AdminDocentesRoute
   '/admin/estudiantes': typeof AdminEstudiantesRoute
   '/admin/icfes': typeof AdminIcfesRoute
+  '/admin/icfes-colegio': typeof AdminIcfesColegioRoute
   '/admin/icfes-resultados': typeof AdminIcfesResultadosRoute
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
   '/admin/planes': typeof AdminPlanesRoute
+  '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
   '/docente/icfes': typeof DocenteIcfesRoute
@@ -293,15 +314,18 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
+  '/admin/contenido': typeof AdminContenidoRoute
   '/admin/cursos': typeof AdminCursosRoute
   '/admin/docentes': typeof AdminDocentesRoute
   '/admin/estudiantes': typeof AdminEstudiantesRoute
   '/admin/icfes': typeof AdminIcfesRoute
+  '/admin/icfes-colegio': typeof AdminIcfesColegioRoute
   '/admin/icfes-resultados': typeof AdminIcfesResultadosRoute
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
   '/admin/planes': typeof AdminPlanesRoute
+  '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
   '/docente/icfes': typeof DocenteIcfesRoute
@@ -335,15 +359,18 @@ export interface FileRoutesById {
   '/super': typeof SuperRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/asignaciones': typeof AdminAsignacionesRoute
+  '/admin/contenido': typeof AdminContenidoRoute
   '/admin/cursos': typeof AdminCursosRoute
   '/admin/docentes': typeof AdminDocentesRoute
   '/admin/estudiantes': typeof AdminEstudiantesRoute
   '/admin/icfes': typeof AdminIcfesRoute
+  '/admin/icfes-colegio': typeof AdminIcfesColegioRoute
   '/admin/icfes-resultados': typeof AdminIcfesResultadosRoute
   '/admin/icfes-simulacros': typeof AdminIcfesSimulacrosRoute
   '/admin/periodos': typeof AdminPeriodosRoute
   '/admin/personalizacion': typeof AdminPersonalizacionRoute
   '/admin/planes': typeof AdminPlanesRoute
+  '/admin/soporte': typeof AdminSoporteRoute
   '/docente/calificaciones': typeof DocenteCalificacionesRoute
   '/docente/chat': typeof DocenteChatRoute
   '/docente/icfes': typeof DocenteIcfesRoute
@@ -378,15 +405,18 @@ export interface FileRouteTypes {
     | '/super'
     | '/admin/administradores'
     | '/admin/asignaciones'
+    | '/admin/contenido'
     | '/admin/cursos'
     | '/admin/docentes'
     | '/admin/estudiantes'
     | '/admin/icfes'
+    | '/admin/icfes-colegio'
     | '/admin/icfes-resultados'
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
     | '/admin/planes'
+    | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
     | '/docente/icfes'
@@ -414,15 +444,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/administradores'
     | '/admin/asignaciones'
+    | '/admin/contenido'
     | '/admin/cursos'
     | '/admin/docentes'
     | '/admin/estudiantes'
     | '/admin/icfes'
+    | '/admin/icfes-colegio'
     | '/admin/icfes-resultados'
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
     | '/admin/planes'
+    | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
     | '/docente/icfes'
@@ -455,15 +488,18 @@ export interface FileRouteTypes {
     | '/super'
     | '/admin/administradores'
     | '/admin/asignaciones'
+    | '/admin/contenido'
     | '/admin/cursos'
     | '/admin/docentes'
     | '/admin/estudiantes'
     | '/admin/icfes'
+    | '/admin/icfes-colegio'
     | '/admin/icfes-resultados'
     | '/admin/icfes-simulacros'
     | '/admin/periodos'
     | '/admin/personalizacion'
     | '/admin/planes'
+    | '/admin/soporte'
     | '/docente/calificaciones'
     | '/docente/chat'
     | '/docente/icfes'
@@ -583,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAsignacionesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/contenido': {
+      id: '/admin/contenido'
+      path: '/contenido'
+      fullPath: '/admin/contenido'
+      preLoaderRoute: typeof AdminContenidoRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/cursos': {
       id: '/admin/cursos'
       path: '/cursos'
@@ -609,6 +652,13 @@ declare module '@tanstack/react-router' {
       path: '/icfes'
       fullPath: '/admin/icfes'
       preLoaderRoute: typeof AdminIcfesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/icfes-colegio': {
+      id: '/admin/icfes-colegio'
+      path: '/icfes-colegio'
+      fullPath: '/admin/icfes-colegio'
+      preLoaderRoute: typeof AdminIcfesColegioRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/icfes-resultados': {
@@ -644,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/planes'
       fullPath: '/admin/planes'
       preLoaderRoute: typeof AdminPlanesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/soporte': {
+      id: '/admin/soporte'
+      path: '/soporte'
+      fullPath: '/admin/soporte'
+      preLoaderRoute: typeof AdminSoporteRouteImport
       parentRoute: typeof AdminRoute
     }
     '/docente/': {
@@ -778,30 +835,36 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAdministradoresRoute: typeof AdminAdministradoresRoute
   AdminAsignacionesRoute: typeof AdminAsignacionesRoute
+  AdminContenidoRoute: typeof AdminContenidoRoute
   AdminCursosRoute: typeof AdminCursosRoute
   AdminDocentesRoute: typeof AdminDocentesRoute
   AdminEstudiantesRoute: typeof AdminEstudiantesRoute
   AdminIcfesRoute: typeof AdminIcfesRoute
+  AdminIcfesColegioRoute: typeof AdminIcfesColegioRoute
   AdminIcfesResultadosRoute: typeof AdminIcfesResultadosRoute
   AdminIcfesSimulacrosRoute: typeof AdminIcfesSimulacrosRoute
   AdminPeriodosRoute: typeof AdminPeriodosRoute
   AdminPersonalizacionRoute: typeof AdminPersonalizacionRoute
   AdminPlanesRoute: typeof AdminPlanesRoute
+  AdminSoporteRoute: typeof AdminSoporteRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdministradoresRoute: AdminAdministradoresRoute,
   AdminAsignacionesRoute: AdminAsignacionesRoute,
+  AdminContenidoRoute: AdminContenidoRoute,
   AdminCursosRoute: AdminCursosRoute,
   AdminDocentesRoute: AdminDocentesRoute,
   AdminEstudiantesRoute: AdminEstudiantesRoute,
   AdminIcfesRoute: AdminIcfesRoute,
+  AdminIcfesColegioRoute: AdminIcfesColegioRoute,
   AdminIcfesResultadosRoute: AdminIcfesResultadosRoute,
   AdminIcfesSimulacrosRoute: AdminIcfesSimulacrosRoute,
   AdminPeriodosRoute: AdminPeriodosRoute,
   AdminPersonalizacionRoute: AdminPersonalizacionRoute,
   AdminPlanesRoute: AdminPlanesRoute,
+  AdminSoporteRoute: AdminSoporteRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
