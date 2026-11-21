@@ -41,9 +41,10 @@ class SchoolPermission(StrEnum):
     REPORTS_READ = "reports.read"
 
     # The material the platform team enabled for the school. Read
-    # only: the school consumes, it does not upload.
+    # only: the school consumes, it does not upload. There is no
+    # download permission: the material lives inside the platform and
+    # nobody takes the file out of it.
     MATERIAL_READ = "material.read"
-    MATERIAL_DOWNLOAD = "material.download"
 
     # The community.
     TEACHERS_READ = "teachers.read"
@@ -65,6 +66,7 @@ class SchoolPermission(StrEnum):
     ICFES_READ = "icfes.read"
     # The school activates in its courses what the platform enabled.
     ICFES_ACTIVATE = "icfes.activate"
+
     # The channel with the support team.
     SUPPORT_WRITE = "support.write"
 
@@ -81,7 +83,6 @@ class SchoolPermission(StrEnum):
 _COMMON_PERMISSIONS: tuple[SchoolPermission, ...] = (
     SchoolPermission.DASHBOARD_READ,
     SchoolPermission.MATERIAL_READ,
-    SchoolPermission.MATERIAL_DOWNLOAD,
     SchoolPermission.TEACHERS_READ,
     SchoolPermission.TEACHERS_WRITE,
     SchoolPermission.STUDENTS_READ,
@@ -117,7 +118,6 @@ PERMISSION_LABELS: dict[SchoolPermission, str] = {
     SchoolPermission.DASHBOARD_READ: "Ver el panel del colegio",
     SchoolPermission.REPORTS_READ: "Ver los reportes de uso y exportarlos",
     SchoolPermission.MATERIAL_READ: "Consultar el material habilitado",
-    SchoolPermission.MATERIAL_DOWNLOAD: "Descargar el material del colegio",
     SchoolPermission.TEACHERS_READ: "Ver los docentes",
     SchoolPermission.TEACHERS_WRITE: "Crear y editar docentes",
     SchoolPermission.STUDENTS_READ: "Ver los estudiantes",
