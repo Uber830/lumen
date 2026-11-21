@@ -126,6 +126,12 @@ class MaterialSchool(Base):
         nullable=False,
         server_default=text("now()"),
     )
+    # When the material left the active material of the school: the
+    # cycle it belonged to was closed. The row stays as history.
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     material: Mapped[Material] = relationship(back_populates="schools")
 
