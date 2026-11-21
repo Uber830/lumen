@@ -5,27 +5,14 @@
 // They talk to the API now.
 // =============================================================================
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseMutationResult,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
-import type {
-  Entitlement,
-  StartCheckoutInput,
-  StartCheckoutResult,
-  Subscription,
-  SubscriptionResponse,
-} from "@/lib/billing/types";
+import type { Entitlement, SubscriptionResponse } from "@/lib/billing/types";
 
-export type { Entitlement, Subscription };
+export type { Entitlement };
 
 export const queryKeys = {
-  subscription: (schoolId: string) => ["subscription", schoolId] as const,
   entitlement: (schoolId: string) => ["entitlement", schoolId] as const,
 };
 
@@ -36,33 +23,6 @@ export function useEntitlement(schoolId: string | null): UseQueryResult<Entitlem
     queryFn: async () => {
       const response = await api.get<SubscriptionResponse>("/v1/subscriptions");
       return response.entitlements;
-    },
-  });
-}
-
-export function useSubscription(
-  schoolId: string | null,
-): UseQueryResult<Subscription | null, Error> {
-  return useQuery({
-    queryKey: schoolId ? queryKeys.subscription(schoolId) : ["subscription", "none"],
-    enabled: !!schoolId,
-    queryFn: async () => {
-      const response = await api.get<SubscriptionResponse>("/v1/subscriptions");
-      return response.subscription;
-    },
-  });
-}
-
-export function useStartCheckout(
-  schoolId: string,
-): UseMutationResult<StartCheckoutResult, Error, StartCheckoutInput> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ plan_id }) =>
-      api.post<StartCheckoutResult>("/v1/subscriptions/checkout", { plan_id }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.subscription(schoolId) });
-      qc.invalidateQueries({ queryKey: queryKeys.entitlement(schoolId) });
     },
   });
 }

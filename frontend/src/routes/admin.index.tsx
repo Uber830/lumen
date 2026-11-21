@@ -186,7 +186,7 @@ function AdminDashboard() {
 
         <SectionCard
           title="Estado del colegio"
-          description="Resumen del plan y el periodo"
+          description="Resumen del colegio y el periodo"
           className="lg:col-span-1"
         >
           <dl className="space-y-3 text-sm">
@@ -195,7 +195,7 @@ function AdminDashboard() {
               <dd className="font-mono text-base">{stats.data?.schoolShortCode || "—"}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Plan</dt>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Estado</dt>
               <dd>
                 <StatusBadge tone={stats.data?.schoolStatus === "active" ? "success" : "warning"}>
                   {stats.data?.schoolStatus === "active"
@@ -227,6 +227,6 @@ function AdminDashboard() {
 
 function dashboardSubtitle(data: ReturnType<typeof useSchoolStats>["data"] | undefined): string {
   if (!data) return "Cargando metricas...";
-  if (!data.currentPeriod) return `Plan ${data.schoolStatus}`;
-  return `Periodo activo: ${data.currentPeriod.name} · Plan ${data.schoolStatus}`;
+  if (!data.currentPeriod) return `Estado: ${data.schoolStatus}`;
+  return `Periodo activo: ${data.currentPeriod.name} · Estado: ${data.schoolStatus}`;
 }

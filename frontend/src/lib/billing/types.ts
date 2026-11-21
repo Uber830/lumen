@@ -1,23 +1,9 @@
 // =============================================================================
-// Billing domain types: plans, subscriptions and entitlements.
+// Billing domain types: subscriptions and entitlements.
 // -----------------------------------------------------------------------------
 // The entities the billing hooks read, plus the subscription response
-// envelope and the checkout input/output shapes.
+// envelope.
 // =============================================================================
-
-export type Plan = {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  price_cents: number;
-  currency: string;
-  interval: string;
-  max_students: number | null;
-  max_teachers: number | null;
-  max_storage_gb: number | null;
-  includes_icfes: boolean;
-};
 
 export type Subscription = {
   id: string;
@@ -55,14 +41,4 @@ export type Entitlement = {
 export type SubscriptionResponse = {
   subscription: Subscription | null;
   entitlements: Entitlement | null;
-};
-
-export type StartCheckoutInput = {
-  plan_id: string;
-};
-
-export type StartCheckoutResult = {
-  checkout_url: string;
-  reference: string;
-  wompi_transaction_id: string | null;
 };

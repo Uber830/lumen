@@ -39,8 +39,6 @@ import {
 import { NAV, isCurrentPath, type AppShellRole } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
-type SchoolPlan = "Basico" | "Estandar" | "Premium" | "Sin plan";
-
 export type { AppShellRole } from "@/lib/navigation";
 
 function initials(name: string): string {
@@ -55,13 +53,11 @@ function initials(name: string): string {
 
 function Brand({
   role,
-  plan,
   schoolName,
   logoUrl,
   collapsed,
 }: {
   role: AppShellRole;
-  plan: SchoolPlan;
   schoolName: string | null;
   logoUrl: string | null;
   collapsed: boolean;
@@ -97,7 +93,7 @@ function Brand({
       <div className="min-w-0">
         <p className="truncate text-sm font-bold leading-tight">{title}</p>
         <p className="truncate text-xs text-muted-foreground">
-          {role === "super" ? "Operación global" : `Lumen · ${plan}`}
+          {role === "super" ? "Operación global" : "Lumen"}
         </p>
       </div>
     </div>
@@ -585,19 +581,8 @@ export function AppShell({
     sessionBrand?.name ||
     schoolName;
 
-  // Derive the plan label and ICFES-enabled flag from the entitlement
-  // snapshot. Phase 5 commits 7/8 keep the fallback "Sin plan" / false
-  // until the Wompi webhook writes the first row.
-  const plan: SchoolPlan = ((): SchoolPlan => {
-    if (!entitlement.data) return "Sin plan";
-    const status = entitlement.data.status;
-    if (status !== "active" && status !== "trial") return "Sin plan";
-    const code = entitlement.data.plan_code.toLowerCase();
-    if (code === "basico") return "Basico";
-    if (code === "estandar") return "Estandar";
-    if (code === "premium") return "Premium";
-    return "Sin plan";
-  })();
+  // The ICFES flag comes from the entitlement snapshot: the module is
+  // open for the schools whose subscription includes it.
   const icfesEnabled = Boolean(
     entitlement.data &&
     (entitlement.data.status === "active" || entitlement.data.status === "trial") &&
@@ -638,7 +623,7 @@ export function AppShell({
     }
     return {
       title: resolvedSchoolName ?? "Colegio",
-      detail: `Plan ${plan}`,
+      detail: "Comunidad educativa",
     };
   })();
 
@@ -668,7 +653,6 @@ export function AppShell({
       >
         <Brand
           role={role}
-          plan={plan}
           schoolName={resolvedSchoolName}
           logoUrl={logoUrl}
           collapsed={collapsed}
@@ -695,7 +679,6 @@ export function AppShell({
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <Brand
                 role={role}
-                plan={plan}
                 schoolName={resolvedSchoolName}
                 logoUrl={logoUrl}
                 collapsed={false}

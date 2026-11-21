@@ -28,12 +28,15 @@ describe("el menú de cada rol", () => {
     }
   });
 
-  it("el rol de plataforma no tiene la sección de Planes", () => {
-    const paths = NAV.super.flatMap((group) => group.items.map((item) => item.to));
-    expect(paths.some((path) => path.includes("planes"))).toBe(false);
-    expect(NAV.super.some((group) => group.items.some((item) => item.label === "Planes"))).toBe(
-      false,
-    );
+  it("ningún rol tiene la sección de Planes", () => {
+    // Los planes todavía no se manejan: no hay ninguna vista de ellos.
+    for (const role of ROLES) {
+      const paths = NAV[role].flatMap((group) => group.items.map((item) => item.to));
+      expect(paths.some((path) => path.includes("planes"))).toBe(false);
+      expect(NAV[role].some((group) => group.items.some((item) => item.label === "Planes"))).toBe(
+        false,
+      );
+    }
   });
 
   it("el rol de plataforma tiene panel, colegios, catálogo y soporte", () => {
