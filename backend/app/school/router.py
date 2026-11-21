@@ -20,7 +20,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.admin_permissions import permissions_for
+from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
 from app.core.context import Membership, RequestContext
 from app.core.errors import NotFoundError
 from app.db.enums import SchoolRole
@@ -36,6 +36,9 @@ from app.school.schemas import (
     MaterialDetailOut,
     MaterialPage,
     MemberPage,
+    PeriodClosedOut,
+    PeriodCurrentOut,
+    PeriodOut,
     SchoolAdminMe,
     SchoolOverview,
     SubjectOut,
@@ -287,5 +290,51 @@ async def list_school_assignments(
         course_id=course_id,
     )
     return [AssignmentOut.model_validate(assignment) for assignment in assignments]
+
+
+@router.get("/periods", response_model=list[PeriodOut])
+async def list_school_periods(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[PeriodOut]:
+    """The periods of the school, the current one first."""
+    membership = _require_admin(context)
+    periods = await cycles.list_periods(session, membership.school_id)
+    return [PeriodOut.model_validate(period) for period in periods]
+
+
+@router.post("/periods/{period_id}/close", response_model=PeriodClosedOut)
+async def close_school_period(
+    period_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PeriodClosedOut:
+    """Close a period of the school.
+
+    Only the principal does it: closing a period takes the material of
+    the cycle out of the active material, and that is a decision of the
+    school, not of its helper.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.PERIODS_CLOSE)
+    closed = await cycles.close_period(session, membership.school_id, period_id)
+    return PeriodClosedOut.model_validate(closed)
+
+
+@router.post("/periods/{period_id}/set-current", response_model=PeriodCurrentOut)
+async def set_current_school_period(
+    period_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PeriodCurrentOut:
+    """Mark a period as the current one.
+
+    The previous current period is closed in the same transaction: a
+    school has one current period at a time.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.PERIODS_CLOSE)
+    current = await cycles.set_current_period(session, membership.school_id, period_id)
+    return PeriodCurrentOut.model_validate(current)
 
 

@@ -326,3 +326,39 @@ class AssignmentOut(BaseModel):
     visible_materials_count: int = 0
 
 
+class PeriodOut(BaseModel):
+    """One academic period of the school."""
+
+    id: str
+    name: str
+    start_date: date
+    end_date: date
+    # The length of the cycle: trimestre, semester or year.
+    modality: str
+    # How the cycle is taught: presencial, virtual or hybrid.
+    delivery_modality: str | None = None
+    # vigente, cerrado or future.
+    status: str = "cerrado"
+    is_current: bool = False
+    closed_at: datetime | None = None
+
+
+class PeriodClosedOut(BaseModel):
+    """The answer of a close: what happened, in the words of the panel."""
+
+    id: str
+    name: str
+    closed_at: datetime
+    # How many pieces of material left the active material of the school.
+    archived_materials: int = 0
+
+
+class PeriodCurrentOut(BaseModel):
+    """The answer of marking a period as the current one."""
+
+    id: str
+    name: str
+    # The periods that were closed to make room for this one.
+    closed_previous: list[str] = Field(default_factory=list)
+
+
