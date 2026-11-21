@@ -106,26 +106,24 @@ function SuperDashboard() {
             </Link>
           }
         >
-          <div className="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-            <div>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-                Por estado
-              </p>
-              {Object.keys(byStatus).length === 0 ? (
-                <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
-              ) : (
-                STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
-                  <MeterRow
-                    key={status}
-                    label={MATERIAL_STATUS_LABEL[status]}
-                    value={byStatus[status] ?? 0}
-                    max={maxStatus}
-                  />
-                ))
-              )}
-            </div>
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
+              Por estado
+            </p>
+            {Object.keys(byStatus).length === 0 ? (
+              <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
+            ) : (
+              STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
+                <MeterRow
+                  key={status}
+                  label={MATERIAL_STATUS_LABEL[status]}
+                  value={byStatus[status] ?? 0}
+                  max={maxStatus}
+                />
+              ))
+            )}
 
-            <div>
+            <div className="mt-4 border-t border-border pt-4">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
                 Por área
               </p>
@@ -145,12 +143,13 @@ function SuperDashboard() {
         <SectionCard
           title="Cobertura del catálogo"
           description="Qué colegio ve qué parte del catálogo"
-          actions={
+          leading={
             <Link
               to="/super/colegios"
-              className="text-xs font-semibold text-primary hover:underline"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:border-primary hover:bg-primary-soft"
             >
               Ver todos
+              <ChevronRight className="size-3.5" strokeWidth={1.9} aria-hidden />
             </Link>
           }
           bodyClassName="p-0"
@@ -159,10 +158,10 @@ function SuperDashboard() {
             <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
           ) : (
             <ul className="flex flex-col">
-              {coverage.slice(0, 6).map((school) => (
+              {coverage.map((school) => (
                 <li
                   key={school.school_id}
-                  className="flex items-center gap-3 border-b border-border px-5 py-2 last:border-b-0"
+                  className="flex items-center gap-3 border-b border-border px-5 py-2.5 last:border-b-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm">{school.name}</span>
                   <StatusPill
@@ -171,11 +170,6 @@ function SuperDashboard() {
                   />
                 </li>
               ))}
-              {coverage.length > 6 && (
-                <li className="px-5 py-2 text-xs text-muted-foreground">
-                  y {coverage.length - 6} colegios más
-                </li>
-              )}
             </ul>
           )}
         </SectionCard>
