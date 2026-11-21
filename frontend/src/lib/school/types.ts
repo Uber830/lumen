@@ -1,24 +1,20 @@
 // =============================================================================
-// School domain types: the school profile and its branding.
+// School domain types: the school profile and its visible identity.
 // -----------------------------------------------------------------------------
 // Consumed by the admin "Personalización" view, the app-shell brand and
-// the dashboard hero.
+// the dashboard.
+//
+// The visible identity of a school is its name, its shield and its
+// colour. The mission, the vision, the cover picture and the gallery
+// were removed from the product.
 // =============================================================================
-
-/** One picture of the school's gallery. */
-export type SchoolGalleryImage = {
-  url: string;
-  caption: string | null;
-};
 
 /**
  * The school's branding, as it travels in the session.
  *
  * It is the part of the school the app needs to paint itself: the
  * colour, the logo and the name. It rides along with the session so the
- * first frame already has them. The mission, the vision and the
- * pictures travel with it for the same reason: the dashboard shows them
- * as soon as the page arrives.
+ * first frame already has them.
  */
 export type SchoolBranding = {
   id: string;
@@ -26,10 +22,6 @@ export type SchoolBranding = {
   display_name: string | null;
   logo_url: string | null;
   primary_color: string | null;
-  mission: string | null;
-  vision: string | null;
-  banner_url: string | null;
-  gallery: SchoolGalleryImage[];
 };
 
 export type School = {
@@ -40,21 +32,9 @@ export type School = {
   display_name: string | null;
   logo_url: string | null;
   primary_color: string | null;
-  /** What the school says it is for, in its own words. */
-  mission: string | null;
-  /** What the school wants to become, in its own words. */
-  vision: string | null;
-  /** The cover image of the dashboard hero. */
-  banner_url: string | null;
-  /** The pictures the school chose to show in the dashboard. */
-  gallery: SchoolGalleryImage[];
 };
 
 export type SchoolUpdateInput = {
   display_name?: string | null;
   primary_color?: string | null;
-  mission?: string | null;
-  vision?: string | null;
-  banner_url?: string | null;
-  gallery?: SchoolGalleryImage[];
 };

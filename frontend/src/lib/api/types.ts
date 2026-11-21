@@ -25,6 +25,8 @@
 import type { SchoolBranding } from "@/lib/school/types";
 
 export type SchoolRole = "school_admin" | "teacher" | "student";
+/** The rank of a school administrator: principal or secundario. */
+export type SchoolAdminRole = "principal" | "secundario";
 export type SchoolStatus = "active" | "trial" | "suspended";
 export type AcademicPeriodModality = "bimestre" | "trimestre" | "semestre" | "anual";
 export type EnrollmentStatus = "active" | "withdrawn" | "completed";
@@ -49,6 +51,8 @@ export type MembershipInfo = {
   id: string;
   school_id: string;
   role: SchoolRole;
+  /** The rank of an administrator: principal or secundario. */
+  admin_role: SchoolAdminRole | null;
   is_primary: boolean;
   joined_at: string;
 };
@@ -73,6 +77,14 @@ export type SessionInfo = {
   // the app paints itself with the school's colour and logo on the
   // first frame.
   school: SchoolBranding | null;
+  /**
+   * The permissions of the caller in its school. The frontend does not
+   * decide what the rank may do: it receives the list and shows or
+   * disables from it.
+   */
+  permissions: string[];
+  /** The academic period the school is in, shown in the top bar. */
+  current_period: string | null;
 };
 
 export type AuthResponse = {

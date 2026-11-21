@@ -1,21 +1,30 @@
-import { useRouteContext, createFileRoute } from "@tanstack/react-router";
-import { Plus, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { ShieldCheck, UserPlus, X } from "lucide-react";
+import { useState } from "react";
 
-import { PageHeader, SectionCard } from "@/components/ui-kit";
-import { StatusBadge } from "@/components/status-badge";
-import { useSchoolMembers } from "@/features/academics/hooks";
-import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
-import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
-import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import {
-  activationLink,
-  parseCsvInvitations,
-  useBulkInviteUsers,
-  useInviteUser,
-  type InviteUserResult,
-} from "@/lib/users/invitations";
-import type { SchoolMember } from "@/features/academics/types";
+  Button,
+  PanelTable,
+  Chip,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+  TableShell,
+  tableCellClass,
+  tableHeadClass,
+} from "@/components/ui-kit";
+import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
+import { MemberAvatar } from "@/components/member-avatar";
+import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
+import {
+  useInviteAdmin,
+  useRemoveAdmin,
+  useSchoolAdmins,
+  useUpdateAdminRank,
+  type SchoolAdmin,
+} from "@/lib/school/team";
+import { formatShortDate } from "@/lib/school/material";
+import { activationLink } from "@/lib/users/invitations";
 
 export const Route = createFileRoute("/admin/administradores")({
   head: () => ({
@@ -23,12 +32,12 @@ export const Route = createFileRoute("/admin/administradores")({
       { title: "Administradores — Lumen" },
       {
         name: "description",
-        content: "Gestioná los administradores del colegio y sus permisos.",
+        content: "El equipo de administradores del colegio, con su rango y sus permisos.",
       },
       { property: "og:title", content: "Administradores — Lumen" },
       {
         property: "og:description",
-        content: "Control de accesos administrativos por institución.",
+        content: "Administra el equipo de administradores de tu institución.",
       },
     ],
   }),
@@ -37,124 +46,79 @@ export const Route = createFileRoute("/admin/administradores")({
 
 function AdministradoresPage() {
   const { session } = useRouteContext({ from: "/admin/administradores" });
-  const schoolId = session.primarySchoolId;
-  const admins = useSchoolMembers(schoolId, "school_admin", true);
-  const invite = useInviteUser();
-  const bulkInvite = useBulkInviteUsers();
+
+  const admins = useSchoolAdmins();
+  const invite = useInviteAdmin();
+  const updateRank = useUpdateAdminRank();
+  const removeAdmin = useRemoveAdmin();
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [csvText, setCsvText] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Activation links for the administrators just created, shown so the
-  // admin can copy and share them.
+  const [rank, setRank] = useState("secundario");
   const [activations, setActivations] = useState<ActivationLink[]>([]);
-  const [bulkSummary, setBulkSummary] = useState<{
-    created: number;
-    failures: BulkImportFailure[];
-  } | null>(null);
-  // The administrator whose management modal is open.
-  const [selectedAdmin, setSelectedAdmin] = useState<SchoolMember | null>(null);
+  // The administrator whose detail is open.
+  const [detail, setDetail] = useState<SchoolAdmin | null>(null);
+  const adminToRemove = useDeleteConfirmation();
 
-  if (!schoolId) {
-    return (
-      <div className="surface-card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-xl font-semibold">No hay colegio activo</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Tu cuenta no está asociada a un colegio.
-        </p>
-      </div>
-    );
-  }
+  // The frontend does not decide what a rank may do: the API returns
+  // the list. The action is disabled **with the reason**, not invisible.
+  const canManage = session.permissions.includes("admins.manage");
+  const total = admins.data?.length ?? 0;
 
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function onInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!email.trim() || !fullName.trim() || !schoolId) return;
+    if (!email.trim() || !fullName.trim()) return;
+
     const created = await invite.mutateAsync({
       email: email.trim(),
       full_name: fullName.trim(),
-      role: "school_admin",
-      school_id: schoolId,
-      is_primary: true,
+      admin_role: rank,
     });
-    const token = created.activation_token;
-    if (token) {
-      setActivations((prev) => [{ email: created.email, link: activationLink(token) }, ...prev]);
+    if (created.activation_token) {
+      setActivations((prev) => [
+        { email: created.email, link: activationLink(created.activation_token!) },
+        ...prev,
+      ]);
     }
     setEmail("");
     setFullName("");
     setOpen(false);
   }
 
-  async function onBulkFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    setCsvText(text);
-  }
-
-  async function onBulkSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    // The role is forced: this is the administrators' import.
-    const rows = parseCsvInvitations(csvText).map((row) => ({
-      ...row,
-      role: "school_admin" as const,
-    }));
-    if (!rows.length) return;
-    const result = await bulkInvite.mutateAsync(rows);
-    setBulkOpen(false);
-    setCsvText("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-
-    const newLinks = result.created
-      .filter((c): c is InviteUserResult & { activation_token: string } => !!c.activation_token)
-      .map((c) => ({ email: c.email, link: activationLink(c.activation_token) }));
-    if (newLinks.length > 0) setActivations((prev) => [...newLinks, ...prev]);
-
-    setBulkSummary({ created: result.created.length, failures: result.failures });
-  }
-
-  const previewRows = csvText ? parseCsvInvitations(csvText) : [];
-
   return (
     <>
       <PageHeader
         title="Administradores"
-        subtitle={`${admins.data?.length ?? 0} administradores con acceso al colegio`}
+        subtitle={`${total} administradores con acceso al colegio. El principal puede administrar al resto.`}
         actions={
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold hover:bg-muted"
-            >
-              <Upload className="size-4" /> Carga masiva CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="size-4" /> Invitar administrador
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                void onBulkFile(e);
-                setBulkOpen(true);
-              }}
-            />
-          </>
+          <Button
+            icon={UserPlus}
+            aria-disabled={!canManage}
+            aria-describedby={canManage ? undefined : "admins-manage-reason"}
+            title={
+              canManage
+                ? "Invitar a un administrador del colegio"
+                : "Esta acción la hace el administrador principal del colegio."
+            }
+            onClick={() => {
+              if (!canManage) return;
+              setOpen((value) => !value);
+            }}
+          >
+            Invitar administrador
+          </Button>
         }
       />
 
-      {bulkSummary && (
-        <BulkImportSummary created={bulkSummary.created} failures={bulkSummary.failures} />
+      {!canManage && (
+        <p
+          id="admins-manage-reason"
+          className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-[13px] text-muted-foreground"
+        >
+          Tu rango es Secundario: puedes ver el equipo, pero no invitar a nadie ni cambiar un rango.
+          Esa acción la hace el administrador principal del colegio.
+        </p>
       )}
 
       <ActivationLinksCard
@@ -164,8 +128,8 @@ function AdministradoresPage() {
       />
 
       {open && (
-        <SectionCard title="Invitar administrador" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onSubmit}>
+        <SectionCard className="mb-4" title="Invitar administrador" bodyClassName="p-0">
+          <form className="space-y-3 p-4" onSubmit={onInvite}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre completo
@@ -175,7 +139,7 @@ function AdministradoresPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Maria Rodriguez"
+                placeholder="Carlos Mendoza"
                 className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
@@ -192,151 +156,209 @@ function AdministradoresPage() {
                 className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={invite.isPending}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Rango
+              </span>
+              <select
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               >
-                {invite.isPending ? "Creando..." : "Crear administrador"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
+                <option value="secundario">
+                  Secundario — administra la comunidad y los cursos
+                </option>
+                <option value="principal">
+                  Principal — además cierra periodos y gestiona el equipo
+                </option>
+              </select>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                El colegio siempre tiene al menos un administrador principal.
+              </p>
+            </label>
             {invite.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {invite.error.message}
               </p>
             )}
-          </form>
-        </SectionCard>
-      )}
-
-      {bulkOpen && (
-        <SectionCard title="Carga masiva CSV" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onBulkSubmit}>
-            <p className="text-xs text-muted-foreground">
-              Encabezados requeridos: <code>email, full_name</code>. Una fila por administrador. Se
-              crean con rol de administrador del colegio.
-            </p>
-            <textarea
-              rows={6}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"email,full_name\nmaria@example.com,Maria Rodriguez\n"}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <p className="text-xs text-muted-foreground">
-              {previewRows.length === 0
-                ? "Sin filas pendientes"
-                : `${previewRows.length} fila(s) detectadas`}
-            </p>
-            {bulkInvite.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {bulkInvite.error.message}
-              </p>
-            )}
             <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={bulkInvite.isPending || previewRows.length === 0}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {bulkInvite.isPending
-                  ? "Procesando..."
-                  : `Cargar ${previewRows.length} administrador(es)`}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkOpen(false);
-                  setCsvText("");
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
+              <Button type="submit" icon={UserPlus} disabled={invite.isPending}>
+                {invite.isPending ? "Invitando..." : "Enviar invitación"}
+              </Button>
+              <Button variant="ghost" icon={X} onClick={() => setOpen(false)}>
                 Cancelar
-              </button>
+              </Button>
             </div>
           </form>
         </SectionCard>
       )}
 
-      <SectionCard bodyClassName="p-0">
-        {admins.isLoading ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando administradores...</p>
-        ) : admins.error ? (
-          <p role="alert" className="px-5 py-6 text-sm text-destructive">
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        {admins.isError ? (
+          <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {admins.error.message}
           </p>
-        ) : (admins.data ?? []).length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">
-            Aun no hay administradores registrados. Usa el boton de arriba para invitar el primero.
-          </p>
+        ) : admins.isLoading ? (
+          <div className="px-[18px] py-4" aria-hidden>
+            {[0, 1].map((row) => (
+              <div key={row} className="flex items-center gap-4 py-[11px]">
+                <span className="h-[11px] w-[190px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                <span className="h-[18px] w-[84px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+              </div>
+            ))}
+          </div>
+        ) : (admins.data?.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="Sin administradores"
+            description="Invita al primer administrador del colegio para que pueda entrar al panel."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="table-head-band text-left text-[11px] uppercase tracking-[0.09em]">
+          <TableShell>
+            <PanelTable className="w-full border-collapse">
+              <caption className="sr-only">
+                Administradores del colegio, con su rango y su estado
+              </caption>
+              <thead>
                 <tr>
-                  <th className="px-5 py-3 font-semibold">Administrador</th>
-                  <th className="px-5 py-3 font-semibold">Ingreso</th>
-                  <th className="px-5 py-3 font-semibold">Estado</th>
-                  <th className="px-5 py-3 text-right font-semibold">Acciones</th>
+                  <th scope="col" className={tableHeadClass}>
+                    Administrador
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Ingreso
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Rol
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Estado
+                  </th>
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Acción
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {(admins.data ?? []).map((a) => {
-                  const isRevoked = a.revoked_at !== null;
-                  return (
-                    <tr key={a.membership_id} className="border-t border-border hover:bg-muted/40">
-                      <td className="px-5 py-3">
-                        <p className="font-medium">{a.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{a.email ?? "Sin correo"}</p>
-                      </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {new Date(a.joined_at).toLocaleDateString("es-CO")}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {a.is_primary && <StatusBadge tone="info">Principal</StatusBadge>}
-                          {!a.account_activated && !isRevoked && (
-                            <StatusBadge tone="warning">Sin activar</StatusBadge>
-                          )}
-                          <StatusBadge tone={isRevoked ? "danger" : "success"}>
-                            {isRevoked ? "Inactivo" : "Activo"}
-                          </StatusBadge>
+                {(admins.data ?? []).map((admin) => (
+                  <tr
+                    key={admin.membership_id}
+                    className="transition-colors hover:bg-white/[0.025]"
+                  >
+                    <td className={tableCellClass}>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <MemberAvatar name={admin.full_name} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">{admin.full_name}</p>
+                          <p className="truncate text-[12px] text-muted-foreground">
+                            {admin.email ?? "Sin correo"}
+                          </p>
                         </div>
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAdmin(a)}
-                          className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft"
+                      </div>
+                    </td>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      {formatShortDate(admin.joined_at)}
+                    </td>
+                    <td className={tableCellClass}>
+                      <Chip tone={admin.admin_role === "principal" ? "info" : "muted"} dot>
+                        {admin.admin_role === "principal" ? "Principal" : "Secundario"}
+                      </Chip>
+                    </td>
+                    <td className={tableCellClass}>
+                      <Chip tone={admin.status === "activo" ? "teal" : "muted"} dot>
+                        {admin.status === "activo" ? "Activo" : "Inactivo"}
+                      </Chip>
+                    </td>
+                    <td className={`${tableCellClass} text-right`}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setDetail(admin)}>
+                          Ver permisos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={X}
+                          aria-disabled={!canManage}
+                          aria-describedby={canManage ? undefined : "admins-manage-reason"}
+                          title={
+                            canManage
+                              ? "Quitar del equipo"
+                              : "Esta acción la hace el administrador principal del colegio."
+                          }
+                          onClick={() => {
+                            if (!canManage) return;
+                            adminToRemove.ask({
+                              id: admin.membership_id,
+                              title: `a ${admin.full_name}`,
+                              description:
+                                "La persona deja de tener acceso al panel del colegio. Su historial se conserva.",
+                              confirmLabel: "Quitar del equipo",
+                            });
+                          }}
                         >
-                          Gestionar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                          Quitar
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-            </table>
-          </div>
+            </PanelTable>
+          </TableShell>
+        )}
+        {(updateRank.error || removeAdmin.error) && (
+          <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
+            {(updateRank.error ?? removeAdmin.error)?.message}
+          </p>
         )}
       </SectionCard>
 
-      {selectedAdmin && (
-        <MemberManageDialog
-          member={selectedAdmin}
-          roleLabel="administrador"
-          onClose={() => setSelectedAdmin(null)}
-        />
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>
+          Los permisos de cada rango los devuelve la API: el panel no decide qué puede hacer cada
+          uno.
+        </span>
+      </p>
+
+      {detail && (
+        <SectionCard
+          className="mt-4"
+          title={`${detail.full_name} · ${detail.admin_role === "principal" ? "Principal" : "Secundario"}`}
+          description="Qué puede hacer este rango en el colegio"
+          actions={
+            <Button variant="ghost" size="sm" icon={X} onClick={() => setDetail(null)}>
+              Cerrar
+            </Button>
+          }
+        >
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {detail.permissions.map((permission) => (
+              <li key={permission.permission} className="flex items-start gap-2 text-[13px]">
+                <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
+                <span className="text-muted-foreground">{permission.label}</span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
       )}
+
+      <ConfirmDialog
+        open={adminToRemove.target !== null}
+        title={`Quitar ${adminToRemove.target?.title ?? "al administrador"}`}
+        description={adminToRemove.target?.description}
+        confirmLabel={adminToRemove.target?.confirmLabel ?? "Quitar del equipo"}
+        pending={removeAdmin.isPending}
+        onCancel={adminToRemove.close}
+        onConfirm={() => {
+          const id = adminToRemove.target?.id;
+          if (!id) return;
+          removeAdmin.mutate(id, { onSuccess: adminToRemove.close });
+        }}
+      />
     </>
   );
 }

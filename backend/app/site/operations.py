@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import ServiceUnavailableError
 from app.db.models import Material, MaterialSchool, School, SiteContent
-from app.platform.catalog import format_size
+from app.platform.catalog import format_size, status_of
 from app.site.schemas import (
     CatalogEntry,
     CatalogState,
@@ -63,7 +63,7 @@ async def list_catalog(session: AsyncSession, limit: int = CATALOG_PAGE_SIZE) ->
     result = await session.execute(
         select(Material)
         .options(selectinload(Material.files))
-        .order_by(Material.position, Material.code)
+        .order_by(Material.position, Material.ref)
         .limit(limit)
     )
     return list(result.scalars().all())
@@ -86,7 +86,12 @@ async def school_names_of(
     result = await session.execute(
         select(MaterialSchool.material_id, School.name)
         .join(School, School.id == MaterialSchool.school_id)
-        .where(MaterialSchool.material_id.in_(material_ids))
+        .where(
+            MaterialSchool.material_id.in_(material_ids),
+            # A school that lost the access keeps the row, but it is
+            # not one of the schools that see the piece.
+            MaterialSchool.enabled.is_(True),
+        )
         .order_by(MaterialSchool.enabled_at, School.name)
     )
 
@@ -107,13 +112,13 @@ def to_entries(
         visible = names[:SCHOOLS_VISIBLE]
         entries.append(
             CatalogEntry(
-                ref=item.code,
+                ref=item.ref,
                 title=item.title,
                 meta=_meta_of(item),
                 area=item.area,
                 schools=visible,
                 schools_extra=max(0, len(names) - len(visible)),
-                state=cast(CatalogState, item.status),
+                state=cast(CatalogState, status_of(item.state)),
             )
         )
     return entries

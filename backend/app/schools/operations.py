@@ -28,7 +28,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -146,12 +145,14 @@ async def bootstrap_school(
         await session.flush()
 
         # The admin membership. is_primary = true so the session picks
-        # this school as primary.
+        # this school as primary, and admin_role makes it the
+        # principal: the school is created with somebody who runs it.
         membership = SchoolMembership(
             id=uuid.uuid4(),
             school_id=school.id,
             user_id=user_id,
             role="school_admin",
+            admin_role="principal",
             is_primary=True,
             joined_at=now,
         )
@@ -235,9 +236,9 @@ async def update_school(
 
     ``changes`` is the set of fields actually sent
     (``model_dump(exclude_unset=True)``), so an omitted field is left
-    untouched and an explicit null clears it. Only branding fields are
-    writable here: display_name, logo_url, primary_color, mission,
-    vision, banner_url and gallery.
+    untouched and an explicit null clears it. Only the visible
+    identity is writable here: display_name, logo_url and
+    primary_color.
 
     display_name is normalised (trimmed, empty -> null). The name and
     short_code are not editable through this path: they are the unique
@@ -245,19 +246,12 @@ async def update_school(
     """
     school = await get_school(session, school_id)
 
-    for field in ("display_name", "logo_url", "primary_color", "mission", "vision", "banner_url"):
+    for field in ("display_name", "logo_url", "primary_color"):
         if field in changes:
             value = changes[field]
             if isinstance(value, str):
                 value = value.strip() or None
             setattr(school, field, value)
-
-    if "gallery" in changes:
-        raw_gallery = changes["gallery"]
-        # The gallery is a list of {"url": ..., "caption": ...}; the
-        # request model already validated its shape.
-        gallery = cast(list[dict[str, object]], raw_gallery) if raw_gallery else []
-        school.gallery = gallery
 
     await session.flush()
     return school

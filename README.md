@@ -13,7 +13,7 @@ para todos los colegios que contratan el servicio.
 | Rol | Módulos |
 | --- | --- |
 | **Plataforma** | Colegios, planes, contenido editorial |
-| **Admin de colegio** | Usuarios, cursos, materias, asignaciones, períodos |
+| **Admin de colegio** | Panel del colegio: dashboard, contenido, comunidad, ciclo, ICFES, identidad y soporte |
 | **Docente** | Materias, calificaciones, tareas, evaluaciones, ICFES, chat |
 | **Estudiante** | Clases, notas, tareas, evaluaciones, materiales, ICFES, chat |
 
@@ -97,6 +97,7 @@ contraseña **`lumen-dev`**:
 | Correo | Rol | Colegio |
 | --- | --- | --- |
 | `super@lumen.co` | Plataforma | — |
+| `ana.restrepo@sagcor.edu.co` | Admin de colegio | Colegio Sagrado Corazón (demo del panel) |
 | `admin6@cms.edu.co` | Admin de colegio | Colegio San Martín |
 | `uber@edu.com` | Admin de colegio | Colegio San Juan |
 | `docente@lumen.co` | Docente | Shared ICFES Bank |
@@ -165,6 +166,8 @@ se corre `./scripts/dev-db.sh reset`.
   autenticación, permisos, esquema y pruebas.
 - [frontend/README.md](frontend/README.md) — la app: rutas, sesión, variables
   de entorno y pruebas.
+- [docs/colegio.md](docs/colegio.md) — el rol de administrador de colegio: sus
+  vistas, sus permisos, su API y las decisiones del producto.
 - [docs/site-style-guide.md](docs/site-style-guide.md) — la dirección visual
   del sitio público (landing y acceso).
 - `ARCHITECTURE.md` y `AUDIT.md` — material heredado de EduSuite, se

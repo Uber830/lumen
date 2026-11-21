@@ -51,6 +51,14 @@ export type SessionContext = {
   }[];
   platformRole: "platform_admin" | null;
   primarySchoolId: string | null;
+  /** The academic period the school is in, shown in the top bar. */
+  currentPeriod: string | null;
+  /**
+   * The permissions of the caller in the school. The frontend does not
+   * decide what the rank may do: it receives the list from the API and
+   * disables the action that is not on it, with the reason.
+   */
+  permissions: string[];
   /**
    * The branding of the primary school.
    *
@@ -69,6 +77,8 @@ function toSessionContext(session: SessionInfo): SessionContext {
     memberships: session.memberships,
     platformRole: session.platform_role,
     primarySchoolId: session.primary_school_id,
+    currentPeriod: session.current_period ?? null,
+    permissions: session.permissions ?? [],
     school: session.school ?? null,
   };
 }

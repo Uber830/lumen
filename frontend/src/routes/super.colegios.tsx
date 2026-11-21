@@ -3,7 +3,7 @@ import { BookOpen, Plus } from "lucide-react";
 import { useState } from "react";
 
 import {
-  EmptyHint,
+  EmptyState,
   PageHeader,
   Pagination,
   SearchField,
@@ -134,7 +134,7 @@ function Colegios() {
         {schools.isLoading ? (
           <SkeletonRows rows={6} columns={6} />
         ) : items.length === 0 ? (
-          <EmptyHint
+          <EmptyState
             title="Sin colegios"
             description="Los filtros no encontraron ninguna institución en la red."
           />

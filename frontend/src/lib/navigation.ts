@@ -15,10 +15,12 @@ import {
   Building2,
   CalendarRange,
   ClipboardList,
+  CreditCard,
   FileCheck2,
   FolderOpen,
   GraduationCap,
   History,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   MessageSquare,
@@ -36,10 +38,16 @@ export type NavItem = {
   label: string;
   to: string;
   icon: LucideIcon;
-  /** The count shown at the right of the entry. */
-  badge?: number;
-  /** The ICFES block folds and unfolds. */
-  collapsible?: boolean;
+  /**
+   * Where the counter of the entry comes from.
+   *
+   * The figure is never written by hand: it is read from the API.
+   */
+  badgeSource?: "material" | "support" | "schools" | "materials";
+  /**
+   * The entry only shows up when the school has the ICFES entitlement.
+   */
+  icfes?: boolean;
 };
 
 export type NavGroup = {
@@ -54,12 +62,24 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
       label: "Operación",
       items: [
         { label: "Panel global", to: "/super", icon: LayoutDashboard },
-        { label: "Colegios", to: "/super/colegios", icon: Building2 },
+        {
+          label: "Colegios",
+          to: "/super/colegios",
+          icon: Building2,
+          badgeSource: "schools",
+        },
       ],
     },
     {
       label: "Contenido",
-      items: [{ label: "Catálogo editorial", to: "/super/catalogo", icon: BookOpen }],
+      items: [
+        {
+          label: "Catálogo editorial",
+          to: "/super/catalogo",
+          icon: BookOpen,
+          badgeSource: "materials",
+        },
+      ],
     },
     {
       label: "Plataforma",
@@ -69,7 +89,15 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
   admin: [
     {
       label: "Operación",
-      items: [{ label: "Dashboard", to: "/admin", icon: LayoutDashboard }],
+      items: [
+        { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+        {
+          label: "Contenido",
+          to: "/admin/contenido",
+          icon: BookOpen,
+          badgeSource: "material",
+        },
+      ],
     },
     {
       label: "Gestión académica",
@@ -82,11 +110,16 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
       ],
     },
     {
-      label: "Evaluación",
+      // The simulators of the school are the ones the platform enabled:
+      // the school activates them by course. The rest of the ICFES work
+      // (the bank, the builder and the aggregate results) stays for the
+      // roles that author the exams.
+      label: "ICFES",
       items: [
-        { label: "Banco ICFES", to: "/admin/icfes", icon: ListChecks, collapsible: true },
-        { label: "Simulacros ICFES", to: "/admin/icfes-simulacros", icon: Target },
-        { label: "Resultados ICFES", to: "/admin/icfes-resultados", icon: PieChart },
+        { label: "Simulacros del colegio", to: "/admin/icfes-colegio", icon: Target, icfes: true },
+        { label: "Banco de preguntas", to: "/admin/icfes", icon: ListChecks, icfes: true },
+        { label: "Crear simulacro", to: "/admin/icfes-simulacros", icon: ListChecks, icfes: true },
+        { label: "Resultados", to: "/admin/icfes-resultados", icon: PieChart, icfes: true },
       ],
     },
     {
@@ -96,27 +129,28 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
         { label: "Administradores", to: "/admin/administradores", icon: ShieldCheck },
       ],
     },
+    {
+      label: "Apoyo",
+      items: [{ label: "Soporte", to: "/admin/soporte", icon: Inbox, badgeSource: "support" }],
+    },
   ],
   docente: [
     {
-      label: "Operación",
+      label: "Mi trabajo",
       items: [
         { label: "Mis materias", to: "/docente", icon: BookOpen },
         { label: "Materia", to: "/docente/materia", icon: FileCheck2 },
         { label: "Calificaciones", to: "/docente/calificaciones", icon: BarChart3 },
+        { label: "Mensajes", to: "/docente/chat", icon: MessageSquare },
       ],
     },
     {
-      label: "Evaluación",
+      label: "Pruebas",
       items: [
-        { label: "Banco ICFES", to: "/docente/icfes", icon: ListChecks, collapsible: true },
-        { label: "Simulacros ICFES", to: "/docente/icfes-simulacros", icon: Target },
-        { label: "Resultados ICFES", to: "/docente/icfes-resultados", icon: PieChart },
+        { label: "Banco ICFES", to: "/docente/icfes", icon: ListChecks, icfes: true },
+        { label: "Simulacros ICFES", to: "/docente/icfes-simulacros", icon: Target, icfes: true },
+        { label: "Resultados ICFES", to: "/docente/icfes-resultados", icon: PieChart, icfes: true },
       ],
-    },
-    {
-      label: "Comunicación",
-      items: [{ label: "Mensajes", to: "/docente/chat", icon: MessageSquare }],
     },
   ],
   estudiante: [
@@ -128,17 +162,30 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
         { label: "Evaluaciones", to: "/estudiante/evaluaciones", icon: FileCheck2 },
         { label: "Tareas", to: "/estudiante/tareas", icon: ClipboardList },
         { label: "Mis notas", to: "/estudiante/notas", icon: BarChart3 },
+        { label: "Mensajes", to: "/estudiante/chat", icon: MessageSquare },
       ],
     },
     {
-      label: "Evaluación",
-      items: [{ label: "Simulacros ICFES", to: "/estudiante/icfes", icon: Target }],
-    },
-    {
-      label: "Comunicación",
-      items: [{ label: "Mensajes", to: "/estudiante/chat", icon: MessageSquare }],
+      label: "Pruebas",
+      items: [{ label: "Simulacros ICFES", to: "/estudiante/icfes", icon: Target, icfes: true }],
     },
   ],
+};
+
+/** The note at the foot of the menu: what this role can and cannot do. */
+export const ROLE_NOTE: Record<AppShellRole, string> = {
+  super: "Cargas el material de la editorial y decides qué colegio puede ver cada pieza.",
+  admin:
+    "Administras la comunidad del colegio. El material lo carga el equipo de plataforma y tú ves lo que quedó habilitado.",
+  docente: "Consultas el material habilitado para tus cursos.",
+  estudiante: "Accedes al material publicado para tus cursos, tareas y calificaciones.",
+};
+
+export const ROLE_LABEL: Record<AppShellRole, string> = {
+  super: "Panel de plataforma",
+  admin: "Administración del colegio",
+  docente: "Docente",
+  estudiante: "Estudiante",
 };
 
 /**
@@ -152,3 +199,6 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
 export function isCurrentPath(pathname: string, to: string): boolean {
   return pathname === to;
 }
+
+/** The icon of the plan, used by the entry that opens the plan of the school. */
+export const PLAN_ICON = CreditCard;

@@ -1,13 +1,15 @@
-"""The school's institutional identity: the session branding and the
-mission, vision and pictures of the school.
+"""The school's visible identity: the session branding and the fields
+the administrator may write.
 
-Two things are checked here:
+Three things are checked here:
 
 - the session carries the school's branding, so the app paints itself
   with the school's colour and logo on the first frame (no flash of the
   default theme);
-- the admin can write the mission, the vision and the gallery, and they
-  come back in the school's profile.
+- the identity is the name, the shield and the colour;
+- the four blocks that were removed from the product (the mission, the
+  vision, the cover picture and the gallery) are gone from the API:
+  they are not accepted and they do not come back.
 """
 
 from __future__ import annotations
@@ -174,13 +176,25 @@ async def test_the_login_response_carries_the_branding_too(client, engine, platf
 
 
 # ---------------------------------------------------------------------------
-# Mission, vision and gallery
+# The four blocks that were removed
 # ---------------------------------------------------------------------------
 
 
-async def test_the_admin_writes_the_mission_and_the_vision(client, engine, platform_admin):
-    """The identity is saved and comes back in the school's profile."""
-    token = await _admin_with_school(client, engine, platform_admin, "ident")
+async def test_the_school_profile_has_no_institutional_blocks(client, engine, platform_admin):
+    """The mission, the vision, the cover picture and the gallery are gone."""
+    token = await _admin_with_school(client, engine, platform_admin, "purged")
+
+    profile = client.get("/v1/schools/me", headers={"Authorization": f"Bearer {token}"})
+    assert profile.status_code == 200, profile.text
+
+    body = profile.json()
+    for field in ("mission", "vision", "banner_url", "gallery"):
+        assert field not in body, f"the school profile still carries {field}"
+
+
+async def test_the_institutional_blocks_are_not_written(client, engine, platform_admin):
+    """A client that sends them does not put them back in the school."""
+    token = await _admin_with_school(client, engine, platform_admin, "noblocks")
 
     response = client.patch(
         "/v1/schools/me",
@@ -188,72 +202,41 @@ async def test_the_admin_writes_the_mission_and_the_vision(client, engine, platf
         json={
             "mission": "Formar estudiantes críticos y creativos.",
             "vision": "Ser una institución de referencia.",
+            "banner_url": "https://example.test/portada.png",
+            "gallery": [{"url": "https://example.test/1.png"}],
         },
     )
     assert response.status_code == 200, response.text
+
     body = response.json()
-    assert body["mission"] == "Formar estudiantes críticos y creativos."
-    assert body["vision"] == "Ser una institución de referencia."
-
-    profile = client.get("/v1/schools/me", headers={"Authorization": f"Bearer {token}"})
-    assert profile.json()["mission"] == body["mission"]
-    assert profile.json()["vision"] == body["vision"]
+    for field in ("mission", "vision", "banner_url", "gallery"):
+        assert field not in body, f"the school profile still carries {field}"
 
 
-async def test_an_empty_mission_clears_it(client, engine, platform_admin):
-    """A blank mission clears the field instead of saving a blank."""
-    token = await _admin_with_school(client, engine, platform_admin, "clear")
+async def test_the_session_carries_no_institutional_blocks(client, engine, platform_admin):
+    """The branding that travels with the session is the visible identity."""
+    token = await _admin_with_school(client, engine, platform_admin, "session")
 
-    client.patch(
-        "/v1/schools/me",
+    me = client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200, me.text
+
+    school = me.json()["school"]
+    assert school is not None
+    for field in ("mission", "vision", "banner_url", "gallery"):
+        assert field not in school, f"the session still carries {field}"
+
+
+async def test_the_picture_upload_endpoint_is_gone(client, engine, platform_admin):
+    """The cover picture and the gallery moved out of the school."""
+    token = await _admin_with_school(client, engine, platform_admin, "images")
+
+    response = client.post(
+        "/v1/schools/me/images",
         headers={"Authorization": f"Bearer {token}"},
-        json={"mission": "Una misión"},
+        data={"kind": "banner"},
+        files={"file": ("banner.png", b"fake-image-bytes", "image/png")},
     )
-    response = client.patch(
-        "/v1/schools/me",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"mission": "   "},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["mission"] is None
-
-
-async def test_the_gallery_is_saved_and_cleared(client, engine, platform_admin):
-    """The pictures of the gallery travel with the school."""
-    token = await _admin_with_school(client, engine, platform_admin, "gal")
-
-    gallery = [
-        {"url": "https://example.test/1.png", "caption": "El patio"},
-        {"url": "https://example.test/2.png", "caption": None},
-    ]
-    response = client.patch(
-        "/v1/schools/me",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"gallery": gallery},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["gallery"] == gallery
-
-    cleared = client.patch(
-        "/v1/schools/me",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"gallery": []},
-    )
-    assert cleared.status_code == 200, cleared.text
-    assert cleared.json()["gallery"] == []
-
-
-async def test_the_gallery_holds_at_most_five_pictures(client, engine, platform_admin):
-    """A longer list is rejected: the dashboard shows them in one row."""
-    token = await _admin_with_school(client, engine, platform_admin, "many")
-
-    gallery = [{"url": f"https://example.test/{i}.png"} for i in range(6)]
-    response = client.patch(
-        "/v1/schools/me",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"gallery": gallery},
-    )
-    assert response.status_code == 422, response.text
+    assert response.status_code == 404, response.text
 
 
 async def test_a_teacher_cannot_write_the_identity(client, engine, seeded_school):
@@ -278,106 +261,40 @@ async def test_a_teacher_cannot_write_the_identity(client, engine, seeded_school
     response = client.patch(
         "/v1/schools/me",
         headers={"Authorization": f"Bearer {mint_token()}"},
-        json={"mission": "Hack"},
+        json={"display_name": "Hack"},
     )
     assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# The picture uploads
+# The shield
 # ---------------------------------------------------------------------------
 
 
-async def test_the_banner_is_uploaded_and_saved(client, engine, monkeypatch, platform_admin):
-    """The cover of the dashboard is stored on the school."""
+async def test_the_shield_is_uploaded_and_saved(client, engine, monkeypatch, platform_admin):
+    """The shield of the school is stored on the school."""
     from app.core import supabase_storage
 
     async def fake_upload(**kwargs):
-        return f"https://example.test/banner-{uuid.uuid4().hex[:6]}.png"
+        return f"https://example.test/escudo-{uuid.uuid4().hex[:6]}.png"
 
-    monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
+    monkeypatch.setattr(supabase_storage, "upload_school_logo", fake_upload)
 
-    token = await _admin_with_school(client, engine, platform_admin, "banner")
+    token = await _admin_with_school(client, engine, platform_admin, "escudo")
 
     response = client.post(
-        "/v1/schools/me/images",
+        "/v1/schools/me/logo",
         headers={"Authorization": f"Bearer {token}"},
-        data={"kind": "banner"},
-        files={"file": ("banner.png", b"fake-image-bytes", "image/png")},
+        files={"file": ("escudo.png", b"fake-image-bytes", "image/png")},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["banner_url"].startswith("https://example.test/banner-")
+    assert response.json()["logo_url"].startswith("https://example.test/escudo-")
 
 
-async def test_a_gallery_picture_is_added_to_the_list(client, engine, monkeypatch, platform_admin):
-    """Each uploaded picture joins the gallery."""
-    from app.core import supabase_storage
-
-    async def fake_upload(**kwargs):
-        return f"https://example.test/gallery-{uuid.uuid4().hex[:6]}.png"
-
-    monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
-
-    token = await _admin_with_school(client, engine, platform_admin, "galu")
-
-    response = client.post(
-        "/v1/schools/me/images",
-        headers={"Authorization": f"Bearer {token}"},
-        data={"kind": "gallery"},
-        files={"file": ("one.png", b"fake-image-bytes", "image/png")},
-    )
-    assert response.status_code == 200, response.text
-    gallery = response.json()["gallery"]
-    assert len(gallery) == 1
-    assert gallery[0]["caption"] is None
-
-
-async def test_the_gallery_refuses_to_grow_past_five(client, engine, monkeypatch, platform_admin):
-    """The sixth picture is refused with a 409."""
-    from app.core import supabase_storage
-
-    async def fake_upload(**kwargs):
-        return f"https://example.test/gallery-{uuid.uuid4().hex[:6]}.png"
-
-    monkeypatch.setattr(supabase_storage, "upload_school_image", fake_upload)
-
-    token = await _admin_with_school(client, engine, platform_admin, "full")
-
-    gallery = [{"url": f"https://example.test/{i}.png"} for i in range(5)]
-    filled = client.patch(
-        "/v1/schools/me",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"gallery": gallery},
-    )
-    assert filled.status_code == 200, filled.text
-
-    response = client.post(
-        "/v1/schools/me/images",
-        headers={"Authorization": f"Bearer {token}"},
-        data={"kind": "gallery"},
-        files={"file": ("seven.png", b"fake-image-bytes", "image/png")},
-    )
-    assert response.status_code == 409, response.text
-
-
-async def test_an_unknown_image_kind_is_rejected(client, engine, platform_admin):
-    """Only the banner and the gallery are accepted."""
-    token = await _admin_with_school(client, engine, platform_admin, "kind")
-
-    response = client.post(
-        "/v1/schools/me/images",
-        headers={"Authorization": f"Bearer {token}"},
-        data={"kind": "mural"},
-        files={"file": ("x.png", b"fake-image-bytes", "image/png")},
-    )
-    assert response.status_code == 422, response.text
-
-
-def test_the_image_upload_requires_authentication(client):
+async def test_the_shield_upload_requires_authentication(client):
     """The upload is not public."""
     response = client.post(
-        "/v1/schools/me/images",
-        data={"kind": "banner"},
-        files={"file": ("x.png", b"fake-image-bytes", "image/png")},
+        "/v1/schools/me/logo",
+        files={"file": ("escudo.png", b"fake-image-bytes", "image/png")},
     )
     assert response.status_code == 401

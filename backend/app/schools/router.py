@@ -3,6 +3,11 @@
 The schools themselves are created by the platform team, from the
 platform module (`app.platform`). A school only manages its own
 profile from here.
+
+The editable identity of a school is the name it shows, its shield and
+its primary colour. The mission, the vision, the cover picture and
+the gallery were removed from the product: they are not part of the
+school's work, and the cover picture belongs to the platform team.
 """
 
 from __future__ import annotations
@@ -10,12 +15,12 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import supabase_storage
 from app.core.context import RequestContext
-from app.core.errors import ConflictError, ForbiddenError, ValidationError
+from app.core.errors import ForbiddenError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
@@ -23,12 +28,7 @@ from app.schools.operations import (
     get_school,
     update_school,
 )
-from app.schools.schemas import (
-    MAX_GALLERY_IMAGES,
-    SchoolGalleryImage,
-    SchoolOut,
-    SchoolUpdateRequest,
-)
+from app.schools.schemas import SchoolOut, SchoolUpdateRequest
 
 router = APIRouter(prefix="/v1/schools", tags=["schools"])
 
@@ -58,14 +58,6 @@ def _school_out(school: object) -> SchoolOut:
         display_name=school.display_name,  # type: ignore[attr-defined]
         logo_url=school.logo_url,  # type: ignore[attr-defined]
         primary_color=school.primary_color,  # type: ignore[attr-defined]
-        mission=school.mission,  # type: ignore[attr-defined]
-        vision=school.vision,  # type: ignore[attr-defined]
-        banner_url=school.banner_url,  # type: ignore[attr-defined]
-        gallery=[
-            SchoolGalleryImage(url=image.get("url", ""), caption=image.get("caption"))
-            for image in (school.gallery or [])  # type: ignore[attr-defined]
-            if image.get("url")
-        ],
     )
 
 
@@ -124,61 +116,6 @@ async def upload_my_school_logo(
         content_type=file.content_type or "application/octet-stream",
     )
     school = await update_school(session, school_id=school_id, changes={"logo_url": logo_url})
-    await session.commit()
-    return _school_out(school)
-
-
-@router.post("/me/images", response_model=SchoolOut)
-async def upload_my_school_image(
-    file: Annotated[UploadFile, File()],
-    kind: Annotated[str, Form()],
-    context: Annotated[RequestContext, Depends(get_context)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> SchoolOut:
-    """Upload a picture of the school's institutional identity (admin only).
-
-    ``kind`` is ``banner`` (the cover of the dashboard) or ``gallery``
-    (one of the pictures the school shows). A banner replaces the
-    previous one; a gallery picture is added to the list, which holds at
-    most ``MAX_GALLERY_IMAGES`` entries.
-    """
-    school_id = _require_school_admin(context)
-
-    if kind not in ("banner", "gallery"):
-        raise ValidationError(
-            "Unsupported image kind. Use banner or gallery.",
-            code="invalid_image_kind",
-        )
-
-    content = await file.read()
-    if not content:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The uploaded file is empty.",
-        )
-
-    url = await supabase_storage.upload_school_image(
-        school_id=str(school_id),
-        kind=kind,
-        content=content,
-        content_type=file.content_type or "application/octet-stream",
-    )
-
-    school = await get_school(session, school_id)
-
-    if kind == "banner":
-        changes: dict[str, object] = {"banner_url": url}
-    else:
-        gallery = list(school.gallery or [])
-        if len(gallery) >= MAX_GALLERY_IMAGES:
-            raise ConflictError(
-                f"The gallery holds at most {MAX_GALLERY_IMAGES} pictures.",
-                code="gallery_full",
-            )
-        gallery.append({"url": url, "caption": None})
-        changes = {"gallery": gallery}
-
-    school = await update_school(session, school_id=school_id, changes=changes)
     await session.commit()
     return _school_out(school)
 

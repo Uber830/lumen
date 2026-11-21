@@ -3,8 +3,14 @@
 - `materials`         — the piece the platform team loads.
 - `material_files`    — the files of the piece.
 - `material_schools`  — the schools that can see it.
+- `material_courses`  — the courses of the school it applies to.
 - `material_history`  — what happened to it and who did it.
 - `audit_log`         — the trace of the critical events.
+
+The catalog has one shape for the whole product: the short code is
+`ref`, the format of the file is `kind` and the editorial state is
+`state`. The `type` is something else: it says what the piece is
+pedagogically ("Libro", "Guía"), not what file it is.
 
 The closed catalogs (types, areas, grades) live in
 `app.platform.catalog`: they are business vocabulary, not rows of a
@@ -47,7 +53,7 @@ class Material(Base):
 
     __tablename__ = "materials"
     __table_args__ = (
-        UniqueConstraint("code", name="materials_code_uq"),
+        UniqueConstraint("ref", name="materials_ref_uq"),
         {"schema": "public"},
     )
 
@@ -57,9 +63,19 @@ class Material(Base):
         default=uuid.uuid4,
     )
     # The readable identifier: "C-1041".
-    code: Mapped[str] = mapped_column(String(12), nullable=False)
+    ref: Mapped[str] = mapped_column(String(12), nullable=False)
     title: Mapped[str] = mapped_column(String(240), nullable=False)
-    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    # What the piece is pedagogically: "Libro", "Guía", "Evaluación",
+    # "Multimedia" or "Documento". A piece that does not say what it is
+    # is a document.
+    type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="Documento",
+        server_default=text("'Documento'"),
+    )
+    # The format of the file: "pdf", "docx", "epub", "mp4" or "zip".
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
     area: Mapped[str] = mapped_column(String(32), nullable=False)
     # The grades it applies to: "7°", "10°".
     grades: Mapped[list[str]] = mapped_column(
@@ -88,12 +104,19 @@ class Material(Base):
         server_default=text("'upload'"),
     )
     external_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(
+    # The editorial state: "borrador", "en_revision", "publicado" or
+    # "archivado".
+    state: Mapped[str] = mapped_column(
         String(16),
         nullable=False,
-        default="draft",
-        server_default=text("'draft'"),
+        default="borrador",
+        server_default=text("'borrador'"),
     )
+    # The file of the piece, when it is a file and not a link. The
+    # storage keeps the key, never the public address.
+    storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # The editorial order of the landing.
     position: Mapped[int] = mapped_column(
         Integer,
@@ -132,7 +155,7 @@ class Material(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
-        return f"<Material {self.code}>"
+        return f"<Material {self.ref}>"
 
 
 class MaterialFile(Base):
@@ -192,22 +215,41 @@ class MaterialFile(Base):
 class MaterialSchool(Base):
     """A school that can see a material.
 
-    The pair is the primary key: a school has access to a piece or it
-    does not, and it is enabled once.
+    The row has its own id and the flag that says whether the access is
+    on. Revoking the access does not delete the row: it archives it,
+    because the row is the history of what the school had.
     """
 
     __tablename__ = "material_schools"
-    __table_args__ = ({"schema": "public"},)
+    __table_args__ = (
+        UniqueConstraint(
+            "material_id",
+            "school_id",
+            name="material_schools_material_school_uq",
+        ),
+        {"schema": "public"},
+    )
 
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
     material_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("public.materials.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
     )
     school_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("public.schools.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
     )
     enabled_at: Mapped[datetime] = created_at()
     enabled_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -215,11 +257,52 @@ class MaterialSchool(Base):
         ForeignKey("public.users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     material: Mapped[Material] = relationship(back_populates="schools")
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<MaterialSchool {self.school_id}>"
+
+
+class MaterialCourse(Base):
+    """A course of a school the material applies to.
+
+    A material with no row here applies to the whole school.
+    """
+
+    __tablename__ = "material_courses"
+    __table_args__ = (
+        UniqueConstraint(
+            "material_id",
+            "course_id",
+            name="material_courses_material_course_uq",
+        ),
+        {"schema": "public"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    material_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.materials.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.courses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = created_at()
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<MaterialCourse {self.course_id}>"
 
 
 class MaterialHistory(Base):
@@ -307,6 +390,7 @@ class AuditLog(Base):
 __all__ = [
     "AuditLog",
     "Material",
+    "MaterialCourse",
     "MaterialFile",
     "MaterialHistory",
     "MaterialSchool",

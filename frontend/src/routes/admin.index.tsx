@@ -1,9 +1,18 @@
 import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
-import { AlertTriangle, BookOpen, ClipboardList, GraduationCap, Users } from "lucide-react";
-import { PageHeader, SectionCard, StatCard } from "@/components/ui-kit";
-import { StatusBadge } from "@/components/status-badge";
-import { useSchoolStats } from "@/lib/admin/hooks";
-import { useSchoolMembers } from "@/features/academics/hooks";
+import {
+  BookOpen,
+  ChevronRight,
+  GraduationCap,
+  Info,
+  Layers,
+  Link2,
+  ListChecks,
+  Upload,
+  Users,
+} from "lucide-react";
+
+import { Button, Chip, PageHeader, SectionCard, StatCard } from "@/components/ui-kit";
+import { useSchoolOverview, type ActivityEntry } from "@/lib/school/overview";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({
@@ -11,7 +20,7 @@ export const Route = createFileRoute("/admin/")({
       { title: "Panel del colegio — Lumen" },
       {
         name: "description",
-        content: "Resumen académico del colegio: estudiantes, docentes, cursos y alertas.",
+        content: "Comunidad, material disponible y operación del periodo vigente.",
       },
       { property: "og:title", content: "Panel del colegio — Lumen" },
       {
@@ -23,210 +32,333 @@ export const Route = createFileRoute("/admin/")({
   component: AdminDashboard,
 });
 
+/**
+ * The quick actions of the panel: the four things the administrator
+ * of a school does most of the time.
+ */
 const quickActions = [
-  { to: "/admin/docentes", label: "Docentes", icon: Users },
-  { to: "/admin/estudiantes", label: "Estudiantes", icon: GraduationCap },
-  { to: "/admin/cursos", label: "Nuevo curso", icon: BookOpen },
-  { to: "/admin/asignaciones", label: "Asignar", icon: ClipboardList },
+  {
+    to: "/admin/docentes",
+    label: "Nuevo docente",
+    hint: "Registra a un docente del colegio",
+    icon: Users,
+  },
+  {
+    to: "/admin/estudiantes",
+    label: "Nuevo estudiante",
+    hint: "Matrícula a un estudiante",
+    icon: GraduationCap,
+  },
+  { to: "/admin/cursos", label: "Crear curso", hint: "Abre un grado o ciclo", icon: Layers },
+  {
+    to: "/admin/asignaciones",
+    label: "Asignar materia",
+    hint: "Vincula docente y curso",
+    icon: Link2,
+  },
 ];
 
-function formatNumber(n: number): string {
-  return n.toLocaleString("es-CO");
+/** The icon of each kind of activity. */
+const activityIcons: Record<string, typeof Upload> = {
+  upload: Upload,
+  layers: Layers,
+  users: Users,
+  link: Link2,
+};
+
+const activityTones: Record<string, string> = {
+  success: "text-success",
+  info: "text-[#7FB8FF]",
+  teal: "text-[#2DD4BF]",
+  muted: "text-muted-foreground",
+};
+
+/** How long ago it happened, in the words of the panel. */
+function relativeTime(value: string): string {
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "—";
+  const minutes = Math.round((Date.now() - then) / 60000);
+  if (minutes < 60) return "Hace un momento";
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "Ayer";
+  if (days < 30) return `Hace ${days} días`;
+  const date = new Date(then);
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function ActivityRow({ entry }: { entry: ActivityEntry }) {
+  const Icon = activityIcons[entry.icon] ?? Info;
+  return (
+    <li className="flex items-start gap-3 border-b border-[rgba(150,175,220,.08)] px-[18px] py-3 last:border-b-0">
+      <span className={`mt-px shrink-0 ${activityTones[entry.tone] ?? "text-muted-foreground"}`}>
+        <Icon className="size-4" strokeWidth={1.9} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13.2px] font-medium">{entry.title}</p>
+        <p className="truncate text-[12px] text-muted-foreground">{entry.detail}</p>
+      </div>
+      <span className="shrink-0 text-[12px] text-muted-foreground">{relativeTime(entry.at)}</span>
+    </li>
+  );
 }
 
 function AdminDashboard() {
   const { session } = useRouteContext({ from: "/admin/" });
-  const schoolId = session.primarySchoolId;
-  const stats = useSchoolStats(schoolId);
-  const recentStudents = useSchoolMembers(schoolId, "student");
-  const unassignedTeachers = useSchoolMembers(schoolId, "teacher");
+  const overview = useSchoolOverview(session.primarySchoolId);
+  const data = overview.data;
+  // While the numbers are on their way the cards show their own shape:
+  // a zero would be a lie about a school that has material and teachers.
+  const loading = overview.isLoading;
 
-  const recentStudentsList = (recentStudents.data ?? []).slice(0, 5);
-  const teachersWithoutSubjects = (unassignedTeachers.data ?? []).filter(
-    (t) => t.is_primary === false,
-  );
+  const material = data?.material;
+  const teachers = data?.teachers;
+  const students = data?.students;
+  const tasks = data?.tasks;
+
+  const maxArea = Math.max(1, ...(material?.by_area ?? []).map((row) => row.count));
+  const accessPct =
+    teachers && teachers.total > 0 ? Math.round((teachers.with_access / teachers.total) * 100) : 0;
 
   return (
     <>
       <PageHeader
-        title={stats.data?.schoolName || "Panel del colegio"}
-        subtitle={dashboardSubtitle(stats.data)}
+        title="Panel del colegio"
+        subtitle="Comunidad, material disponible y operación del periodo vigente."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {overview.isError ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-xl border border-border bg-card px-4 py-3 text-[13px] text-destructive"
+        >
+          {overview.error.message}
+        </p>
+      ) : null}
+
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
-          label="Estudiantes"
-          value={formatNumber(stats.data?.students ?? 0)}
-          delta={stats.data ? "Matriculados activos" : "Cargando..."}
-          icon={GraduationCap}
+          label="Material disponible"
+          value={String(material?.available ?? 0)}
+          tone="success"
+          icon={BookOpen}
+          loading={loading}
+          delta="cargado por el equipo editorial de Lumen"
         />
         <StatCard
           label="Docentes"
-          value={formatNumber(stats.data?.teachers ?? 0)}
-          delta={stats.data ? "En el colegio" : "Cargando..."}
+          value={String(teachers?.total ?? 0)}
+          tone="primary"
           icon={Users}
+          loading={loading}
+          delta={
+            teachers && teachers.pending > 0 ? (
+              <>
+                <b className="font-semibold text-[#A0B2CE]">{teachers.pending}</b> sin acceso
+              </>
+            ) : (
+              "todos con acceso al material"
+            )
+          }
         />
         <StatCard
-          label="Cursos activos"
-          value={formatNumber(stats.data?.courses ?? 0)}
-          delta="Registrados"
-          icon={BookOpen}
-          tone="success"
+          label="Estudiantes matriculados"
+          value={String(students?.total ?? 0)}
+          tone="teal"
+          icon={GraduationCap}
+          loading={loading}
+          delta={
+            students ? (
+              <>
+                en {students.courses} cursos ·{" "}
+                <b className="font-semibold text-[#A0B2CE]">{students.with_access}</b> con acceso
+                activo
+              </>
+            ) : (
+              ""
+            )
+          }
         />
         <StatCard
-          label="Tareas sin revisar"
-          value={formatNumber(stats.data?.pendingTasks ?? 0)}
-          delta={stats.data?.pendingTasks ? "Requiere atencion" : "Al dia"}
-          icon={AlertTriangle}
-          tone={stats.data?.pendingTasks ? "warning" : "primary"}
+          label="Tareas por revisar"
+          value={String(tasks?.pending ?? 0)}
+          tone="warning"
+          icon={ListChecks}
+          loading={loading}
+          delta={
+            tasks && tasks.stale > 0 ? (
+              <>
+                <b className="font-semibold text-[#A0B2CE]">{tasks.stale}</b> con más de 3 días
+              </>
+            ) : (
+              "entregas por calificar"
+            )
+          }
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
-          title="Acciones rapidas"
-          description="Atajos para alta y gestion"
-          className="lg:col-span-2"
+          title="Material habilitado para tu colegio"
+          description="Lo que el equipo de plataforma cargó y dejó visible para tu institución"
+          actions={
+            <Link to="/admin/contenido">
+              <Button variant="ghost" size="sm">
+                Ver todo
+                <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
+              </Button>
+            </Link>
+          }
         >
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {quickActions.map((q) => (
-              <Link
-                key={q.to}
-                to={q.to}
-                className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-xs font-semibold hover:bg-muted"
+          {loading ? (
+            <div className="flex flex-col gap-2.5" aria-hidden>
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} className="grid grid-cols-[150px_1fr_54px] items-center gap-3">
+                  <span className="h-[11px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                  <span className="h-[9px] animate-pulse rounded-full bg-[rgba(150,175,220,.11)]" />
+                  <span className="h-[11px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                </div>
+              ))}
+            </div>
+          ) : material && material.by_area.length > 0 ? (
+            material.by_area.map((row) => (
+              <div
+                key={row.area}
+                className="grid grid-cols-[150px_1fr_54px] items-center gap-3 py-1.5 text-[12.8px]"
               >
-                <q.icon className="size-4 shrink-0 text-primary" strokeWidth={1.75} />
-                <span className="truncate">{q.label}</span>
+                <span className="truncate text-muted-foreground">{row.area}</span>
+                <span className="h-[9px] overflow-hidden rounded-full bg-[rgba(150,175,220,.12)]">
+                  <span
+                    className="block h-full rounded-full bg-gradient-to-r from-primary to-[#2DD4BF]"
+                    style={{ width: `${Math.round((row.count / maxArea) * 100)}%` }}
+                  />
+                </span>
+                <span className="text-right font-mono text-[12px] text-[#A0B2CE]">{row.count}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-[13px] text-muted-foreground">
+              Todavía no hay material habilitado para tu colegio.
+            </p>
+          )}
+
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(46,143,255,.28)] bg-primary-soft p-3 text-[12.5px] text-[#A0B2CE]">
+            <Info className="mt-px size-4 shrink-0 text-[#7FB8FF]" strokeWidth={1.9} aria-hidden />
+            <span>
+              <b className="font-semibold text-foreground">
+                El material lo carga el equipo editorial de Lumen
+              </b>
+              <br />
+              Tu colegio tiene {loading ? "—" : (material?.available ?? 0)} de{" "}
+              {loading ? "—" : (material?.catalog_total ?? 0)} materiales habilitados y publicados.
+              Lo que ves es todo lo que puedes usar; para pedir más, escríbele a tu coordinador.
+            </span>
+          </p>
+        </SectionCard>
+
+        <SectionCard title="Estado del colegio" description="Resumen del periodo y la operación">
+          <dl className="grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
+            <dt className="text-[12.4px] text-muted-foreground">Periodo</dt>
+            <dd>
+              {loading ? (
+                <span className="inline-block h-[11px] w-[132px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+              ) : (
+                (data?.period?.name ?? "Sin periodo vigente")
+              )}
+            </dd>
+
+            <dt className="text-[12.4px] text-muted-foreground">Cursos</dt>
+            <dd>{loading ? "—" : `${data?.courses ?? 0} activos`}</dd>
+
+            <dt className="text-[12.4px] text-muted-foreground">Material</dt>
+            <dd>{loading ? "—" : `${material?.available ?? 0} disponibles`}</dd>
+
+            <dt className="text-[12.4px] text-muted-foreground">Docentes con acceso</dt>
+            <dd>
+              <span className="mt-1 block h-[9px] overflow-hidden rounded-full bg-[rgba(150,175,220,.12)]">
+                <span
+                  className="block h-full rounded-full bg-gradient-to-r from-primary to-[#2DD4BF]"
+                  style={{ width: `${accessPct}%` }}
+                />
+              </span>
+              <span className="mt-1.5 block text-[12px] text-muted-foreground">
+                {loading
+                  ? "—"
+                  : `${teachers?.with_access ?? 0} de ${teachers?.total ?? 0} docentes con acceso activo`}
+              </span>
+            </dd>
+          </dl>
+        </SectionCard>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <SectionCard
+          title="Actividad reciente"
+          description="Cargas y cambios de la última semana"
+          bodyClassName="p-0"
+        >
+          {loading ? (
+            <ul aria-hidden>
+              {[0, 1, 2].map((row) => (
+                <li
+                  key={row}
+                  className="flex items-start gap-3 border-b border-[rgba(150,175,220,.08)] px-[18px] py-3 last:border-b-0"
+                >
+                  <span className="size-4 animate-pulse rounded-full bg-[rgba(150,175,220,.11)]" />
+                  <span className="h-[11px] flex-1 animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                </li>
+              ))}
+            </ul>
+          ) : data && data.activity.length > 0 ? (
+            <ul>
+              {data.activity.map((entry) => (
+                <ActivityRow key={`${entry.title}-${entry.at}`} entry={entry} />
+              ))}
+            </ul>
+          ) : (
+            <p className="px-[18px] py-6 text-[13px] text-muted-foreground">
+              Todavía no hay actividad registrada en el colegio.
+            </p>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Acciones rápidas" description="Atajos de alta frecuencia">
+          <div className="flex flex-col gap-2">
+            {quickActions.map((action) => (
+              <Link
+                key={action.to}
+                to={action.to}
+                className="flex items-center gap-[11px] rounded-[10px] border border-border bg-[#0B1222] px-[10px] py-[9px] transition-colors hover:border-[rgba(150,175,220,.26)] hover:bg-secondary"
+              >
+                <action.icon
+                  className="size-[17px] shrink-0 opacity-85"
+                  strokeWidth={1.9}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 text-left">
+                  <b className="block text-[13.2px] font-medium text-foreground">{action.label}</b>
+                  <span className="block text-[11.6px] text-muted-foreground">{action.hint}</span>
+                </span>
+                <ChevronRight
+                  className="size-[15px] shrink-0 text-muted-foreground"
+                  strokeWidth={1.9}
+                  aria-hidden
+                />
               </Link>
             ))}
           </div>
         </SectionCard>
-
-        <SectionCard title="Alertas" description="Puntos que requieren seguimiento">
-          <ul className="space-y-3">
-            {stats.data && stats.data.pendingTasks > 0 && (
-              <li className="flex items-start gap-3 rounded-lg border border-border p-3">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" strokeWidth={2} />
-                <span className="text-sm">
-                  {stats.data.pendingTasks} tareas pendientes de revision
-                </span>
-              </li>
-            )}
-            {teachersWithoutSubjects.length > 0 && (
-              <li className="flex items-start gap-3 rounded-lg border border-border p-3">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" strokeWidth={2} />
-                <span className="text-sm">
-                  {teachersWithoutSubjects.length} docentes sin materias asignadas
-                </span>
-              </li>
-            )}
-            {stats.data &&
-              stats.data.pendingTasks === 0 &&
-              teachersWithoutSubjects.length === 0 && (
-                <li className="flex items-start gap-3 rounded-lg border border-success bg-success-soft p-3">
-                  <StatusBadge tone="success">Al dia</StatusBadge>
-                  <span className="text-sm">Sin alertas pendientes.</span>
-                </li>
-              )}
-          </ul>
-        </SectionCard>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <SectionCard
-          title="Estudiantes recientes"
-          description="Ultimos matriculados"
-          className="lg:col-span-2"
-          bodyClassName="p-0"
-          actions={
-            <Link
-              to="/admin/estudiantes"
-              className="text-sm font-semibold text-primary hover:underline"
-            >
-              Ver todos
-            </Link>
-          }
-        >
-          {recentStudentsList.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground">
-              Aun no hay estudiantes matriculados. Invita el primero desde la pagina de estudiantes.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="table-head-band text-left text-[11px] uppercase tracking-[0.09em]">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold">Estudiante</th>
-                    <th className="px-5 py-3 font-semibold">Ingreso</th>
-                    <th className="px-5 py-3 font-semibold">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentStudentsList.map((s) => (
-                    <tr key={s.user_id} className="border-t border-border">
-                      <td className="px-5 py-3">
-                        <p className="font-medium">{s.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{s.email ?? "Sin correo"}</p>
-                      </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {new Date(s.joined_at).toLocaleDateString("es-CO")}
-                      </td>
-                      <td className="px-5 py-3">
-                        <StatusBadge tone={s.is_primary ? "success" : "neutral"}>
-                          {s.is_primary ? "Activo" : "Secundario"}
-                        </StatusBadge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Estado del colegio"
-          description="Resumen del colegio y el periodo"
-          className="lg:col-span-1"
-        >
-          <dl className="space-y-3 text-sm">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Codigo</dt>
-              <dd className="font-mono text-base">{stats.data?.schoolShortCode || "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Estado</dt>
-              <dd>
-                <StatusBadge tone={stats.data?.schoolStatus === "active" ? "success" : "warning"}>
-                  {stats.data?.schoolStatus === "active"
-                    ? "Activo"
-                    : stats.data?.schoolStatus === "trial"
-                      ? "Prueba"
-                      : "Suspendido"}
-                </StatusBadge>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                Periodo actual
-              </dt>
-              <dd>
-                {stats.data?.currentPeriod ? (
-                  <span className="font-medium">{stats.data.currentPeriod.name}</span>
-                ) : (
-                  <span className="text-muted-foreground">Sin periodo activo</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </SectionCard>
-      </div>
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>Los datos son del colegio y se cuentan en el servidor al abrir la vista.</span>
+      </p>
     </>
   );
-}
-
-function dashboardSubtitle(data: ReturnType<typeof useSchoolStats>["data"] | undefined): string {
-  if (!data) return "Cargando metricas...";
-  if (!data.currentPeriod) return `Estado: ${data.schoolStatus}`;
-  return `Periodo activo: ${data.currentPeriod.name} · Estado: ${data.schoolStatus}`;
 }
