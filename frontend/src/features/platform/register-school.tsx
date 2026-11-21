@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
-import { useCatalogOptions, useRegisterSchool } from "@/lib/platform/hooks";
+import { useRegisterSchool } from "@/lib/platform/hooks";
 import type { RegisteredSchool } from "@/lib/platform/types";
 
 /**
@@ -18,32 +18,27 @@ import type { RegisteredSchool } from "@/lib/platform/types";
  * The platform team says who is in the network: the name of the
  * institution, its city and the administrator who will run it. The
  * grades, the students and the teachers are reported by the school
- * itself, from its own panel.
+ * itself, from its own panel. The subscription is not chosen here:
+ * the school starts with the default plan.
  *
  * The administrator's account is born without a password: the answer
  * carries the activation link that is shared with the school.
  */
 export function RegisterSchool({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const options = useCatalogOptions();
   const register = useRegisterSchool();
 
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [code, setCode] = useState("");
-  const [plan, setPlan] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [created, setCreated] = useState<RegisteredSchool | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const plans = options.data?.plans ?? [];
-  const selectedPlan = plan || plans[0]?.code || "";
-
   function reset() {
     setName("");
     setCity("");
     setCode("");
-    setPlan("");
     setAdminName("");
     setAdminEmail("");
     setCreated(null);
@@ -52,7 +47,7 @@ export function RegisterSchool({ open, onClose }: { open: boolean; onClose: () =
   }
 
   async function onSubmit() {
-    if (!name.trim() || !adminName.trim() || !adminEmail.trim() || !selectedPlan) {
+    if (!name.trim() || !adminName.trim() || !adminEmail.trim()) {
       setProblem("Completa el nombre del colegio y los datos de su administrador.");
       return;
     }
@@ -61,7 +56,6 @@ export function RegisterSchool({ open, onClose }: { open: boolean; onClose: () =
       const school = await register.mutateAsync({
         school_name: name.trim(),
         short_code: (code.trim() || name.trim()).slice(0, 16),
-        plan_code: selectedPlan,
         admin_email: adminEmail.trim(),
         admin_name: adminName.trim(),
         city: city.trim() || null,
@@ -144,21 +138,6 @@ export function RegisterSchool({ open, onClose }: { open: boolean; onClose: () =
                 placeholder="Se toma del nombre"
                 className="h-9 rounded-lg border border-input bg-card px-3 text-sm"
               />
-            </label>
-
-            <label className="grid gap-1 text-sm">
-              <span className="text-xs font-medium">Plan</span>
-              <select
-                value={selectedPlan}
-                onChange={(event) => setPlan(event.target.value)}
-                className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
-              >
-                {plans.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
             </label>
 
             <label className="grid gap-1 text-sm">

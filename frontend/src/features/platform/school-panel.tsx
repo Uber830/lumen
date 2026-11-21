@@ -89,7 +89,7 @@ export function SchoolPanel({
             <DialogTitle className="text-[16px]">{detail?.name ?? "Colegio"}</DialogTitle>
             <DialogDescription className="mt-0.5 text-xs">
               {detail
-                ? [detail.short_code, detail.city, detail.plan].filter(Boolean).join(" · ")
+                ? [detail.short_code, detail.city].filter(Boolean).join(" · ")
                 : "Los datos de la institución."}
             </DialogDescription>
           </div>

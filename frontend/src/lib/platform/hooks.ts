@@ -60,7 +60,6 @@ export interface CatalogFilters {
 
 export interface SchoolFilters {
   q?: string;
-  plan?: string;
   status?: string;
   page?: number;
   per_page?: number;
@@ -97,7 +96,7 @@ export function usePlatformMetrics(enabled = true): UseQueryResult<PlatformMetri
   });
 }
 
-/** The closed catalogs: types, areas, grades and plans. */
+/** The closed catalogs: types, areas, grades and statuses. */
 export function useCatalogOptions(): UseQueryResult<CatalogOptions, Error> {
   return useQuery({
     queryKey: platformKeys.options,
@@ -143,7 +142,6 @@ export function usePlatformSchools(
     queryFn: () =>
       api.get<Page<SchoolSummary>>("/v1/platform/schools", {
         q: filters.q || undefined,
-        plan: filters.plan || undefined,
         status: filters.status || undefined,
         page: filters.page ?? 1,
         per_page: filters.per_page ?? 8,
@@ -308,7 +306,6 @@ export function useRegisterSchool(): UseMutationResult<
   {
     school_name: string;
     short_code: string;
-    plan_code: string;
     admin_email: string;
     admin_name: string;
     city?: string | null;

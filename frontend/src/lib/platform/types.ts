@@ -46,7 +46,6 @@ export interface MaterialSchool {
   id: string;
   name: string;
   short_code: string;
-  plan: string | null;
   students: number;
 }
 
@@ -98,7 +97,6 @@ export interface SchoolCoverage {
   name: string;
   short_code: string;
   status: string;
-  plan: string | null;
   students: number;
   teachers: number;
   covered: number;
@@ -121,7 +119,6 @@ export interface SchoolSummary {
   short_code: string;
   city: string | null;
   status: string;
-  plan: string | null;
   students: number;
   teachers: number;
   covered: number;
@@ -147,7 +144,6 @@ export interface SchoolDetail {
   short_code: string;
   city: string | null;
   status: string;
-  plan: string | null;
   students: number;
   teachers: number;
   covered: number;
@@ -183,7 +179,6 @@ export interface CatalogOptions {
   grades: string[];
   statuses: string[];
   visible_to: string[];
-  plans: { code: string; name: string }[];
 }
 
 export interface CreateMaterialInput {

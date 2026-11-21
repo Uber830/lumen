@@ -9,13 +9,12 @@ import {
   SearchField,
   SkeletonRows,
   StatusPill,
-  Tag,
   Toolbar,
 } from "@/components/ui-kit";
 import { EnableMaterials } from "@/features/platform/enable-materials";
 import { RegisterSchool } from "@/features/platform/register-school";
 import { SchoolPanel } from "@/features/platform/school-panel";
-import { useCatalogOptions, usePlatformSchools } from "@/lib/platform/hooks";
+import { usePlatformSchools } from "@/lib/platform/hooks";
 
 export const Route = createFileRoute("/super/colegios")({
   head: () => ({
@@ -39,7 +38,6 @@ const PER_PAGE = 8;
 
 function Colegios() {
   const [q, setQ] = useState("");
-  const [plan, setPlan] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -47,8 +45,7 @@ function Colegios() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [enableOpen, setEnableOpen] = useState(false);
 
-  const options = useCatalogOptions();
-  const schools = usePlatformSchools({ q, plan, status, page, per_page: PER_PAGE });
+  const schools = usePlatformSchools({ q, status, page, per_page: PER_PAGE });
 
   const total = schools.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -90,23 +87,6 @@ function Colegios() {
             placeholder="Buscar colegio"
             className="h-9 w-full border border-input sm:w-72"
           />
-
-          <select
-            value={plan}
-            onChange={(event) => {
-              setPlan(event.target.value);
-              setPage(1);
-            }}
-            aria-label="Filtrar por plan"
-            className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
-          >
-            <option value="">Todos los planes</option>
-            {(options.data?.plans ?? []).map((value) => (
-              <option key={value.code} value={value.code}>
-                {value.name}
-              </option>
-            ))}
-          </select>
 
           <select
             value={status}
@@ -172,9 +152,6 @@ function Colegios() {
                       Colegio
                     </th>
                     <th scope="col" className="px-5 py-3 font-semibold">
-                      Plan
-                    </th>
-                    <th scope="col" className="px-5 py-3 font-semibold">
                       Estudiantes
                     </th>
                     <th scope="col" className="px-5 py-3 font-semibold">
@@ -210,13 +187,6 @@ function Colegios() {
                         <span className="code-cell mt-0.5 block text-ink-3">
                           {[school.short_code, school.city].filter(Boolean).join(" · ")}
                         </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        {school.plan ? (
-                          <Tag>{school.plan}</Tag>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
                       </td>
                       <td className="px-5 py-3">
                         {school.students > 0 ? (

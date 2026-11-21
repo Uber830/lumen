@@ -55,8 +55,7 @@ export function SchoolsOfMaterial({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{school.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {school.short_code}
-                      {school.plan ? ` · ${school.plan}` : ""} · {school.students} estudiantes
+                      {school.short_code} · {school.students} estudiantes
                     </span>
                   </span>
                   <StatusPill label="Habilitado" tone="success" />
