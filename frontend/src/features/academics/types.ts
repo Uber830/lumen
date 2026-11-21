@@ -153,6 +153,11 @@ export type CreateTeacherAssignmentInput = {
   teacher_id: string;
 };
 
+export type UpdateTeacherAssignmentInput = {
+  id: string;
+  patch: Partial<CreateTeacherAssignmentInput>;
+};
+
 export type CreateStudentEnrollmentInput = {
   course_id: string;
   student_id: string;

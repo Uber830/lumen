@@ -1,21 +1,33 @@
-import { useNavigate, useRouteContext, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
+import { BookOpen, ChevronRight, Link2, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { BookOpen, Link2, Plus, Trash2, X } from "lucide-react";
-import { PageHeader, CollapsibleCard, SectionCard } from "@/components/ui-kit";
+
+import {
+  Button,
+  PanelTable,
+  Chip,
+  CollapsibleCard,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+  TableShell,
+  tableCellClass,
+  tableHeadClass,
+} from "@/components/ui-kit";
 import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
-import { StatusBadge } from "@/components/status-badge";
 import { Select } from "@/components/select-field";
 import {
   useCourseSubjects,
-  useCourses,
   useCreateCourse,
   useCreateCourseSubject,
   useCreateSubject,
   useDeleteCourse,
   useDeleteCourseSubject,
   useDeleteSubject,
+  useCourses,
   useSubjects,
 } from "@/features/academics/hooks";
+import { useSchoolCourses, useSchoolSubjects } from "@/lib/school/community";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/cursos")({
@@ -24,38 +36,32 @@ export const Route = createFileRoute("/admin/cursos")({
       { title: "Cursos y materias — Lumen" },
       {
         name: "description",
-        content: "Creá cursos, definí materias y organizá la estructura académica del colegio.",
+        content: "Estructura académica del colegio: cursos, materias y quién las imparte.",
       },
       { property: "og:title", content: "Cursos y materias — Lumen" },
       {
         property: "og:description",
-        content: "Estructura académica flexible por curso y materia.",
+        content: "Administra los cursos y las materias de tu institución.",
       },
     ],
   }),
   component: CursosPage,
 });
 
-/** The areas a subject usually belongs to. The field stays free text. */
-const SUGGESTED_AREAS = [
-  "Matemáticas",
-  "Lengua Castellana",
-  "Ciencias Naturales",
-  "Ciencias Sociales",
-  "Inglés",
-  "Tecnología e Informática",
-  "Educación Física",
-  "Arte",
-  "Religión",
-  "Otra",
-];
-
 function CursosPage() {
   const navigate = useNavigate();
   const { session } = useRouteContext({ from: "/admin/cursos" });
   const schoolId = session.primarySchoolId;
-  const courses = useCourses(schoolId);
-  const subjects = useSubjects(schoolId);
+
+  // The read side comes from the panel's own endpoints: the counts of
+  // subjects and teachers per course are computed in the server.
+  const courses = useSchoolCourses();
+  const subjects = useSchoolSubjects();
+
+  // The write side keeps using the academic hooks: creating a course, a
+  // subject or an offering is the same operation it always was.
+  const academicCourses = useCourses(schoolId);
+  const academicSubjects = useSubjects(schoolId);
   const courseSubjects = useCourseSubjects(schoolId);
   const createCourse = useCreateCourse(schoolId ?? "");
   const deleteCourse = useDeleteCourse(schoolId ?? "");
@@ -71,7 +77,6 @@ function CursosPage() {
   const [courseId, setCourseId] = useState("");
   const [subjectId, setSubjectId] = useState("");
 
-  // The three deletions ask for confirmation with the same modal.
   const courseToDelete = useDeleteConfirmation();
   const subjectToDelete = useDeleteConfirmation();
   const offeringToDelete = useDeleteConfirmation();
@@ -85,22 +90,22 @@ function CursosPage() {
 
   const courseOptions = useMemo(
     () =>
-      (courses.data ?? []).map((course) => ({
+      (academicCourses.data ?? []).map((course) => ({
         value: course.id,
         label: course.name,
         hint: course.grade_label,
       })),
-    [courses.data],
+    [academicCourses.data],
   );
 
   const subjectOptions = useMemo(
     () =>
-      (subjects.data ?? []).map((subject) => ({
+      (academicSubjects.data ?? []).map((subject) => ({
         value: subject.id,
         label: subject.name,
         hint: subject.area ?? undefined,
       })),
-    [subjects.data],
+    [academicSubjects.data],
   );
 
   // The pairs already offered, so the form does not offer what exists.
@@ -162,12 +167,182 @@ function CursosPage() {
     setSubjectId("");
   }
 
+  const activeCourses = (courses.data ?? []).filter((course) => course.status === "activo");
+  const coveredCourses = new Set((subjects.data ?? []).flatMap((subject) => subject.courses)).size;
+
   return (
     <>
       <PageHeader
         title="Cursos y materias"
-        subtitle={`${courses.data?.length ?? 0} cursos · ${subjects.data?.length ?? 0} materias`}
+        subtitle="Estructura académica del colegio: cursos, materias y quién las imparte."
+        actions={
+          <Button icon={Plus} onClick={() => toggleBox("course")}>
+            Nuevo curso
+          </Button>
+        }
       />
+
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <SectionCard
+          className="overflow-hidden"
+          bodyClassName="p-0"
+          title="Cursos del colegio"
+          description={`${courses.isLoading ? "—" : activeCourses.length} cursos en el periodo vigente`}
+        >
+          {courses.isError ? (
+            <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
+              {courses.error.message}
+            </p>
+          ) : courses.isLoading ? (
+            <div className="px-[18px] py-4" aria-hidden>
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-4 py-[11px]">
+                  <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                </div>
+              ))}
+            </div>
+          ) : (courses.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="Sin cursos"
+              description="Crea el primer curso del colegio para empezar a estructurar el año."
+              action={
+                <Button icon={Plus} onClick={() => toggleBox("course")}>
+                  Nuevo curso
+                </Button>
+              }
+            />
+          ) : (
+            <TableShell>
+              <PanelTable className="w-full border-collapse">
+                <caption className="sr-only">
+                  Cursos del colegio, con sus materias, sus docentes y su estado
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className={tableHeadClass}>
+                      Curso
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Grado
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Materias
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Docentes
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Estado
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(courses.data ?? []).map((course) => (
+                    <tr key={course.id} className="transition-colors hover:bg-white/[0.025]">
+                      <td className={`${tableCellClass} font-medium text-foreground`}>
+                        {course.name}
+                      </td>
+                      <td className={tableCellClass}>{course.grade_label}</td>
+                      <td
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                      >
+                        {course.subject_count}
+                      </td>
+                      <td
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                      >
+                        {course.teacher_count}
+                      </td>
+                      <td className={tableCellClass}>
+                        <Chip tone={course.status === "activo" ? "teal" : "muted"} dot>
+                          {course.status === "activo" ? "Activo" : "Inactivo"}
+                        </Chip>
+                      </td>
+                      <td className={`${tableCellClass} text-right`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate({ to: "/admin/asignaciones" })}
+                        >
+                          Abrir
+                          <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </PanelTable>
+            </TableShell>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          className="overflow-hidden"
+          bodyClassName="p-0"
+          title="Materias"
+          description={`${subjects.isLoading ? "—" : (subjects.data?.length ?? 0)} materias · ${subjects.isLoading ? "—" : coveredCourses} cursos cubiertos`}
+        >
+          {subjects.isError ? (
+            <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
+              {subjects.error.message}
+            </p>
+          ) : subjects.isLoading ? (
+            <div className="px-[18px] py-4" aria-hidden>
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-3 py-[11px]">
+                  <span className="h-[11px] w-[130px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                  <span className="h-[18px] w-[64px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                </div>
+              ))}
+            </div>
+          ) : (subjects.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="Sin materias"
+              description="Crea la primera materia para poder ofrecerla en los cursos."
+            />
+          ) : (
+            <ul>
+              {(subjects.data ?? []).map((subject) => (
+                <li
+                  key={subject.id}
+                  className="border-b border-[rgba(150,175,220,.08)] px-[18px] py-[13px] last:border-b-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <BookOpen
+                      className="size-[15px] shrink-0 text-primary"
+                      strokeWidth={1.9}
+                      aria-hidden
+                    />
+                    <span className="truncate text-[13.4px] font-medium">{subject.name}</span>
+                    <span className="shrink-0 text-[12px] text-muted-foreground">
+                      {subject.area ?? "Sin área"}
+                    </span>
+                    <span className="ml-auto shrink-0 font-mono text-[12.4px] text-[#A0B2CE]">
+                      {subject.course_count}
+                    </span>
+                  </div>
+                  {subject.courses.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 pl-[23px]">
+                      {subject.courses.map((course) => (
+                        <Chip key={course} tone="muted">
+                          {course}
+                        </Chip>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-1">
@@ -288,7 +463,7 @@ function CursosPage() {
                     value={courseId}
                     onChange={setCourseId}
                     options={courseOptions}
-                    placeholder={courseOptions.length ? "Elegí un curso" : "Primero creá un curso"}
+                    placeholder={courseOptions.length ? "Elige un curso" : "Primero crea un curso"}
                     emptyLabel="Todavía no hay cursos"
                   />
                 </div>
@@ -303,7 +478,7 @@ function CursosPage() {
                     onChange={setSubjectId}
                     options={availableSubjects}
                     placeholder={
-                      availableSubjects.length ? "Elegí una materia" : "Primero creá una materia"
+                      availableSubjects.length ? "Elige una materia" : "Primero crea una materia"
                     }
                     emptyLabel="Todavía no hay materias"
                   />
@@ -327,88 +502,37 @@ function CursosPage() {
         </div>
 
         <div className="space-y-5 lg:col-span-2">
-          <SectionCard title="Cursos del colegio" bodyClassName="p-0">
-            {courses.isLoading ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">Cargando cursos...</p>
-            ) : courses.error ? (
+          <SectionCard title="Materias y cursos" bodyClassName="p-0">
+            {courseSubjects.isLoading ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">Cargando la estructura...</p>
+            ) : courseSubjects.error ? (
               <p role="alert" className="px-5 py-6 text-sm text-destructive">
-                {courses.error.message}
+                {courseSubjects.error.message}
               </p>
-            ) : courses.data && courses.data.length === 0 ? (
+            ) : (courseSubjects.data ?? []).length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">
-                Todavia no hay cursos. Crea el primero con el formulario de la izquierda.
+                Todavía no hay materias ofrecidas en los cursos. Ofrece la primera con el formulario
+                de la izquierda.
               </p>
             ) : (
               <ul className="divide-y divide-border">
-                {courses.data?.map((c) => {
-                  const subjectsInCourse = (courseSubjects.data ?? []).filter(
-                    (cs) => cs.course_id === c.id,
-                  );
+                {(academicSubjects.data ?? []).map((subject) => {
+                  const offeredIn = coursesBySubject.get(subject.id) ?? [];
                   return (
                     <li
-                      key={c.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{c.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {c.grade_label} · {subjectsInCourse.length} materias asociadas
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge tone={c.grade_label ? "success" : "neutral"}>
-                          {c.grade_label ? "Activo" : "Sin grado"}
-                        </StatusBadge>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            courseToDelete.ask({
-                              id: c.id,
-                              title: `el curso "${c.name}"`,
-                              description:
-                                "Se borra el curso y todas las materias que tenías ofrecidas en él, con sus docentes, contenidos y notas. Esta acción no se puede deshacer.",
-                            })
-                          }
-                          disabled={deleteCourse.isPending}
-                          className="rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
-                          aria-label={`Eliminar ${c.name}`}
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Materias" bodyClassName="p-0">
-            {subjects.isLoading ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">Cargando materias...</p>
-            ) : subjects.error ? (
-              <p role="alert" className="px-5 py-6 text-sm text-destructive">
-                {subjects.error.message}
-              </p>
-            ) : subjects.data && subjects.data.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-muted-foreground">
-                Todavia no hay materias. Creá la primera con el formulario de la izquierda.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {subjects.data?.map((s) => {
-                  const offeredIn = coursesBySubject.get(s.id) ?? [];
-                  return (
-                    <li
-                      key={s.id}
+                      key={subject.id}
                       className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-5 py-3.5"
                     >
                       <div className="min-w-0">
                         <span className="flex min-w-0 items-center gap-2 text-sm">
-                          <BookOpen className="size-4 shrink-0 text-primary" strokeWidth={1.75} />
-                          <span className="truncate font-medium">{s.name}</span>
+                          <BookOpen
+                            className="size-4 shrink-0 text-primary"
+                            strokeWidth={1.9}
+                            aria-hidden
+                          />
+                          <span className="truncate font-medium">{subject.name}</span>
                           <span className="shrink-0 text-xs text-muted-foreground">
-                            {s.area ?? "Sin area"}
+                            {subject.area ?? "Sin área"}
                           </span>
                         </span>
                         {offeredIn.length > 0 ? (
@@ -424,14 +548,14 @@ function CursosPage() {
                                   onClick={() =>
                                     offeringToDelete.ask({
                                       id: course.id,
-                                      title: `"${s.name}" de "${course.courseName}"`,
+                                      title: `"${subject.name}" de "${course.courseName}"`,
                                       description:
                                         "La materia deja de ofrecerse en ese curso. También se borran los docentes asignados, los contenidos, las tareas y las notas que dependan de ella.",
                                       confirmLabel: "Quitar materia",
                                     })
                                   }
                                   disabled={deleteCourseSubject.isPending}
-                                  aria-label={`Quitar ${s.name} de ${course.courseName}`}
+                                  aria-label={`Quitar ${subject.name} de ${course.courseName}`}
                                   className="rounded-full p-0.5 hover:bg-background hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   <X className="size-3" />
@@ -449,8 +573,8 @@ function CursosPage() {
                         type="button"
                         onClick={() =>
                           subjectToDelete.ask({
-                            id: s.id,
-                            title: `la materia "${s.name}"`,
+                            id: subject.id,
+                            title: `la materia "${subject.name}"`,
                             description:
                               "Se borra la materia y todas las veces que estaba ofrecida en cursos, con los docentes y las notas asociadas. Esta acción no se puede deshacer.",
                           })
@@ -459,7 +583,7 @@ function CursosPage() {
                         className={cn(
                           "rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60",
                         )}
-                        aria-label={`Eliminar ${s.name}`}
+                        aria-label={`Eliminar ${subject.name}`}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -479,8 +603,66 @@ function CursosPage() {
               </p>
             )}
           </SectionCard>
+
+          <SectionCard title="Cursos" bodyClassName="p-0">
+            {academicCourses.isLoading ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">Cargando cursos...</p>
+            ) : academicCourses.error ? (
+              <p role="alert" className="px-5 py-6 text-sm text-destructive">
+                {academicCourses.error.message}
+              </p>
+            ) : (academicCourses.data ?? []).length === 0 ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">
+                Todavía no hay cursos. Crea el primero con el formulario de la izquierda.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {(academicCourses.data ?? []).map((course) => (
+                  <li
+                    key={course.id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{course.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{course.grade_label}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        courseToDelete.ask({
+                          id: course.id,
+                          title: `el curso "${course.name}"`,
+                          description:
+                            "Se borra el curso y todas las materias que tenías ofrecidas en él, con sus docentes, contenidos y notas. Esta acción no se puede deshacer.",
+                        })
+                      }
+                      disabled={deleteCourse.isPending}
+                      className="rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label={`Eliminar ${course.name}`}
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {deleteCourse.error && (
+              <p role="alert" className="px-5 py-4 text-sm text-destructive">
+                {deleteCourse.error.message}
+              </p>
+            )}
+          </SectionCard>
         </div>
       </div>
+
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>Los conteos de materias y docentes se calculan en el servidor.</span>
+      </p>
 
       <ConfirmDialog
         open={courseToDelete.target !== null}
@@ -522,6 +704,16 @@ function CursosPage() {
     </>
   );
 }
+
+const SUGGESTED_AREAS = [
+  "Matemáticas",
+  "Lengua",
+  "Ciencias",
+  "Sociales",
+  "Inglés",
+  "Arte",
+  "Educación Física",
+];
 
 function NoSchoolFallback({ onSignOut }: { onSignOut: () => void }) {
   return (
