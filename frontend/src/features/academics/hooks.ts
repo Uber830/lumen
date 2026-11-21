@@ -37,6 +37,7 @@ import type {
   UpdateAcademicPeriodInput,
   UpdateCourseInput,
   UpdateSubjectInput,
+  UpdateTeacherAssignmentInput,
 } from "@/features/academics/types";
 
 export const queryKeys = {
@@ -251,6 +252,22 @@ export function useCreateTeacherAssignment(
     mutationFn: (input) => api.post<TeacherAssignment>("/v1/academics/teacher-assignments", input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.teacherAssignments(schoolId) });
+      qc.invalidateQueries({ queryKey: ["school", "assignments"] });
+      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+    },
+  });
+}
+
+export function useUpdateTeacherAssignment(
+  schoolId: string,
+): UseMutationResult<TeacherAssignment, Error, UpdateTeacherAssignmentInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }) =>
+      api.patch<TeacherAssignment>(`/v1/academics/teacher-assignments/${id}`, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.teacherAssignments(schoolId) });
+      qc.invalidateQueries({ queryKey: ["school", "assignments"] });
       qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
     },
   });
@@ -264,6 +281,7 @@ export function useDeleteTeacherAssignment(
     mutationFn: (id) => api.delete<void>(`/v1/academics/teacher-assignments/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.teacherAssignments(schoolId) });
+      qc.invalidateQueries({ queryKey: ["school", "assignments"] });
       qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
     },
   });

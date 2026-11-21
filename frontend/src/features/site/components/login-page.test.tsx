@@ -177,7 +177,14 @@ describe("LoginPage", () => {
         user: { id: "1", email: "ana@colegio.edu.co" },
         profile: null,
         memberships: [
-          { id: "m", school_id: "s", role: "teacher", is_primary: true, joined_at: "" },
+          {
+            id: "m",
+            school_id: "s",
+            role: "teacher",
+            admin_role: null,
+            is_primary: true,
+            joined_at: "",
+          },
         ],
         platform_role: null,
         primary_school_id: "s",
@@ -221,6 +228,8 @@ describe("destinationForSession", () => {
     platform_role: null,
     primary_school_id: null,
     school: null,
+    permissions: [],
+    current_period: null,
     ...overrides,
   });
 
@@ -230,7 +239,14 @@ describe("destinationForSession", () => {
       destinationForSession(
         session({
           memberships: [
-            { id: "m", school_id: "s", role: "school_admin", is_primary: true, joined_at: "" },
+            {
+              id: "m",
+              school_id: "s",
+              role: "school_admin",
+              admin_role: "principal",
+              is_primary: true,
+              joined_at: "",
+            },
           ],
         }),
       ),
@@ -239,7 +255,14 @@ describe("destinationForSession", () => {
       destinationForSession(
         session({
           memberships: [
-            { id: "m", school_id: "s", role: "teacher", is_primary: true, joined_at: "" },
+            {
+              id: "m",
+              school_id: "s",
+              role: "teacher",
+              admin_role: null,
+              is_primary: true,
+              joined_at: "",
+            },
           ],
         }),
       ),
@@ -248,7 +271,14 @@ describe("destinationForSession", () => {
       destinationForSession(
         session({
           memberships: [
-            { id: "m", school_id: "s", role: "student", is_primary: true, joined_at: "" },
+            {
+              id: "m",
+              school_id: "s",
+              role: "student",
+              admin_role: null,
+              is_primary: true,
+              joined_at: "",
+            },
           ],
         }),
       ),

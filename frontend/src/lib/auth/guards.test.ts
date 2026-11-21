@@ -11,6 +11,8 @@ function session(overrides: Partial<SessionContext> = {}): SessionContext {
     platformRole: null,
     primarySchoolId: null,
     school: null,
+    currentPeriod: null,
+    permissions: [],
     ...overrides,
   };
 }

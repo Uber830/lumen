@@ -36,6 +36,7 @@ from app.notifications.router import router as notifications_router
 from app.plans.router import router as plans_router
 from app.platform.catalog_router import router as platform_catalog_router
 from app.platform.router import router as platform_router
+from app.school.router import router as school_router
 from app.schools.router import router as schools_router
 from app.site.router import router as site_router
 from app.subscriptions.router import router as subscriptions_router
@@ -165,6 +166,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(notifications_router)
     app.include_router(plans_router)
+    app.include_router(school_router)
     app.include_router(schools_router)
     app.include_router(platform_router)
     app.include_router(platform_catalog_router)

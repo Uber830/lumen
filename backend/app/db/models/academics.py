@@ -30,7 +30,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, created_at, updated_at
-from app.db.enums import AcademicPeriodModality, EnrollmentStatus, pg_enum
+from app.db.enums import (
+    AcademicPeriodModality,
+    DeliveryModality,
+    EnrollmentStatus,
+    pg_enum,
+)
 
 
 class AcademicPeriod(Base):
@@ -75,6 +80,18 @@ class AcademicPeriod(Base):
         nullable=False,
         default=False,
         server_default=text("false"),
+    )
+    # When the period was closed. Its material stays in the history of
+    # the school, out of the active material.
+    closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Whether the period was given in person, online or in a mixed
+    # way. Not the length of the cycle, which is `modality`.
+    delivery_modality: Mapped[DeliveryModality | None] = mapped_column(
+        pg_enum(DeliveryModality, "delivery_modality"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = created_at()
     updated_at: Mapped[datetime] = updated_at()

@@ -1,15 +1,26 @@
-import { useRouteContext, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { CalendarRange, Lock, Plus, X } from "lucide-react";
 import { useState } from "react";
-import { CalendarRange, Plus, Trash2 } from "lucide-react";
-import { PageHeader, SectionCard } from "@/components/ui-kit";
-import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
-import { StatusBadge, toneForEstado } from "@/components/status-badge";
+
 import {
-  useAcademicPeriods,
-  useCreateAcademicPeriod,
-  useDeleteAcademicPeriod,
-  useUpdateAcademicPeriod,
-} from "@/features/academics/hooks";
+  Button,
+  PanelTable,
+  Chip,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+  TableShell,
+  tableCellClass,
+  tableHeadClass,
+} from "@/components/ui-kit";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useCreateAcademicPeriod, useDeleteAcademicPeriod } from "@/features/academics/hooks";
+import {
+  useClosePeriod,
+  useSchoolPeriods,
+  useSetCurrentPeriod,
+  type SchoolPeriod,
+} from "@/lib/school/cycles";
 
 export const Route = createFileRoute("/admin/periodos")({
   head: () => ({
@@ -17,7 +28,7 @@ export const Route = createFileRoute("/admin/periodos")({
       { title: "Períodos académicos — Lumen" },
       {
         name: "description",
-        content: "Configurá bimestres, trimestres o semestres con fechas de inicio y fin.",
+        content: "Ciclo lectivo y modalidad. El contenido se archiva al cerrar un periodo.",
       },
       { property: "og:title", content: "Períodos académicos — Lumen" },
       {
@@ -45,18 +56,28 @@ const MODALITIES = [
 function periodErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : "";
   if (/already exists/i.test(raw)) {
-    return "Ya existe un período con ese nombre. Usá un nombre distinto (por ejemplo, 2do Trimestre).";
+    return "Ya existe un período con ese nombre. Usa un nombre distinto (por ejemplo, 2do Trimestre).";
   }
   return raw || "No se pudo crear el período.";
+}
+
+/** The date, the way the panel writes them: 14/11/2026. */
+function shortDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${date.getFullYear()}`;
 }
 
 function PeriodosPage() {
   const { session } = useRouteContext({ from: "/admin/periodos" });
   const schoolId = session.primarySchoolId;
 
-  const periods = useAcademicPeriods(schoolId);
+  const periods = useSchoolPeriods();
+  const close = useClosePeriod();
+  const setCurrent = useSetCurrentPeriod();
   const create = useCreateAcademicPeriod(schoolId ?? "");
-  const update = useUpdateAcademicPeriod(schoolId ?? "");
   const remove = useDeleteAcademicPeriod(schoolId ?? "");
 
   const [name, setName] = useState("");
@@ -66,20 +87,30 @@ function PeriodosPage() {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [dateError, setDateError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  // The period the admin is about to close, and the one to delete.
+  const [toClose, setToClose] = useState<SchoolPeriod | null>(null);
+  const [toDelete, setToDelete] = useState<SchoolPeriod | null>(null);
 
-  // The deletion asks for confirmation with the shared modal.
-  const periodToDelete = useDeleteConfirmation();
+  // The frontend does not decide what the rank may do: it receives the
+  // list from the API. A closed action is disabled **with the reason**,
+  // not invisible.
+  const canClose = session.permissions.includes("periods.close");
+  const current = (periods.data ?? []).find((period) => period.status === "vigente") ?? null;
 
-  if (!schoolId) {
-    return (
-      <div className="surface-card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-xl font-semibold">No hay colegio activo</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Tu cuenta no está asociada a un colegio todavía.
-        </p>
-      </div>
-    );
-  }
+  // The reason of a control that does not work is read by the screen
+  // reader, not only by the mouse that rests on it.
+  const closeReason = !canClose
+    ? "Cerrar un periodo lo hace el administrador principal del colegio."
+    : !current
+      ? "No hay un periodo vigente que cerrar."
+      : "";
+  const currentReason = (period: SchoolPeriod) =>
+    !canClose
+      ? "Marcar un periodo vigente lo hace el administrador principal del colegio."
+      : period.status === "vigente"
+        ? "Este periodo ya es el vigente."
+        : "";
 
   async function onCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,27 +133,77 @@ function PeriodosPage() {
       setName("");
       setStart("");
       setEnd("");
+      setFormOpen(false);
     } catch {
       // The error is shown below the form, in Spanish.
     }
-  }
-
-  async function onMarkCurrent(id: string, isCurrent: boolean) {
-    if (isCurrent) return;
-    await update.mutateAsync({ id, patch: { is_current: true } });
   }
 
   return (
     <>
       <PageHeader
         title="Períodos académicos"
-        subtitle={`Ciclo lectivo · ${periods.data?.length ?? 0} períodos configurados`}
-        actions={<CalendarRange className="size-5 text-muted-foreground" aria-hidden />}
+        subtitle="Ciclo lectivo y modalidad. El contenido se archiva al cerrar un periodo."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              icon={Lock}
+              aria-disabled={!canClose || !current}
+              aria-describedby={closeReason ? "periodos-close-reason" : undefined}
+              title={
+                canClose
+                  ? current
+                    ? "Cerrar el periodo vigente"
+                    : "No hay un periodo vigente que cerrar"
+                  : "Esta acción la hace el administrador principal del colegio."
+              }
+              onClick={() => {
+                if (!canClose || !current) return;
+                setToClose(current);
+              }}
+            >
+              Cerrar periodo
+            </Button>
+            <Button icon={Plus} onClick={() => setFormOpen((open) => !open)}>
+              Nuevo periodo
+            </Button>
+          </>
+        }
       />
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <SectionCard title="Nuevo período" className="lg:col-span-1">
-          <form className="space-y-3" onSubmit={onCreate}>
+      {/* The current period is permanent context: it says where the
+          school is, and it is the one the close acts on. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+        <Chip tone="teal" dot>
+          {periods.isLoading
+            ? "Buscando el periodo vigente..."
+            : current
+              ? `Vigente: ${current.name}`
+              : "Sin periodo vigente"}
+        </Chip>
+        {current && !periods.isLoading && (
+          <span className="text-[12.4px] text-muted-foreground">
+            {shortDate(current.start_date)} — {shortDate(current.end_date)} ·{" "}
+            {current.delivery_modality ?? current.modality}
+          </span>
+        )}
+        {!canClose && (
+          <span className="text-[12.4px] text-muted-foreground">
+            El cierre de periodos es del administrador principal.
+          </span>
+        )}
+      </div>
+
+      {closeReason && (
+        <p id="periodos-close-reason" className="sr-only">
+          {closeReason}
+        </p>
+      )}
+
+      {formOpen && (
+        <SectionCard className="mb-4" title="Nuevo periodo" bodyClassName="p-0">
+          <form className="space-y-3 p-4" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre
@@ -132,36 +213,29 @@ function PeriodosPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="1er Trimestre 2026"
+                placeholder="4to Trimestre 2026"
                 className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                El nombre tiene que ser distinto en cada período. Podés crear todos los que
-                necesites.
-              </p>
             </label>
-            <div>
+            <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Modalidad
               </span>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {MODALITIES.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setModality(m.id)}
-                    className={
-                      modality === m.id
-                        ? "rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground"
-                        : "rounded-lg border border-border px-3.5 py-1.5 text-xs font-semibold hover:bg-muted"
-                    }
-                  >
-                    {m.label}
-                  </button>
+              <select
+                value={modality}
+                onChange={(e) =>
+                  setModality(e.target.value as "bimestre" | "trimestre" | "semestre" | "anual")
+                }
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {MODALITIES.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
                 ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+              </select>
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Inicio
@@ -187,97 +261,218 @@ function PeriodosPage() {
                 />
               </label>
             </div>
-            <button
-              type="submit"
-              disabled={create.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Plus className="size-4" />
-              {create.isPending ? "Creando..." : "Crear período"}
-            </button>
             {dateError && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {dateError}
               </p>
             )}
             {create.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {periodErrorMessage(create.error)}
               </p>
             )}
+            <div className="flex items-center gap-2">
+              <Button type="submit" icon={CalendarRange} disabled={create.isPending}>
+                {create.isPending ? "Creando..." : "Crear periodo"}
+              </Button>
+              <Button
+                variant="ghost"
+                icon={X}
+                onClick={() => {
+                  setFormOpen(false);
+                  setDateError(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
           </form>
         </SectionCard>
+      )}
 
-        <SectionCard title="Períodos configurados" className="lg:col-span-2" bodyClassName="p-0">
-          {periods.isLoading ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground">Cargando períodos...</p>
-          ) : periods.error ? (
-            <p role="alert" className="px-5 py-6 text-sm text-destructive">
-              {periods.error.message}
-            </p>
-          ) : periods.data && periods.data.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground">
-              Crea el primer período con el formulario de la izquierda.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {periods.data?.map((p) => (
-                <li
-                  key={p.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-5 py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{p.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {p.start_date} → {p.end_date} · {p.modality}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge tone={toneForEstado(p.is_current ? "Activo" : "Pendiente")}>
-                      {p.is_current ? "Vigente" : "No vigente"}
-                    </StatusBadge>
-                    <button
-                      type="button"
-                      onClick={() => onMarkCurrent(p.id, p.is_current)}
-                      disabled={p.is_current || update.isPending}
-                      className="rounded-lg border border-border px-2.5 py-1 text-xs font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Marcar vigente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        periodToDelete.ask({
-                          id: p.id,
-                          title: `el período "${p.name}"`,
-                          description:
-                            "Se borran también las notas registradas en este período. Esta acción no se puede deshacer.",
-                        })
-                      }
-                      disabled={remove.isPending}
-                      className="rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
-                      aria-label={`Eliminar ${p.name}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-      </div>
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        {periods.isError ? (
+          <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
+            {periods.error.message}
+          </p>
+        ) : periods.isLoading ? (
+          <div className="px-[18px] py-4" aria-hidden>
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="flex items-center gap-4 py-[11px]">
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[18px] w-[70px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+              </div>
+            ))}
+          </div>
+        ) : (periods.data?.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={CalendarRange}
+            title="Sin periodos"
+            description="Crea el primer periodo académico del colegio para poder trabajar con notas y material."
+            action={
+              <Button icon={Plus} onClick={() => setFormOpen(true)}>
+                Nuevo periodo
+              </Button>
+            }
+          />
+        ) : (
+          <TableShell>
+            <PanelTable className="w-full border-collapse">
+              <caption className="sr-only">
+                Periodos académicos del colegio, con su modalidad y su estado
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" className={tableHeadClass}>
+                    Periodo
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Inicio
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Fin
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Modalidad
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Estado
+                  </th>
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Acción
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(periods.data ?? []).map((period) => (
+                  <tr key={period.id} className="transition-colors hover:bg-white/[0.025]">
+                    <td className={`${tableCellClass} font-medium text-foreground`}>
+                      {period.name}
+                    </td>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      {shortDate(period.start_date)}
+                    </td>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      {shortDate(period.end_date)}
+                    </td>
+                    <td className={tableCellClass}>
+                      {period.delivery_modality ?? period.modality}
+                    </td>
+                    <td className={tableCellClass}>
+                      <Chip
+                        tone={
+                          period.status === "vigente"
+                            ? "ok"
+                            : period.status === "future"
+                              ? "info"
+                              : "muted"
+                        }
+                        dot
+                      >
+                        {period.status === "vigente"
+                          ? "Vigente"
+                          : period.status === "future"
+                            ? "Por iniciar"
+                            : "Cerrado"}
+                      </Chip>
+                    </td>
+                    <td className={`${tableCellClass} text-right`}>
+                      {currentReason(period) && (
+                        <span id={`periodos-current-${period.id}`} className="sr-only">
+                          {currentReason(period)}
+                        </span>
+                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-disabled={!canClose || period.status === "vigente"}
+                          aria-describedby={
+                            currentReason(period) ? `periodos-current-${period.id}` : undefined
+                          }
+                          title={
+                            canClose
+                              ? period.status === "vigente"
+                                ? "Este periodo ya es el vigente"
+                                : "Marcar este periodo como vigente"
+                              : "Esta acción la hace el administrador principal del colegio."
+                          }
+                          onClick={() => {
+                            if (!canClose || period.status === "vigente") return;
+                            setCurrent.mutate(period.id);
+                          }}
+                        >
+                          Marcar vigente
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={X}
+                          onClick={() => setToDelete(period)}
+                          disabled={remove.isPending}
+                        >
+                          Quitar
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PanelTable>
+          </TableShell>
+        )}
+        {(close.error || setCurrent.error || remove.error) && (
+          <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
+            {(close.error ?? setCurrent.error ?? remove.error)?.message}
+          </p>
+        )}
+      </SectionCard>
+
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>
+          Al cerrar un periodo, el material de ese ciclo se archiva para el colegio: queda en el
+          histórico y sale del material activo.
+        </span>
+      </p>
 
       <ConfirmDialog
-        open={periodToDelete.target !== null}
-        title={`Eliminar ${periodToDelete.target?.title ?? ""}`}
-        description={periodToDelete.target?.description}
-        pending={remove.isPending}
-        onCancel={periodToDelete.close}
+        open={toClose !== null}
+        title={toClose ? `Cerrar ${toClose.name}` : "Cerrar periodo"}
+        description={
+          toClose
+            ? `Se cerrará el ${toClose.name}. Las tareas y notas del periodo quedarán en histórico y el material de este ciclo se archivará para el colegio.`
+            : undefined
+        }
+        confirmLabel="Cerrar periodo"
+        pending={close.isPending}
+        onCancel={() => setToClose(null)}
         onConfirm={() => {
-          const id = periodToDelete.target?.id;
-          if (!id) return;
-          remove.mutate(id, { onSuccess: periodToDelete.close });
+          if (!toClose) return;
+          close.mutate(toClose.id, { onSuccess: () => setToClose(null) });
+        }}
+      />
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={toDelete ? `Eliminar ${toDelete.name}` : "Eliminar periodo"}
+        description={
+          toDelete
+            ? "Se borra el periodo con sus notas y tareas. Esta acción no se puede deshacer."
+            : undefined
+        }
+        confirmLabel="Eliminar periodo"
+        pending={remove.isPending}
+        onCancel={() => setToDelete(null)}
+        onConfirm={() => {
+          if (!toDelete) return;
+          remove.mutate(toDelete.id, { onSuccess: () => setToDelete(null) });
         }}
       />
     </>

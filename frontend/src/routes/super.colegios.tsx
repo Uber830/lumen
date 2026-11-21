@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  EmptyHint,
+  EmptyState,
   PageHeader,
   Pagination,
   SearchField,
@@ -104,7 +104,7 @@ function Colegios() {
         {schools.isLoading ? (
           <SkeletonRows rows={6} columns={6} />
         ) : (schools.data?.items.length ?? 0) === 0 ? (
-          <EmptyHint
+          <EmptyState
             title="Sin colegios"
             description="Los filtros no encontraron ninguna institución en la red."
           />

@@ -26,6 +26,7 @@ from app.db.models import (
     MaterialSchool,
     School,
 )
+from app.platform import catalog
 
 # The endpoints commit their writes, so the rows they create are
 # removed before and after each test.
@@ -56,12 +57,13 @@ def test_a_material_that_is_missing_something_says_what() -> None:
     from app.platform.catalog import publication_gaps
 
     material = Material(
-        code="C-0001",
+        ref="C-0001",
         title="Matemáticas 7",
         type="Libro",
         area="Matemáticas",
+        kind="pdf",
         grades=["7°"],
-        status="draft",
+        state="borrador",
     )
 
     assert publication_gaps(material, school_count=1) == []
@@ -233,14 +235,15 @@ async def _make_material(
 ) -> Material:
     """A material straight in the database."""
     material = Material(
-        code=f"C-{uuid.uuid4().hex[:8].upper()}",
+        ref=f"C-{uuid.uuid4().hex[:8].upper()}",
         title=title,
         type=material_type,
         area=area,
+        kind="pdf",
         grades=grades if grades is not None else ["7°"],
         visible_to="all",
         origin="upload",
-        status=status,
+        state=catalog.state_of(status),
         created_at=datetime.now(UTC),
     )
     async with AsyncSession(bind=engine, expire_on_commit=False) as session:

@@ -37,6 +37,7 @@ from app.core.tokens import (
 )
 from app.db.enums import SchoolRole
 from app.db.models import (
+    AcademicPeriod,
     PasswordResetToken,
     PlatformRole,
     Profile,
@@ -78,6 +79,9 @@ class UserSession:
     # logo: without it the page would start with the default theme and
     # repaint a second later.
     school: School | None = None
+    # The academic period the school is in. The top bar shows it as
+    # the context of the session.
+    current_period: str | None = None
 
     @property
     def primary_school_id(self) -> uuid.UUID | None:
@@ -145,6 +149,7 @@ async def load_session_context(
     # can paint itself with the school's colours and logo on the very
     # first frame instead of a second later.
     school = await _load_primary_school(session, memberships)
+    current_period = await _load_current_period(session, memberships)
 
     return UserSession(
         user_id=user.id,
@@ -153,7 +158,31 @@ async def load_session_context(
         memberships=memberships,
         platform_role=platform_role.role.value if platform_role else None,
         school=school,
+        current_period=current_period,
     )
+
+
+async def _load_current_period(
+    session: AsyncSession,
+    memberships: list[SchoolMembership],
+) -> str | None:
+    """The name of the period the school is in, if it has one open."""
+    if not memberships:
+        return None
+
+    primary = next((m for m in memberships if m.is_primary), None)
+    school_id = primary.school_id if primary is not None else memberships[0].school_id
+
+    result = await session.execute(
+        select(AcademicPeriod)
+        .where(
+            AcademicPeriod.school_id == school_id,
+            AcademicPeriod.is_current.is_(True),
+        )
+        .limit(1)
+    )
+    period = result.scalar_one_or_none()
+    return period.name if period else None
 
 
 async def _load_primary_school(
@@ -327,6 +356,10 @@ async def authenticate(
         # now that we have the plaintext.
         user.password_hash = hash_password(password)
         await session.flush()
+
+    # The account was used just now.
+    user.last_login_at = datetime.now(UTC)
+    await session.flush()
 
     return user
 

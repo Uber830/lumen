@@ -3,7 +3,7 @@ import { Search, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
-  EmptyHint,
+  EmptyState,
   ExtraCount,
   PageHeader,
   Pagination,
@@ -154,7 +154,7 @@ function Catalogo() {
         {catalog.isLoading ? (
           <SkeletonRows rows={6} columns={6} />
         ) : items.length === 0 ? (
-          <EmptyHint
+          <EmptyState
             title="Sin material en el catálogo"
             description={
               filtersActive

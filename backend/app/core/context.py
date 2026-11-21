@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ForbiddenError, NotFoundError
-from app.db.enums import SchoolRole
+from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.models import PlatformRole, SchoolMembership
 
 
@@ -39,6 +39,9 @@ class Membership:
     role: SchoolRole
     is_primary: bool
     joined_at: datetime
+    # The rank of an administrator: principal or secundario. It is
+    # None for teachers and students.
+    admin_role: SchoolAdminRole | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +169,7 @@ async def load_context(
             id=row.id,
             school_id=row.school_id,
             role=row.role,
+            admin_role=row.admin_role,
             is_primary=row.is_primary,
             joined_at=row.joined_at,
         )

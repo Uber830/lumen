@@ -7,6 +7,7 @@ on.
 The modules are grouped by domain:
 
 - `identity`   — users, profiles, platform roles, schools, memberships, plans.
+- `materials`  — the editorial catalog and the schools it is enabled for.
 - `academics`  — periods, courses, subjects, assignments, enrollments.
 - `learning`   — content, tasks, submissions, grades.
 - `chat`       — conversations, members, messages.
@@ -34,6 +35,7 @@ from app.db.models.billing import Entitlement, Subscription, WompiEventProcessed
 from app.db.models.catalog import (
     AuditLog,
     Material,
+    MaterialCourse,
     MaterialFile,
     MaterialHistory,
     MaterialSchool,
@@ -47,6 +49,7 @@ from app.db.models.evaluations import (
     EvaluationQuestion,
 )
 from app.db.models.icfes import (
+    IcfesActivation,
     IcfesAnswer,
     IcfesAnswerKey,
     IcfesAttempt,
@@ -54,6 +57,8 @@ from app.db.models.icfes import (
     IcfesScore,
     IcfesSimulation,
     IcfesSimulationQuestion,
+    IcfesSimulator,
+    IcfesSimulatorSchool,
 )
 from app.db.models.identity import (
     Plan,
@@ -61,6 +66,7 @@ from app.db.models.identity import (
     Profile,
     School,
     SchoolMembership,
+    SchoolSettings,
     User,
 )
 from app.db.models.learning import (
@@ -78,6 +84,7 @@ from app.db.models.sessions import (
     RefreshToken,
 )
 from app.db.models.site import SiteContent
+from app.db.models.support import SupportCase, SupportMessage
 
 __all__ = [
     "AcademicPeriod",
@@ -97,6 +104,7 @@ __all__ = [
     "EvaluationAttempt",
     "EvaluationQuestion",
     "Grade",
+    "IcfesActivation",
     "IcfesAnswer",
     "IcfesAnswerKey",
     "IcfesAttempt",
@@ -104,8 +112,11 @@ __all__ = [
     "IcfesScore",
     "IcfesSimulation",
     "IcfesSimulationQuestion",
+    "IcfesSimulator",
+    "IcfesSimulatorSchool",
     "LoginAttempt",
     "Material",
+    "MaterialCourse",
     "MaterialFile",
     "MaterialHistory",
     "MaterialSchool",
@@ -119,7 +130,10 @@ __all__ = [
     "EmailVerificationToken",
     "School",
     "SchoolMembership",
+    "SchoolSettings",
     "SiteContent",
+    "SupportCase",
+    "SupportMessage",
     "StudentEnrollment",
     "Subject",
     "Subscription",

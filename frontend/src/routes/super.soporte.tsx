@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  EmptyHint,
+  EmptyState,
   PageHeader,
   Pagination,
   SkeletonRows,
@@ -103,7 +103,7 @@ function Soporte() {
         {audit.isLoading ? (
           <SkeletonRows rows={6} columns={4} />
         ) : (audit.data?.items.length ?? 0) === 0 ? (
-          <EmptyHint
+          <EmptyState
             title="Sin eventos"
             description="No hay movimientos de la red que coincidan con el filtro."
           />
