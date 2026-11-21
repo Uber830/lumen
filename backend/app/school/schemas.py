@@ -362,3 +362,34 @@ class PeriodCurrentOut(BaseModel):
     closed_previous: list[str] = Field(default_factory=list)
 
 
+class ContrastOut(BaseModel):
+    """The contrast of the primary colour of the school.
+
+    The backend calculates it: the ratio against the background of the
+    panel and against the surface of the cards, and the minimum of the
+    two. The interface shows it next to the colour.
+    """
+
+    background_ratio: float
+    surface_ratio: float
+    min_ratio: float
+    minimum: float = 4.5
+
+
+class SchoolIdentityOut(BaseModel):
+    """The visible identity of the school."""
+
+    display_name: str
+    name: str
+    logo_url: str | None = None
+    primary_color: str | None = None
+    contrast: ContrastOut | None = None
+
+
+class SchoolIdentityUpdate(BaseModel):
+    """What the school can change of its identity."""
+
+    display_name: str | None = None
+    primary_color: str | None = None
+
+

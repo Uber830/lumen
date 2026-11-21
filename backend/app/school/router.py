@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
@@ -26,7 +26,7 @@ from app.core.errors import NotFoundError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
-from app.school import community, cycles, operations
+from app.school import community, cycles, identity, operations
 from app.school.schemas import (
     AdminSchoolOut,
     AdminUserOut,
@@ -40,6 +40,8 @@ from app.school.schemas import (
     PeriodCurrentOut,
     PeriodOut,
     SchoolAdminMe,
+    SchoolIdentityOut,
+    SchoolIdentityUpdate,
     SchoolOverview,
     SubjectOut,
 )
@@ -336,5 +338,73 @@ async def set_current_school_period(
     require_permission(membership.admin_role, SchoolPermission.PERIODS_CLOSE)
     current = await cycles.set_current_period(session, membership.school_id, period_id)
     return PeriodCurrentOut.model_validate(current)
+
+
+@router.get("/settings", response_model=SchoolIdentityOut)
+async def school_identity(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolIdentityOut:
+    """The visible identity of the school, with the contrast of its colour.
+
+    Any administrator reads it. Changing it is the principal's.
+    """
+    membership = _require_admin(context)
+    identity_data = await identity.get_identity(session, membership.school_id)
+    return SchoolIdentityOut.model_validate(identity_data)
+
+
+@router.patch("/settings", response_model=SchoolIdentityOut)
+async def update_school_identity(
+    body: SchoolIdentityUpdate,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolIdentityOut:
+    """Change the name and the colour of the school.
+
+    The colour is validated in the backend: a colour below 4.5:1 of
+    contrast is refused, and the refusal carries the ratio so the
+    interface can say how far it is from the minimum.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.CUSTOMIZATION_WRITE)
+    identity_data = await identity.update_identity(
+        session,
+        membership.school_id,
+        display_name=body.display_name,
+        primary_color=body.primary_color,
+    )
+    return SchoolIdentityOut.model_validate(identity_data)
+
+
+@router.post("/logo", response_model=SchoolIdentityOut)
+async def upload_school_logo(
+    file: Annotated[UploadFile, File()],
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolIdentityOut:
+    """Upload the shield of the school.
+
+    The type is read from the content and not from what the browser
+    says: PNG, SVG or JPEG, and no more than 2 MB.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.CUSTOMIZATION_WRITE)
+
+    content = await file.read()
+    content_type = identity.validate_logo(content, file.content_type or "")
+
+    from app.core import supabase_storage
+
+    logo_url = await supabase_storage.upload_school_logo(
+        school_id=str(membership.school_id),
+        content=content,
+        content_type=content_type,
+    )
+
+    await identity.set_logo(session, membership.school_id, logo_url)
+
+    identity_data = await identity.get_identity(session, membership.school_id)
+    return SchoolIdentityOut.model_validate(identity_data)
 
 
