@@ -14,13 +14,14 @@ schools exist.
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_permissions import permissions_for
-from app.core.context import RequestContext
+from app.core.context import Membership, RequestContext
 from app.core.errors import NotFoundError
 from app.db.enums import SchoolRole
 from app.db.session import get_db
@@ -30,10 +31,31 @@ from app.school.schemas import (
     AdminSchoolOut,
     AdminUserOut,
     CurrentPeriodOut,
+    MaterialDetailOut,
+    MaterialPage,
     SchoolAdminMe,
+    SchoolOverview,
 )
 
 router = APIRouter(prefix="/v1/school", tags=["school"])
+
+
+def _require_admin(context: RequestContext) -> Membership:
+    """The membership of the administrator, or a refusal.
+
+    The school comes from the session. The caller that belongs to a
+    school but not as an administrator gets a 403: it already knows
+    the school exists, so there is nothing to hide.
+    """
+    from app.core.errors import ForbiddenError
+
+    membership = context.require_any_membership()
+    if membership.role != SchoolRole.SCHOOL_ADMIN:
+        raise ForbiddenError(
+            "Only school administrators can see this panel.",
+            code="insufficient_role",
+        )
+    return membership
 
 
 @router.get("/me", response_model=SchoolAdminMe)
@@ -47,16 +69,7 @@ async def school_me(
     the frontend shows what is on the list and disables the rest with
     its reason.
     """
-    membership = context.require_any_membership()
-    if membership.role != SchoolRole.SCHOOL_ADMIN:
-        # The caller belongs to a school, but not as an administrator:
-        # it knows the school exists, so a 403 is honest here.
-        from app.core.errors import ForbiddenError
-
-        raise ForbiddenError(
-            "Only school administrators can see this panel.",
-            code="insufficient_role",
-        )
+    membership = _require_admin(context)
 
     school = await operations.get_school(session, membership.school_id)
     if school is None:
@@ -106,4 +119,67 @@ async def school_me(
     )
 
 
-__all__ = ["router"]
+@router.get("/material", response_model=MaterialPage)
+async def list_school_material(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    q: Annotated[str | None, Query(description="Título, área o ID del material")] = None,
+    area: Annotated[str | None, Query(description="El área del material")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50)] = 6,
+) -> MaterialPage:
+    """The material enabled for the school.
+
+    Read only: the school consumes the material, it does not publish
+    it. The filters and the pagination run in the server.
+    """
+    membership = _require_admin(context)
+    page_data = await operations.list_material(
+        session,
+        membership.school_id,
+        query=q,
+        area=area,
+        page=page,
+        per_page=per_page,
+    )
+    return MaterialPage.model_validate(page_data)
+
+
+@router.get("/material/{material_id}", response_model=MaterialDetailOut)
+async def get_school_material(
+    material_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetailOut:
+    """One material of the school, with its access confirmed.
+
+    A material that is not enabled for this school answers 404: the
+    endpoint must not confirm that the material of another school
+    exists.
+    """
+    membership = _require_admin(context)
+    material = await operations.get_material(session, membership.school_id, material_id)
+    if material is None:
+        raise NotFoundError("Material not found.")
+    return MaterialDetailOut.model_validate(material)
+
+
+@router.get("/overview", response_model=SchoolOverview)
+async def school_overview(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolOverview:
+    """Return the dashboard of the school in a single call.
+
+    The dashboard is the view that suffers the most in mobile, so it
+    asks for everything at once instead of four round trips: the
+    indicators, the material by area, the state of the school and the
+    recent activity.
+
+    Every number is counted from the rows of the caller's own school.
+    """
+    membership = _require_admin(context)
+    overview = await operations.get_overview(session, membership.school_id)
+    return SchoolOverview.model_validate(overview)
+
+
