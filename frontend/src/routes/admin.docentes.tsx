@@ -1,16 +1,24 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import { Plus, Upload } from "lucide-react";
-import { PageHeader, SectionCard } from "@/components/ui-kit";
-import { StatusBadge } from "@/components/status-badge";
+import { Plus, Search, Upload, UserRoundX } from "lucide-react";
+import { useRef, useState } from "react";
+
 import {
-  useCourseSubjects,
-  useSchoolMembers,
-  useTeacherAssignments,
-} from "@/features/academics/hooks";
+  Button,
+  PanelTable,
+  Chip,
+  EmptyState,
+  PageHeader,
+  Pagination,
+  SectionCard,
+  TableShell,
+  Toolbar,
+  tableCellClass,
+  tableHeadClass,
+} from "@/components/ui-kit";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
+import type { SchoolMember } from "@/features/academics/types";
 import {
   activationLink,
   parseCsvInvitations,
@@ -18,7 +26,8 @@ import {
   useInviteUser,
   type InviteUserResult,
 } from "@/lib/users/invitations";
-import type { SchoolMember } from "@/features/academics/types";
+import { useSchoolCourses, useSchoolTeachers, type SchoolMemberRow } from "@/lib/school/community";
+import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/docentes")({
   head: () => ({
@@ -31,7 +40,7 @@ export const Route = createFileRoute("/admin/docentes")({
       { property: "og:title", content: "Docentes — Lumen" },
       {
         property: "og:description",
-        content: "Administrá el plantel docente de tu institución.",
+        content: "Administra el plantel docente de tu institución.",
       },
     ],
   }),
@@ -41,9 +50,17 @@ export const Route = createFileRoute("/admin/docentes")({
 function DocentesPage() {
   const { session } = useRouteContext({ from: "/admin/docentes" });
   const schoolId = session.primarySchoolId;
-  const teachers = useSchoolMembers(schoolId, "teacher", true);
-  const assignments = useTeacherAssignments(schoolId);
-  const courseSubjects = useCourseSubjects(schoolId);
+
+  // The list is filtered and paginated in the server: the school may
+  // have hundreds of teachers and the browser never sees all of them.
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [courseId, setCourseId] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const teachers = useSchoolTeachers({ q: query, status, course_id: courseId, page });
+  const courses = useSchoolCourses();
+
   const invite = useInviteUser();
   const bulkInvite = useBulkInviteUsers();
 
@@ -61,34 +78,45 @@ function DocentesPage() {
     failures: BulkImportFailure[];
   } | null>(null);
   // The teacher whose management modal is open.
-  const [selectedTeacher, setSelectedTeacher] = useState<SchoolMember | null>(null);
+  const [selectedTeacher, setSelectedTeacher] = useState<SchoolMemberRow | null>(null);
 
-  // The courses each teacher teaches, so the table can show them.
-  const coursesByTeacher = useMemo(() => {
-    const labelByCourseSubject = new Map(
-      (courseSubjects.data ?? []).map((cs) => [cs.id, `${cs.course_name} · ${cs.subject_name}`]),
-    );
-    const map = new Map<string, string[]>();
-    for (const assignment of assignments.data ?? []) {
-      const label = labelByCourseSubject.get(assignment.course_subject_id);
-      if (!label) continue;
-      const list = map.get(assignment.teacher_id) ?? [];
-      list.push(label);
-      map.set(assignment.teacher_id, list);
-    }
-    return map;
-  }, [assignments.data, courseSubjects.data]);
+  const total = teachers.data?.total ?? 0;
 
-  if (!schoolId) {
-    return (
-      <div className="surface-card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-xl font-semibold">No hay colegio activo</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Tu cuenta no está asociada a un colegio.
-        </p>
-      </div>
-    );
+  // The dialog of the old view works with the member of the school. The
+  // row of the new list carries everything it needs.
+  function asMember(row: SchoolMemberRow): SchoolMember {
+    return {
+      membership_id: row.membership_id,
+      school_id: schoolId ?? "",
+      user_id: row.user_id,
+      role: "teacher",
+      is_primary: true,
+      joined_at: row.joined_at,
+      full_name: row.full_name ?? "",
+      email: row.email,
+      phone: null,
+      avatar_url: null,
+      revoked_at: row.revoked_at,
+      account_activated: row.account_activated,
+    };
   }
+
+  // A new filter starts again on the first page: the second page of the
+  // previous filter is not the second page of this one.
+  const applyQuery = (value: string) => {
+    setQuery(value);
+    setPage(1);
+  };
+
+  const applyStatus = (value: string) => {
+    setStatus(value);
+    setPage(1);
+  };
+
+  const applyCourse = (value: string) => {
+    setCourseId(value);
+    setPage(1);
+  };
 
   async function onCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,23 +170,15 @@ function DocentesPage() {
     <>
       <PageHeader
         title="Docentes"
-        subtitle={`${teachers.data?.length ?? 0} docentes registrados`}
+        subtitle={`${teachers.isLoading ? "—" : total} docentes registrados en el colegio. Asigna cursos y revisa el acceso a la plataforma.`}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold hover:bg-muted"
-            >
-              <Upload className="size-4" /> Carga masiva CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="size-4" /> Nuevo docente
-            </button>
+            <Button variant="outline" icon={Upload} onClick={() => fileInputRef.current?.click()}>
+              Carga masiva CSV
+            </Button>
+            <Button icon={Plus} onClick={() => setOpen(true)}>
+              Nuevo docente
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -230,6 +250,7 @@ function DocentesPage() {
           </form>
         </SectionCard>
       )}
+
       {open && (
         <SectionCard title="Nuevo docente" bodyClassName="p-0">
           <form className="space-y-3 p-4" onSubmit={onCreate}>
@@ -284,76 +305,188 @@ function DocentesPage() {
         </SectionCard>
       )}
 
-      <SectionCard bodyClassName="p-0">
-        {teachers.isLoading ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando docentes...</p>
-        ) : teachers.error ? (
-          <p role="alert" className="px-5 py-6 text-sm text-destructive">
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        <Toolbar>
+          <div className="relative w-full max-w-[280px]">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-[15px] -translate-y-1/2 text-muted-foreground"
+              strokeWidth={1.9}
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => applyQuery(event.target.value)}
+              placeholder="Buscar por nombre o correo"
+              aria-label="Buscar por nombre o correo"
+              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+            />
+          </div>
+
+          <select
+            value={status}
+            onChange={(event) => applyStatus(event.target.value)}
+            aria-label="Filtrar por estado"
+            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los estados</option>
+            <option value="activo">Activos</option>
+            <option value="inactivo">Inactivos</option>
+          </select>
+
+          <select
+            value={courseId}
+            onChange={(event) => applyCourse(event.target.value)}
+            aria-label="Filtrar por curso"
+            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los cursos</option>
+            {(courses.data ?? []).map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="ml-auto">
+            <Chip tone="muted">{teachers.data ? `${total} docentes` : "—"}</Chip>
+          </div>
+        </Toolbar>
+
+        {teachers.isError ? (
+          <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {teachers.error.message}
           </p>
-        ) : (teachers.data ?? []).length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">
-            Aún no hay docentes. Usá "Nuevo docente" para crear el primero.
-          </p>
+        ) : teachers.isLoading ? (
+          <div className="px-[18px] py-4" aria-hidden>
+            {[0, 1, 2, 3].map((row) => (
+              <div key={row} className="flex items-center gap-4 py-[11px]">
+                <span className="h-[11px] w-[180px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+              </div>
+            ))}
+          </div>
+        ) : (teachers.data?.items.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={UserRoundX}
+            title="Sin resultados"
+            description="Ajusta los filtros o registra al primer docente del colegio."
+            action={
+              <Button icon={Plus} onClick={() => setOpen(true)}>
+                Nuevo docente
+              </Button>
+            }
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Docente</th>
-                  <th className="px-5 py-3 font-semibold">Curso</th>
-                  <th className="px-5 py-3 font-semibold">Ingreso</th>
-                  <th className="px-5 py-3 font-semibold">Estado</th>
-                  <th className="px-5 py-3 text-right font-semibold">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(teachers.data ?? []).map((t) => {
-                  const isRevoked = t.revoked_at !== null;
-                  const teacherCourses = coursesByTeacher.get(t.user_id) ?? [];
-                  return (
-                    <tr key={t.membership_id} className="border-t border-border hover:bg-muted/40">
-                      <td className="px-5 py-3">
-                        <p className="font-medium">{t.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{t.email ?? "Sin correo"}</p>
+          <>
+            <TableShell>
+              <PanelTable className="w-full border-collapse">
+                <caption className="sr-only">
+                  Docentes del colegio, con su curso, su acceso y su estado
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className={tableHeadClass}>
+                      Docente
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Curso · Materia
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Ingreso
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Acceso
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Estado
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(teachers.data?.items ?? []).map((teacher) => (
+                    <tr
+                      key={teacher.membership_id}
+                      className="transition-colors hover:bg-white/[0.025]"
+                    >
+                      <td className={tableCellClass}>
+                        <p className="font-medium text-foreground">{teacher.full_name ?? "—"}</p>
+                        <p className="text-[12px] text-muted-foreground">
+                          {teacher.email ?? "Sin correo"}
+                        </p>
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {teacherCourses.length > 0 ? teacherCourses.join(", ") : "Sin curso"}
+                      <td className={tableCellClass}>
+                        {teacher.courses.length > 0 ? (
+                          <>
+                            <p className="text-[13px]">{teacher.courses.join(" · ")}</p>
+                            {teacher.subjects && teacher.subjects.length > 0 && (
+                              <p className="text-[12px] text-muted-foreground">
+                                {teacher.subjects.join(" · ")}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Sin curso</span>
+                        )}
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {new Date(t.joined_at).toLocaleDateString("es-CO")}
+                      <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                        {formatShortDate(teacher.joined_at)}
                       </td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {!t.account_activated && !isRevoked && (
-                            <StatusBadge tone="warning">Sin activar</StatusBadge>
-                          )}
-                          <StatusBadge tone={isRevoked ? "danger" : "success"}>
-                            {isRevoked ? "Inactivo" : "Activo"}
-                          </StatusBadge>
-                        </div>
+                      <td className={tableCellClass}>
+                        <Chip tone={teacher.access === "activado" ? "ok" : "warn"} dot>
+                          {teacher.access === "activado" ? "Activado" : "Pendiente"}
+                        </Chip>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTeacher(t)}
-                          className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft"
+                      <td className={tableCellClass}>
+                        <Chip tone={teacher.status === "activo" ? "teal" : "muted"} dot>
+                          {teacher.status === "activo" ? "Activo" : "Inactivo"}
+                        </Chip>
+                      </td>
+                      <td className={`${tableCellClass} text-right`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedTeacher(teacher)}
                         >
                           Gestionar
-                        </button>
+                        </Button>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </PanelTable>
+            </TableShell>
+
+            <Pagination
+              page={teachers.data?.page ?? 1}
+              pageCount={teachers.data?.pages ?? 0}
+              total={teachers.data?.total ?? 0}
+              pageSize={teachers.data?.per_page ?? 10}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </SectionCard>
 
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>
+          La búsqueda y los filtros se ejecutan en el servidor, sobre los datos del colegio.
+        </span>
+      </p>
+
       {selectedTeacher && (
         <MemberManageDialog
-          member={selectedTeacher}
+          member={asMember(selectedTeacher)}
           roleLabel="docente"
           onClose={() => setSelectedTeacher(null)}
         />

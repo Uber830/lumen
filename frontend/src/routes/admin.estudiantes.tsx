@@ -1,18 +1,25 @@
-import { useRouteContext, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { GraduationCap, Plus, Search, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { Plus, Search, Upload } from "lucide-react";
-import { PageHeader, Pagination, SectionCard } from "@/components/ui-kit";
-import { StatusBadge } from "@/components/status-badge";
-import { Select } from "@/components/select-field";
+
 import {
-  useCourses,
-  useCreateStudentEnrollment,
-  useSchoolMembers,
-  useStudentEnrollments,
-} from "@/features/academics/hooks";
+  Button,
+  PanelTable,
+  Chip,
+  EmptyState,
+  PageHeader,
+  Pagination,
+  SectionCard,
+  TableShell,
+  Toolbar,
+  tableCellClass,
+  tableHeadClass,
+} from "@/components/ui-kit";
+import { Select } from "@/components/select-field";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
+import type { SchoolMember } from "@/features/academics/types";
 import {
   activationLink,
   parseCsvInvitations,
@@ -20,7 +27,8 @@ import {
   useInviteUser,
   type InviteUserResult,
 } from "@/lib/users/invitations";
-import type { SchoolMember } from "@/features/academics/types";
+import { useSchoolCourses, useSchoolStudents, type SchoolMemberRow } from "@/lib/school/community";
+import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/estudiantes")({
   head: () => ({
@@ -28,45 +36,51 @@ export const Route = createFileRoute("/admin/estudiantes")({
       { title: "Estudiantes — Lumen" },
       {
         name: "description",
-        content: "Listado de estudiantes con búsqueda, filtros por curso y carga masiva CSV.",
+        content: "Matrícula, búsqueda y control de acceso de los estudiantes del colegio.",
       },
       { property: "og:title", content: "Estudiantes — Lumen" },
       {
         property: "og:description",
-        content: "Gestioná la matrícula de tu colegio desde un solo lugar.",
+        content: "Administra la matrícula de tu institución.",
       },
     ],
   }),
   component: EstudiantesPage,
 });
 
-/** How many students fit in a page of the table. */
-const PAGE_SIZE = 10;
-
 function EstudiantesPage() {
   const { session } = useRouteContext({ from: "/admin/estudiantes" });
   const schoolId = session.primarySchoolId;
-  const students = useSchoolMembers(schoolId, "student", true);
-  const courses = useCourses(schoolId);
-  const enrollments = useStudentEnrollments(schoolId);
+
+  // The list is filtered and paginated in the server. The filter by
+  // course is the one the administrator uses the most: the thinking
+  // goes by courses, not by the whole list.
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [courseId, setCourseId] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const students = useSchoolStudents({ q: query, status, course_id: courseId, page });
+  const courses = useSchoolCourses();
+
   const invite = useInviteUser();
   const bulkInvite = useBulkInviteUsers();
-  const createEnrollment = useCreateStudentEnrollment(schoolId ?? "");
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [courseId, setCourseId] = useState("");
+  const [newCourseId, setNewCourseId] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [csvText, setCsvText] = useState("");
-  const [query, setQuery] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activations, setActivations] = useState<ActivationLink[]>([]);
   const [bulkSummary, setBulkSummary] = useState<{
     created: number;
     failures: BulkImportFailure[];
   } | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<SchoolMember | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<SchoolMemberRow | null>(null);
+
+  const total = students.data?.total ?? 0;
 
   const courseOptions = useMemo(
     () =>
@@ -78,62 +92,37 @@ function EstudiantesPage() {
     [courses.data],
   );
 
-  // The courses each student is enrolled in.
-  const coursesByStudent = useMemo(() => {
-    const courseNameById = new Map((courses.data ?? []).map((c) => [c.id, c.name]));
-    const map = new Map<string, string[]>();
-    for (const enrollment of enrollments.data ?? []) {
-      const name = courseNameById.get(enrollment.course_id);
-      if (!name) continue;
-      const list = map.get(enrollment.student_id) ?? [];
-      list.push(name);
-      map.set(enrollment.student_id, list);
-    }
-    return map;
-  }, [enrollments.data, courses.data]);
+  function asMember(row: SchoolMemberRow): SchoolMember {
+    return {
+      membership_id: row.membership_id,
+      school_id: schoolId ?? "",
+      user_id: row.user_id,
+      role: "student",
+      is_primary: true,
+      joined_at: row.joined_at,
+      full_name: row.full_name ?? "",
+      email: row.email,
+      phone: null,
+      avatar_url: null,
+      revoked_at: row.revoked_at,
+      account_activated: row.account_activated,
+    };
+  }
 
-  const filteredStudents = useMemo(() => {
-    const all = students.data ?? [];
-    const needle = query.trim().toLowerCase();
-    if (!needle) return all;
-    return all.filter(
-      (student) =>
-        student.full_name.toLowerCase().includes(needle) ||
-        (student.email ?? "").toLowerCase().includes(needle),
-    );
-  }, [students.data, query]);
-
-  // The list is paginated: ten students per page.
-  const pageCount = Math.max(1, Math.ceil(filteredStudents.length / PAGE_SIZE));
-  const [page, setPage] = useState(1);
-
-  // A new search starts on the first page, and a list that shrank never
-  // leaves the user on a page that does not exist. Both are adjustments
-  // during the render, not an effect.
-  const [lastQuery, setLastQuery] = useState(query);
-  if (query !== lastQuery) {
-    setLastQuery(query);
+  const applyQuery = (value: string) => {
+    setQuery(value);
     setPage(1);
-  }
-  if (page > pageCount) {
-    setPage(pageCount);
-  }
+  };
 
-  const visibleStudents = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredStudents.slice(start, start + PAGE_SIZE);
-  }, [filteredStudents, page]);
+  const applyStatus = (value: string) => {
+    setStatus(value);
+    setPage(1);
+  };
 
-  if (!schoolId) {
-    return (
-      <div className="surface-card mx-auto max-w-md p-8 text-center">
-        <h1 className="text-xl font-semibold">No hay colegio activo</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Tu cuenta no está asociada a un colegio.
-        </p>
-      </div>
-    );
-  }
+  const applyCourse = (value: string) => {
+    setCourseId(value);
+    setPage(1);
+  };
 
   async function onCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -152,17 +141,9 @@ function EstudiantesPage() {
         ...prev,
       ]);
     }
-    // The enrolment is part of the same action: a student without a course
-    // cannot see anything of the platform.
-    if (courseId) {
-      await createEnrollment.mutateAsync({
-        course_id: courseId,
-        student_id: created.user_id,
-      });
-    }
     setEmail("");
     setFullName("");
-    setCourseId("");
+    setNewCourseId("");
     setOpen(false);
   }
 
@@ -196,23 +177,15 @@ function EstudiantesPage() {
     <>
       <PageHeader
         title="Estudiantes"
-        subtitle={`${students.data?.length ?? 0} estudiantes matriculados`}
+        subtitle={`${students.isLoading ? "—" : total} estudiantes matriculados. Controla el acceso, el curso y el promedio.`}
         actions={
           <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold hover:bg-muted"
-            >
-              <Upload className="size-4" /> Carga masiva CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-            >
-              <Plus className="size-4" /> Nuevo estudiante
-            </button>
+            <Button variant="outline" icon={Upload} onClick={() => fileInputRef.current?.click()}>
+              Carga masiva CSV
+            </Button>
+            <Button icon={Plus} onClick={() => setOpen(true)}>
+              Nuevo estudiante
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -272,23 +245,23 @@ function EstudiantesPage() {
               </span>
               <div className="mt-1.5">
                 <Select
-                  value={courseId}
-                  onChange={setCourseId}
+                  value={newCourseId}
+                  onChange={setNewCourseId}
                   options={courseOptions}
                   placeholder={
-                    courseOptions.length ? "Elegí un curso (opcional)" : "Primero creá un curso"
+                    courseOptions.length ? "Elige un curso (opcional)" : "Primero crea un curso"
                   }
                   emptyLabel="Todavía no hay cursos"
                 />
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Si elegís un curso, el estudiante queda matriculado en él.
+                Si eliges un curso, el estudiante queda matriculado en él.
               </p>
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                disabled={invite.isPending || createEnrollment.isPending}
+                disabled={invite.isPending}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {invite.isPending ? "Creando..." : "Crear estudiante"}
@@ -304,11 +277,6 @@ function EstudiantesPage() {
             {invite.error && (
               <p role="alert" className="text-sm text-destructive">
                 {invite.error.message}
-              </p>
-            )}
-            {createEnrollment.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {createEnrollment.error.message}
               </p>
             )}
           </form>
@@ -365,104 +333,189 @@ function EstudiantesPage() {
         </SectionCard>
       )}
 
-      <SectionCard bodyClassName="p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-background px-3 py-2">
-            <Search className="size-4 shrink-0 text-muted-foreground" />
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        <Toolbar>
+          <div className="relative w-full max-w-[280px]">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-[15px] -translate-y-1/2 text-muted-foreground"
+              strokeWidth={1.9}
+              aria-hidden
+            />
             <input
-              placeholder="Buscar estudiante"
+              type="search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              onChange={(event) => applyQuery(event.target.value)}
+              placeholder="Buscar por nombre o correo"
+              aria-label="Buscar por nombre o correo"
+              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Estudiante</th>
-                <th className="px-5 py-3 font-semibold">Curso</th>
-                <th className="px-5 py-3 font-semibold">Ingreso</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
-                <th className="px-5 py-3 text-right font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-6 text-sm text-muted-foreground">
-                    Cargando estudiantes...
-                  </td>
-                </tr>
-              ) : students.error ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-6 text-sm text-destructive" role="alert">
-                    {students.error.message}
-                  </td>
-                </tr>
-              ) : filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-6 text-sm text-muted-foreground">
-                    {students.data && students.data.length > 0
-                      ? "Ningun estudiante coincide con la busqueda."
-                      : 'Aun no hay estudiantes matriculados. Usá "Nuevo estudiante" para crear el primero.'}
-                  </td>
-                </tr>
-              ) : (
-                visibleStudents.map((s) => {
-                  const isRevoked = s.revoked_at !== null;
-                  const studentCourses = coursesByStudent.get(s.user_id) ?? [];
-                  return (
-                    <tr key={s.user_id} className="border-t border-border hover:bg-muted/40">
-                      <td className="px-5 py-3">
-                        <p className="font-medium">{s.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{s.email ?? "Sin correo"}</p>
+
+          <select
+            value={status}
+            onChange={(event) => applyStatus(event.target.value)}
+            aria-label="Filtrar por estado"
+            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los estados</option>
+            <option value="activo">Activos</option>
+            <option value="inactivo">Inactivos</option>
+          </select>
+
+          <select
+            value={courseId}
+            onChange={(event) => applyCourse(event.target.value)}
+            aria-label="Filtrar por curso"
+            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los cursos</option>
+            {(courses.data ?? []).map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="ml-auto">
+            <Chip tone="muted">{students.data ? `${total} estudiantes` : "—"}</Chip>
+          </div>
+        </Toolbar>
+
+        {students.isError ? (
+          <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
+            {students.error.message}
+          </p>
+        ) : students.isLoading ? (
+          <div className="px-[18px] py-4" aria-hidden>
+            {[0, 1, 2, 3].map((row) => (
+              <div key={row} className="flex items-center gap-4 py-[11px]">
+                <span className="h-[11px] w-[180px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+              </div>
+            ))}
+          </div>
+        ) : (students.data?.items.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={GraduationCap}
+            title="Sin resultados"
+            description="Ajusta los filtros o matricula al primer estudiante del colegio."
+            action={
+              <Button icon={Plus} onClick={() => setOpen(true)}>
+                Nuevo estudiante
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <TableShell>
+              <PanelTable className="w-full border-collapse">
+                <caption className="sr-only">
+                  Estudiantes del colegio, con su curso, su acceso y su promedio
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className={tableHeadClass}>
+                      Estudiante
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Cursos
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Ingreso
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Acceso
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Promedio
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Estado
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(students.data?.items ?? []).map((student) => (
+                    <tr
+                      key={student.membership_id}
+                      className="transition-colors hover:bg-white/[0.025]"
+                    >
+                      <td className={tableCellClass}>
+                        <p className="font-medium text-foreground">{student.full_name ?? "—"}</p>
+                        <p className="text-[12px] text-muted-foreground">
+                          {student.email ?? "Sin correo"}
+                        </p>
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {studentCourses.length > 0 ? studentCourses.join(", ") : "Sin curso"}
+                      <td className={tableCellClass}>
+                        {student.courses.length > 0 ? (
+                          student.courses.join(" · ")
+                        ) : (
+                          <span className="text-muted-foreground">Sin curso</span>
+                        )}
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">
-                        {new Date(s.joined_at).toLocaleDateString("es-CO")}
+                      <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                        {formatShortDate(student.joined_at)}
                       </td>
-                      <td className="px-5 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {!s.account_activated && !isRevoked && (
-                            <StatusBadge tone="warning">Sin activar</StatusBadge>
-                          )}
-                          <StatusBadge tone={isRevoked ? "danger" : "success"}>
-                            {isRevoked ? "Inactivo" : "Activo"}
-                          </StatusBadge>
-                        </div>
+                      <td className={tableCellClass}>
+                        <Chip tone={student.access === "activado" ? "ok" : "warn"} dot>
+                          {student.access === "activado" ? "Activado" : "Pendiente"}
+                        </Chip>
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStudent(s)}
-                          className="rounded-lg px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-soft"
+                      <td
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                      >
+                        {student.average === null || student.average === undefined
+                          ? "—"
+                          : student.average.toFixed(2)}
+                      </td>
+                      <td className={tableCellClass}>
+                        <Chip tone={student.status === "activo" ? "teal" : "muted"} dot>
+                          {student.status === "activo" ? "Activo" : "Inactivo"}
+                        </Chip>
+                      </td>
+                      <td className={`${tableCellClass} text-right`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedStudent(student)}
                         >
                           Gestionar
-                        </button>
+                        </Button>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination
-          page={page}
-          pageCount={pageCount}
-          total={filteredStudents.length}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-        />
+                  ))}
+                </tbody>
+              </PanelTable>
+            </TableShell>
+
+            <Pagination
+              page={students.data?.page ?? 1}
+              pageCount={students.data?.pages ?? 0}
+              total={students.data?.total ?? 0}
+              pageSize={students.data?.per_page ?? 10}
+              onPageChange={setPage}
+            />
+          </>
+        )}
       </SectionCard>
+
+      {/* The foot of the view: the state of the system, so that a page
+          is never a blank rectangle. */}
+      <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+        <Chip tone="muted" dot>
+          Sistema operativo
+        </Chip>
+        <span>El filtro por curso y la búsqueda se ejecutan en el servidor.</span>
+      </p>
 
       {selectedStudent && (
         <MemberManageDialog
-          member={selectedStudent}
+          member={asMember(selectedStudent)}
           roleLabel="estudiante"
           onClose={() => setSelectedStudent(null)}
         />

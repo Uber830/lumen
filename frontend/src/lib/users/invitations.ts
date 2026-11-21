@@ -45,6 +45,9 @@ export function useInviteUser(): UseMutationResult<InviteUserResult, Error, Invi
       // Refresh the members table so the new user shows up right away
       // instead of waiting for React Query to refetch on staleness.
       qc.invalidateQueries({ queryKey: queryKeys.members(result.school_id) });
+      // The panel of the school reads its own lists: a new teacher has
+      // to appear in them at once.
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
     },
   });
 }
@@ -62,6 +65,8 @@ export function useBulkInviteUsers(): UseMutationResult<
       // A bulk upload can touch any member list; invalidate the whole
       // family so every open members view refetches.
       qc.invalidateQueries({ queryKey: ["school_members"] });
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
+      qc.invalidateQueries({ queryKey: ["school", "students"] });
     },
   });
 }
@@ -84,6 +89,8 @@ export function useUpdateMembership(): UseMutationResult<
       api.patch<MembershipUpdateResult>(`/v1/users/memberships/${membershipId}`, { revoked }),
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: queryKeys.members(result.school_id) });
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
+      qc.invalidateQueries({ queryKey: ["school", "students"] });
     },
   });
 }
@@ -102,6 +109,8 @@ export function useCreateActivationLink(): UseMutationResult<ActivationLinkResul
     onSuccess: () => {
       // The member list changes: the account may already be active.
       qc.invalidateQueries({ queryKey: ["school_members"] });
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
+      qc.invalidateQueries({ queryKey: ["school", "students"] });
     },
   });
 }
