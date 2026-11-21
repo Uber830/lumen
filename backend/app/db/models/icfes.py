@@ -11,15 +11,35 @@
 `icfes_answer_keys` is restricted to admins and teachers; the student
 role cannot read it. The scoring module in app/icfes/scoring.py
 consumes it server-side.
+
+The catalog of simulators of the platform team lives in three layers,
+each one with a single owner:
+
+- `icfes_simulators`         the catalog: the platform team writes it.
+- `icfes_simulator_schools`  who has each simulator: the platform team
+- `icfes_activations`        decides it, and the school only reads it.
+                              what the school does with what it received:
+                              in which courses the simulator runs and
+                              until when.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -375,7 +395,151 @@ class IcfesScore(Base):
     updated_at: Mapped[datetime] = updated_at()
 
 
+class IcfesSimulator(Base):
+    """A simulator of the catalog of the platform team.
+
+    The simulator is the exam the platform team prepares: its code, the
+    grade it is for, how many questions it has and how long it takes.
+    The average score stays null until the exam is corrected.
+    """
+
+    __tablename__ = "icfes_simulators"
+    __table_args__ = (
+        UniqueConstraint("code", name="icfes_simulators_code_uq"),
+        {"schema": "public"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    # The short code shown in the tables: SIM-2026-2-S7.
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    grade: Mapped[str] = mapped_column(Text, nullable=False)
+    question_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration_min: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    scheduled_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # borrador, en_revision, publicado, en_curso, cerrado or archivado.
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="borrador",
+        server_default="borrador",
+    )
+    # The average of the school, on the 0-500 scale of the exam.
+    average_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    # The exam the students take. The results are the ones of a real
+    # run of it.
+    simulation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.icfes_simulations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = updated_at()
+
+
+class IcfesSimulatorSchool(Base):
+    """A school with a simulator of the catalog.
+
+    The platform team enables the simulator for the school. The school
+    cannot enable or disable it: a simulator that is not here does not
+    exist for that school.
+    """
+
+    __tablename__ = "icfes_simulator_schools"
+    __table_args__ = (
+        UniqueConstraint(
+            "simulator_id",
+            "school_id",
+            name="icfes_simulator_schools_uq",
+        ),
+        {"schema": "public"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    simulator_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.icfes_simulators.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    school_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.schools.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    enabled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+    enabled_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+
+class IcfesActivation(Base):
+    """A course of the school where a simulator runs.
+
+    The school activates the simulator course by course and sets the
+    deadline of each one. One row per course.
+    """
+
+    __tablename__ = "icfes_activations"
+    __table_args__ = (
+        UniqueConstraint(
+            "school_id",
+            "simulator_id",
+            "course_id",
+            name="icfes_activations_uq",
+        ),
+        {"schema": "public"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    school_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.schools.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    simulator_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.icfes_simulators.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("public.courses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    deadline: Mapped[date] = mapped_column(Date, nullable=False)
+    activated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    )
+
+
 __all__ = [
+    "IcfesActivation",
     "IcfesAnswer",
     "IcfesAnswerKey",
     "IcfesAttempt",
@@ -383,4 +547,6 @@ __all__ = [
     "IcfesScore",
     "IcfesSimulation",
     "IcfesSimulationQuestion",
+    "IcfesSimulator",
+    "IcfesSimulatorSchool",
 ]

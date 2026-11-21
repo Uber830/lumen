@@ -13,6 +13,7 @@ The modules are grouped by domain:
 - `chat`       — conversations, members, messages.
 - `evaluations`— authored assessments and their attempts.
 - `icfes`      — the question bank, simulations and attempts.
+- `support`    — the requests of the school to the support team.
 - `billing`    — subscriptions, entitlements, the Wompi ledger.
 - `sessions`   — refresh tokens, password resets, email verifications.
 - `notifications` — the in-app notifications of each user.
@@ -39,6 +40,7 @@ from app.db.models.evaluations import (
     EvaluationQuestion,
 )
 from app.db.models.icfes import (
+    IcfesActivation,
     IcfesAnswer,
     IcfesAnswerKey,
     IcfesAttempt,
@@ -46,6 +48,8 @@ from app.db.models.icfes import (
     IcfesScore,
     IcfesSimulation,
     IcfesSimulationQuestion,
+    IcfesSimulator,
+    IcfesSimulatorSchool,
 )
 from app.db.models.identity import (
     Plan,
@@ -72,6 +76,7 @@ from app.db.models.sessions import (
     RefreshToken,
 )
 from app.db.models.site import CatalogItem, CatalogItemSchool, SiteContent
+from app.db.models.support import SupportCase, SupportMessage
 
 __all__ = [
     "AcademicPeriod",
@@ -92,6 +97,7 @@ __all__ = [
     "EvaluationAttempt",
     "EvaluationQuestion",
     "Grade",
+    "IcfesActivation",
     "IcfesAnswer",
     "IcfesAnswerKey",
     "IcfesAttempt",
@@ -99,6 +105,8 @@ __all__ = [
     "IcfesScore",
     "IcfesSimulation",
     "IcfesSimulationQuestion",
+    "IcfesSimulator",
+    "IcfesSimulatorSchool",
     "LoginAttempt",
     "Material",
     "MaterialCourse",
@@ -115,6 +123,8 @@ __all__ = [
     "SchoolMembership",
     "SchoolSettings",
     "SiteContent",
+    "SupportCase",
+    "SupportMessage",
     "StudentEnrollment",
     "Subject",
     "Subscription",
