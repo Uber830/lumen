@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
+import { NAV, isCurrentPath, type AppShellRole } from "@/lib/navigation";
 
 /*
  * The menu is part of the contract with the business: the platform role
@@ -42,13 +42,6 @@ describe("el menú de cada rol", () => {
     expect(paths).toContain("/super/colegios");
     expect(paths).toContain("/super/catalogo");
     expect(paths).toContain("/super/soporte");
-  });
-
-  it("cada rol tiene una nota y una etiqueta", () => {
-    for (const role of ROLES) {
-      expect(ROLE_NOTE[role]).toBeTruthy();
-      expect(ROLE_LABEL[role]).toBeTruthy();
-    }
   });
 });
 

@@ -141,21 +141,6 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
   ],
 };
 
-/** The note at the foot of the menu: what this role can and cannot do. */
-export const ROLE_NOTE: Record<AppShellRole, string> = {
-  super: "Cargas el material de la editorial y decides qué colegio puede ver cada pieza.",
-  admin: "Administras la comunidad del colegio. El material lo carga el equipo de plataforma.",
-  docente: "Consulta y descarga el material habilitado para tus cursos.",
-  estudiante: "Accedes al material publicado para tus cursos, tareas y calificaciones.",
-};
-
-export const ROLE_LABEL: Record<AppShellRole, string> = {
-  super: "Equipo de plataforma",
-  admin: "Administración del colegio",
-  docente: "Docente",
-  estudiante: "Estudiante",
-};
-
 /**
  * Whether an entry is the page the reader is on.
  *
