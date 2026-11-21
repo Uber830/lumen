@@ -97,6 +97,31 @@
 }
 
 /*
+ * The focus is always visible: the outline is the school's accent and
+ * it does not depend on the browser's default.
+ */
+.lumen-panel :focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/*
+ * The motion is a courtesy, not a right: with the reduced motion
+ * asked for, the panel stops moving.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .lumen-panel *,
+  .lumen-panel *::before,
+  .lumen-panel *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
  * The scrollbar of the panel, in the colour of the lines.
  */
 .lumen-panel * {
