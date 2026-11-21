@@ -248,7 +248,7 @@ export function Select({
                 ? { bottom: placement.bottom }
                 : { top: placement.top }),
             }}
-            className="z-50 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lift outline-none"
+            className="z-50 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lift outline-none"
           >
             {options.length === 0 ? (
               <p className="px-3 py-2.5 text-sm text-muted-foreground">{emptyLabel}</p>

@@ -1,17 +1,18 @@
 # El Índice — la guía de estilo del sitio público
 
-La landing (`/`) y el acceso (`/login`) tienen su propia dirección visual,
-separada de la del panel de la aplicación. Este documento explica cómo se
-construye, para que las dos páginas se parezcan entre sí y para que nadie
-tenga que adivinar por qué un botón tiene el borde que tiene.
+La landing (`/`) y el acceso (`/login`) mandan en el diseño de Lumen. El
+panel de la aplicación usa la misma paleta, las mismas tipografías y las
+mismas esquinas: hay **un solo diseño** en el producto, el de «El Índice».
+Este documento explica cómo se construye, para que nadie tenga que adivinar
+por qué un botón tiene el borde que tiene.
 
 ## Los tokens
 
-Viven en `frontend/src/features/site/site.css`, dentro de la clase de ámbito
-`.idx-site`. No están en `:root` a propósito: el panel tiene su propia paleta
-(índigo, esquinas redondeadas) y el sitio público la suya (papel, esquinas
-rectas). El ámbito mantiene los dos sistemas separados sin un segundo juego de
-variables globales.
+Viven en `frontend/src/styles.css`, en `:root` y en `.dark`. El sitio público y
+el panel los comparten: no hay dos paletas ni dos juegos de variables. Lo que
+sí es particular del sitio vive en `frontend/src/features/site/site.css`, dentro
+de la clase de ámbito `.idx-site` (la retícula del cuaderno y la medida de las
+columnas).
 
 | Token | Valor | Para qué |
 | --- | --- | --- |
@@ -23,10 +24,15 @@ variables globales.
 | `--ink-3` | `#8B93A3` | Etiquetas, unidades, metadatos |
 | `--line` | `#DFE3EA` | Separadores |
 | `--line-2` | `#C6CCD8` | Bordes de control, chips |
-| `--accent` | `#1A4CF0` | El único color de marca |
-| `--accent-soft` | `rgba(26,76,240,.08)` | Fondo de la fila al pasar el cursor |
-| `--radius` | `4px` | El radio de los controles rectangulares |
+| `--brand` | `#1A4CF0` | El único color de marca (`#4C7BFF` en oscuro) |
+| `--brand-soft` | `rgba(26,76,240,.08)` | Fondo de la fila al pasar el cursor |
+| `--head-bg` | `#0A0D13` | La banda oscura de la cabecera de las tablas |
+| `--radius` | `0.375rem` | El radio de los controles rectangulares |
 | `--maxw` | `1220px` | El ancho del contenido |
+
+El tema oscuro es una **preferencia personal**: vive en `localStorage`
+(`lumen-theme`), la clase `.dark` se pone en `<html>` y los tokens cambian de
+valor. El sitio y el panel la respetan por igual.
 
 El tema de Tailwind los expone como utilidades (`src/styles.css`):
 
@@ -34,12 +40,14 @@ El tema de Tailwind los expone como utilidades (`src/styles.css`):
 @theme inline {
   --color-paper: var(--paper);
   --color-ink: var(--ink);
-  --color-brand: var(--accent);
+  --color-brand: var(--brand);
   --radius-idx: 4px;
 }
 ```
 
-`bg-paper`, `text-ink`, `border-line`, `bg-brand`, `rounded-idx`.
+`bg-paper`, `text-ink`, `border-line`, `bg-brand`, `rounded-idx`. El panel usa
+además `surface-card` (la tarjeta sin sombra), `table-head-band` (la banda
+oscura de la cabecera) y `code-cell` (las referencias en monoespaciada).
 
 ## La retícula
 
@@ -49,7 +57,7 @@ pide y no debe pagar por ella.
 
 ## Las reglas
 
-- **Botones rectangulares**, radio de 4 px. Tres variantes: sólido tinta
+- **Botones rectangulares**, radio del diseño. Tres variantes: sólido tinta
   (`solid`), contorno (`outline`) y acento azul (`accent`). **Una sola
   acción primaria por pantalla.**
 - **Tipografía:** Space Grotesk para el texto, IBM Plex Mono para las
@@ -57,8 +65,9 @@ pide y no debe pagar por ella.
   `letter-spacing` negativo.
 - **Kicker de sección:** monoespaciada, versalitas, con el identificador del
   índice (`IDX-001`) y una línea que se estira hasta el borde.
-- **Tablas:** cabecera en tinta con texto blanco, filas con `hover` en
-  `--accent-soft`, bordes hairline, `<caption>` y `<th scope="col">`.
+- **Tablas:** cabecera en tinta con texto blanco (la clase `table-head-band`),
+  filas con `hover` en `--brand-soft`, bordes hairline, `<caption>` y
+  `<th scope="col">`. Es el mismo patrón en el sitio y en el panel.
 - **Marcas de corte:** los paneles tipo spec llevan una L de 14 px en
   `--accent` al 50 % en dos esquinas opuestas.
 - **Sin sombras difusas:** las superficies se separan por borde.
@@ -68,7 +77,8 @@ pide y no debe pagar por ella.
 
 Todo el texto visible de la landing sale de `GET /v1/public/site`. La fila de
 `site_content` con la clave `landing` guarda el copy y las cifras; el
-catálogo editorial vive en `catalog_items` y `catalog_item_schools`.
+catálogo editorial vive en `materials` y `material_schools`, y lo administra el
+rol de plataforma desde `/super/catalogo`.
 
 El frontend no tiene constantes de contenido: `src/features/site/types.ts`
 describe el contrato y los componentes renderizan lo que llega. Cuando el
@@ -107,7 +117,9 @@ npm run og        # la imagen de compartir (1200x630)
   asocian al campo con `aria-describedby`.
 - Las preguntas son `<details>` nativos: funcionan con el teclado sin una
   línea de JavaScript.
-- `prefers-reduced-motion` desactiva las transiciones del sitio.
+- `prefers-reduced-motion` desactiva las transiciones del sitio y del panel.
+- El foco es visible en toda la aplicación (`focus-visible` con el azul de
+  marca), también en el menú de usuario, que responde a las flechas.
 
 ## Responsive
 

@@ -1,33 +1,19 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
-  BarChart3,
   Bell,
-  BookOpen,
-  Building2,
-  CalendarRange,
   ChevronDown,
-  ClipboardList,
-  CreditCard,
-  FileCheck2,
-  FolderOpen,
   GraduationCap,
-  Inbox,
   Info,
-  LayoutDashboard,
-  Link2,
-  ListChecks,
   LogOut,
   Menu,
-  MessageSquare,
+  Monitor,
+  Moon,
   Palette,
-  PieChart,
-  ShieldCheck,
-  Target,
+  Sun,
   UserSquare2,
-  Users,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -36,152 +22,30 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth/browser";
 import type { SessionContext } from "@/lib/auth/functions";
 import { useEntitlement } from "@/lib/billing/hooks";
+import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
+import type { NavItem } from "@/lib/navigation";
+import { usePlatformMetrics } from "@/lib/platform/hooks";
 import { useSchool } from "@/lib/school/hooks";
 import { useSchoolOverview } from "@/lib/school/overview";
 import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
+import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+
+export type { AppShellRole } from "@/lib/navigation";
 
 type SchoolPlan = "Basico" | "Estandar" | "Premium" | "Sin plan";
 
-export type AppShellRole = "super" | "admin" | "docente" | "estudiante";
-
-type NavItem = {
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  /** The counter of the rail: the material the school has available. */
-  badge?: "material" | "support";
-  /** The entry only shows up when the school has the ICFES entitlement. */
-  icfes?: boolean;
-};
-
-type NavGroup = { label: string; items: NavItem[] };
-
-/**
- * The rail of each role.
- *
- * The groups say what the section is about: the operation of the day,
- * the academic structure, the configuration of the school and the
- * support. "Mi perfil" is not here: it lives in the menu of the user,
- * at the top right.
- */
-const NAV: Record<AppShellRole, NavGroup[]> = {
-  admin: [
-    {
-      label: "Operación",
-      items: [
-        { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-        { label: "Contenido", to: "/admin/contenido", icon: BookOpen, badge: "material" },
-      ],
-    },
-    {
-      label: "Gestión académica",
-      items: [
-        { label: "Docentes", to: "/admin/docentes", icon: Users },
-        { label: "Estudiantes", to: "/admin/estudiantes", icon: GraduationCap },
-        { label: "Cursos y materias", to: "/admin/cursos", icon: BookOpen },
-        { label: "Asignaciones", to: "/admin/asignaciones", icon: Link2 },
-        { label: "Períodos", to: "/admin/periodos", icon: CalendarRange },
-      ],
-    },
-    {
-      // The simulators of the school are the ones the platform enabled:
-      // the school activates them by course. The rest of the ICFES work
-      // (the bank, the builder and the aggregate results) stays for the
-      // roles that author the exams.
-      label: "ICFES",
-      items: [
-        { label: "Simulacros del colegio", to: "/admin/icfes-colegio", icon: Target, icfes: true },
-        { label: "Banco de preguntas", to: "/admin/icfes", icon: ListChecks, icfes: true },
-        { label: "Crear simulacro", to: "/admin/icfes-simulacros", icon: ListChecks, icfes: true },
-        { label: "Resultados", to: "/admin/icfes-resultados", icon: PieChart, icfes: true },
-      ],
-    },
-    {
-      label: "Configuración",
-      items: [
-        { label: "Personalización", to: "/admin/personalizacion", icon: Palette },
-        { label: "Administradores", to: "/admin/administradores", icon: ShieldCheck },
-      ],
-    },
-    {
-      label: "Apoyo",
-      items: [{ label: "Soporte", to: "/admin/soporte", icon: Inbox, badge: "support" }],
-    },
-  ],
-  super: [
-    {
-      label: "Operación",
-      items: [
-        { label: "Dashboard", to: "/super", icon: LayoutDashboard },
-        { label: "Colegios", to: "/super/colegios", icon: Building2 },
-        { label: "Planes", to: "/super/planes", icon: CreditCard },
-      ],
-    },
-  ],
-  docente: [
-    {
-      label: "Mi trabajo",
-      items: [
-        { label: "Mis materias", to: "/docente", icon: BookOpen },
-        { label: "Materia", to: "/docente/materia", icon: FileCheck2 },
-        { label: "Calificaciones", to: "/docente/calificaciones", icon: BarChart3 },
-        { label: "Mensajes", to: "/docente/chat", icon: MessageSquare },
-      ],
-    },
-    {
-      label: "Pruebas",
-      items: [
-        { label: "Banco ICFES", to: "/docente/icfes", icon: ListChecks, icfes: true },
-        { label: "Simulacros ICFES", to: "/docente/icfes-simulacros", icon: Target, icfes: true },
-        { label: "Resultados ICFES", to: "/docente/icfes-resultados", icon: PieChart, icfes: true },
-      ],
-    },
-  ],
-  estudiante: [
-    {
-      label: "Mi colegio",
-      items: [
-        { label: "Mis clases", to: "/estudiante", icon: BookOpen },
-        { label: "Materiales", to: "/estudiante/materiales", icon: FolderOpen },
-        { label: "Tareas", to: "/estudiante/tareas", icon: ClipboardList },
-        { label: "Mis notas", to: "/estudiante/notas", icon: BarChart3 },
-        { label: "Mensajes", to: "/estudiante/chat", icon: MessageSquare },
-      ],
-    },
-    {
-      label: "Pruebas",
-      items: [{ label: "Simulacros ICFES", to: "/estudiante/icfes", icon: Target, icfes: true }],
-    },
-  ],
-};
-
-/** What each role is allowed to do, told in the foot of the rail. */
-const ROLE_NOTES: Record<AppShellRole, { title: string; note: string }> = {
-  admin: {
-    title: "Administrador de colegio",
-    note: "Administras la comunidad del colegio. El material lo carga el equipo de plataforma y tú ves lo que quedó habilitado.",
-  },
-  docente: {
-    title: "Docente",
-    note: "Consultas y descargas el material habilitado para tus cursos. No puedes cargar ni archivar material.",
-  },
-  estudiante: {
-    title: "Estudiante",
-    note: "Accedes al material publicado para tus cursos, tareas y calificaciones.",
-  },
-  super: {
-    title: "Plataforma",
-    note: "Cargas el material de la editorial y defines qué colegio puede ver cada cosa.",
-  },
-};
+/** Where a counter of the rail comes from. */
+type BadgeCounts = Partial<Record<NonNullable<NavItem["badgeSource"]>, number | null>>;
 
 /*
  * The rail has three shapes, decided by the width of the screen:
@@ -243,17 +107,23 @@ function Brand({
   );
 }
 
+/**
+ * The rail of each role.
+ *
+ * The groups say what the section is about: the operation of the day,
+ * the academic structure, the configuration of the school and the
+ * support. "Mi perfil" is not here: it lives in the menu of the user,
+ * at the top right.
+ */
 function NavGroups({
   role,
   icfesEnabled,
-  materialCount,
-  supportCount,
+  badges,
   onNavigate,
 }: {
   role: AppShellRole;
   icfesEnabled: boolean;
-  materialCount: number | null;
-  supportCount: number | null;
+  badges: BadgeCounts;
   onNavigate?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -276,16 +146,11 @@ function NavGroups({
             </p>
             <ul className="space-y-0.5">
               {items.map((item) => {
-                const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+                const active = isCurrentPath(pathname, item.to);
                 // The counter only shows up where there is a real queue
-                // of work: the material the school has, and the cases
-                // that are still open.
-                const count =
-                  item.badge === "material"
-                    ? materialCount
-                    : item.badge === "support"
-                      ? supportCount
-                      : null;
+                // of work: the material the school has, the cases that
+                // are still open and the size of the network.
+                const count = item.badgeSource ? (badges[item.badgeSource] ?? null) : null;
                 return (
                   <li key={item.to}>
                     <Link
@@ -335,7 +200,6 @@ function NavGroups({
 
 /** The foot of the rail: what the role of the session can do. */
 function RoleNote({ role }: { role: AppShellRole }) {
-  const note = ROLE_NOTES[role];
   return (
     <div className="border-t border-sidebar-border p-3">
       <div className="flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground">
@@ -345,16 +209,24 @@ function RoleNote({ role }: { role: AppShellRole }) {
           aria-hidden
         />
         <p className={cn("min-w-0 leading-snug", ICON_ONLY)}>
-          <span className="font-semibold text-sidebar-foreground">{note.title}</span>
+          <span className="font-semibold text-sidebar-foreground">{ROLE_LABEL[role]}</span>
           <br />
-          {note.note}
+          {ROLE_NOTE[role]}
         </p>
       </div>
     </div>
   );
 }
 
-/** The menu of the user: the profile and the way out. */
+const THEME_CHOICES: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
+  { value: "light", label: "Claro", icon: Sun },
+  { value: "dark", label: "Oscuro", icon: Moon },
+  { value: "system", label: "Sistema", icon: Monitor },
+];
+
+/**
+ * The menu of the user: the profile, the preferences and the way out.
+ */
 function UserMenu({
   session,
   role,
@@ -371,6 +243,9 @@ function UserMenu({
   onSignOut: () => void;
 }) {
   const avatar = session.profile?.avatar_url;
+  // The theme is a personal preference that lives in the browser: the
+  // store is the source of truth, so the menu reads it directly.
+  const theme = useSyncExternalStore(subscribeTheme, getStoredTheme, getStoredTheme);
 
   return (
     <DropdownMenu>
@@ -419,12 +294,22 @@ function UserMenu({
             Notificaciones
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/perfil">
-            <Palette className="size-4" strokeWidth={1.9} aria-hidden />
-            Preferencias
-          </Link>
-        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="flex items-center gap-2">
+          <Palette className="size-3.5" strokeWidth={1.9} aria-hidden />
+          Tema
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={theme}
+          onValueChange={(value) => setTheme(value as ThemePreference)}
+        >
+          {THEME_CHOICES.map((choice) => (
+            <DropdownMenuRadioItem key={choice.value} value={choice.value}>
+              <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
+              {choice.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(event: Event) => {
@@ -462,6 +347,8 @@ export function AppShell({
   // The counter of the support: the cases of the school that are still
   // open. The query is off for the roles that do not have the channel.
   const supportCases = useSchoolSupportCases(role === "admin");
+  // The size of the network, for the rail of the platform role.
+  const metrics = usePlatformMetrics(role === "super");
 
   // The school's branding comes with the session, so the server already
   // knows it when it renders the page. The live query (useSchool) keeps
@@ -489,6 +376,19 @@ export function AppShell({
     sessionBrand?.name ||
     schoolName;
 
+  // The plan comes from the entitlement snapshot: it is the label the
+  // platform shows for the school.
+  const plan: SchoolPlan = ((): SchoolPlan => {
+    if (!entitlement.data) return "Sin plan";
+    const status = entitlement.data.status;
+    if (status !== "active" && status !== "trial") return "Sin plan";
+    const code = entitlement.data.plan_code.toLowerCase();
+    if (code === "basico") return "Basico";
+    if (code === "estandar") return "Estandar";
+    if (code === "premium") return "Premium";
+    return "Sin plan";
+  })();
+
   const icfesEnabled = Boolean(
     entitlement.data &&
     (entitlement.data.status === "active" || entitlement.data.status === "trial") &&
@@ -514,8 +414,34 @@ export function AppShell({
     }
   }
 
-  const materialCount = overview.data?.material.available ?? null;
-  const supportCount = supportCases.data ? openCaseCount(supportCases.data) : null;
+  // The counters of the rail. Every figure comes from the API: the
+  // panel never shows a number that is written by hand.
+  const badges: BadgeCounts = {
+    material: overview.data?.material.available ?? null,
+    support: supportCases.data ? openCaseCount(supportCases.data) : null,
+    schools: metrics.data?.schools ?? null,
+    materials: metrics.data?.materials ?? null,
+  };
+
+  // The bar above the page says where the user is and how big the
+  // network is.
+  const context = (() => {
+    if (role === "super") {
+      const schools = metrics.data?.schools;
+      const materials = metrics.data?.materials;
+      return {
+        title: "Panel de plataforma",
+        detail:
+          schools !== undefined && materials !== undefined
+            ? `${schools} colegios · ${materials} materiales en catálogo`
+            : "Cargando la red…",
+      };
+    }
+    return {
+      title: resolvedSchoolName ?? "Colegio",
+      detail: session.currentPeriod ?? `Plan ${plan}`,
+    };
+  })();
 
   return (
     <div className="lumen-panel min-h-screen w-full bg-background">
@@ -533,12 +459,7 @@ export function AppShell({
       >
         <Brand role={role} schoolName={resolvedSchoolName} logoUrl={logoUrl} />
         <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
-          <NavGroups
-            role={role}
-            icfesEnabled={icfesEnabled}
-            materialCount={materialCount}
-            supportCount={supportCount}
-          />
+          <NavGroups role={role} icfesEnabled={icfesEnabled} badges={badges} />
         </div>
         <RoleNote role={role} />
       </aside>
@@ -565,8 +486,7 @@ export function AppShell({
               <NavGroups
                 role={role}
                 icfesEnabled={icfesEnabled}
-                materialCount={materialCount}
-                supportCount={supportCount}
+                badges={badges}
                 onNavigate={() => setOpen(false)}
               />
             </div>
@@ -589,17 +509,10 @@ export function AppShell({
               search of the panel lives inside each table. */}
           <div className="flex min-w-0 items-center gap-2.5 text-[13px] text-muted-foreground">
             <span className="truncate text-[14px] font-semibold text-foreground">
-              {role === "super" ? "Panel de plataforma" : (resolvedSchoolName ?? "Colegio")}
+              {context.title}
             </span>
-            {session.currentPeriod && (
-              <>
-                <span
-                  className="size-[5px] shrink-0 rounded-full bg-muted-foreground/60"
-                  aria-hidden
-                />
-                <span className="truncate">{session.currentPeriod}</span>
-              </>
-            )}
+            <span className="size-[5px] shrink-0 rounded-full bg-muted-foreground/60" aria-hidden />
+            <span className="truncate">{context.detail}</span>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2.5">

@@ -48,10 +48,32 @@ COLUMNS_ADDED_BY_ALTER = {
     "icfes_simulations": {"material_id", "average_score", "status"},
 }
 
+# Columns that a migration creates and another one drops.
+#
+# The catalog arrived in two shapes: the team of the platform declared
+# `code` and `status`, and this project decided that `ref` and `state`
+# are the names that stay. The migration that adapts the catalog drops
+# the two columns of the other shape once their values are in `ref` and
+# `state`, but the create-table parser still sees them in the file that
+# brought them.
+COLUMNS_DROPPED_BY_ADAPTATION = {
+    "materials": {"code", "status"},
+}
+
 _CREATE_TABLE_RE = re.compile(
     r"create table (?:if not exists )?(?:public\.)?(\w+)\s*\((.*?)\n\);",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+def _without_comments(sql: str) -> str:
+    """The SQL without its comment lines.
+
+    A commented-out statement is documentation, not schema: the
+    rollback block of a migration describes the tables it would
+    recreate, and those tables are not part of the schema.
+    """
+    return "\n".join(line for line in sql.split("\n") if not line.lstrip().startswith("--"))
 
 
 def _parse_migration_columns() -> dict[str, set[str]]:
@@ -60,7 +82,7 @@ def _parse_migration_columns() -> dict[str, set[str]]:
 
     for directory in MIGRATION_DIRS:
         for path in sorted(directory.glob("*.sql")):
-            sql = path.read_text(encoding="utf-8")
+            sql = _without_comments(path.read_text(encoding="utf-8"))
             for match in _CREATE_TABLE_RE.finditer(sql):
                 table_name, body = match.group(1), match.group(2)
                 columns = tables.setdefault(table_name, set())
@@ -138,7 +160,9 @@ def test_columns_match_the_migrations(
         if orm_columns is None:
             continue
 
-        expected = migration_columns | COLUMNS_ADDED_BY_ALTER.get(table_name, set())
+        expected = (
+            migration_columns | COLUMNS_ADDED_BY_ALTER.get(table_name, set())
+        ) - COLUMNS_DROPPED_BY_ADAPTATION.get(table_name, set())
         actual = orm_columns
 
         missing = sorted(expected - actual)

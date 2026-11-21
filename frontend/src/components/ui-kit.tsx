@@ -5,6 +5,15 @@ import { Children, cloneElement, isValidElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
+ * The pieces every view of the panel is built with.
+ *
+ * There is one design in Lumen — the one of «El Índice» — so these
+ * pieces carry the same language: hairline borders instead of shadows,
+ * square corners, a dark band on the head of the tables and the type
+ * of the public site.
+ */
+
+/**
  * The header of a view: the title, what the view is about and the
  * action of the screen.
  *
@@ -167,6 +176,7 @@ export function SectionCard({
   title,
   description,
   actions,
+  leading,
   children,
   className,
   bodyClassName,
@@ -174,14 +184,17 @@ export function SectionCard({
   title?: string;
   description?: string;
   actions?: ReactNode;
+  /** What goes before the title: a link to the screen of the block. */
+  leading?: ReactNode;
   children: ReactNode;
   className?: string;
   bodyClassName?: string;
 }) {
   return (
     <section className={cn("overflow-hidden rounded-2xl border border-border bg-card", className)}>
-      {(title || actions) && (
+      {(title || actions || leading) && (
         <div className="flex items-center gap-3 border-b border-border px-[18px] py-[15px]">
+          {leading}
           <div className="min-w-0">
             {title && (
               <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
@@ -286,6 +299,52 @@ export function Chip({
 }
 
 /**
+ * The state of a piece, as a pill with a dot and its name.
+ *
+ * It is the chip of the design system with the point of its colour:
+ * the whole panel speaks the same language.
+ */
+export type StatusTone = "muted" | "success" | "warning" | "danger" | "info";
+
+const statusTones: Record<StatusTone, ChipTone> = {
+  muted: "muted",
+  success: "ok",
+  warning: "warn",
+  danger: "danger",
+  info: "info",
+};
+
+export function StatusPill({
+  label,
+  tone = "muted",
+  className,
+}: {
+  label: string;
+  tone?: StatusTone;
+  className?: string;
+}) {
+  return (
+    <Chip tone={statusTones[tone]} dot className={className}>
+      {label}
+    </Chip>
+  );
+}
+
+/** A neutral tag: the type of a material, a school code. */
+export function Tag({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full bg-[rgba(150,175,220,.1)] px-[9px] py-[3px] text-[11.8px] font-medium text-muted-foreground",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
  * The toolbar of a table: the search, the filters and the counter.
  *
  * The search of the panel lives here, inside the table it filters.
@@ -295,12 +354,51 @@ export function Toolbar({ children, className }: { children: ReactNode; classNam
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2.5 border-b border-border px-[18px] py-3",
+        "flex flex-wrap items-center gap-2.5 border-b border-border bg-card px-[18px] py-3",
         className,
       )}
     >
       {children}
     </div>
+  );
+}
+
+/** The search field of a toolbar. */
+export function SearchField({
+  value,
+  onChange,
+  placeholder = "Buscar",
+  className,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <label className={cn("flex h-9 items-center gap-2 rounded-[10px] bg-card px-3", className)}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.9}
+        strokeLinecap="round"
+        className="size-4 shrink-0 text-muted-foreground"
+        aria-hidden
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <span className="sr-only">{label ?? placeholder}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+      />
+    </label>
   );
 }
 
@@ -545,5 +643,87 @@ export function CollapsibleCard({
       </button>
       {open && <div className="px-[18px] py-[18px]">{children}</div>}
     </section>
+  );
+}
+
+/**
+ * The skeleton of a table: it has the shape of the real table, so the
+ * page does not jump when the data arrives.
+ */
+export function SkeletonRows({ rows = 6, columns = 5 }: { rows?: number; columns?: number }) {
+  return (
+    <div className="space-y-2 p-4" aria-hidden>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div key={rowIndex} className="flex items-center gap-4">
+          {Array.from({ length: columns }).map((__, columnIndex) => (
+            <div
+              key={columnIndex}
+              className="h-4 animate-pulse rounded bg-[rgba(150,175,220,.12)]"
+              style={{
+                width: columnIndex === 0 ? "34%" : `${Math.max(10, 60 - columnIndex * 8)}%`,
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The skeleton of the figures of the panel. */
+export function SkeletonCards({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-border bg-card p-5">
+          <div className="h-3 w-24 animate-pulse rounded bg-[rgba(150,175,220,.12)]" />
+          <div className="mt-3 h-7 w-16 animate-pulse rounded bg-[rgba(150,175,220,.12)]" />
+          <div className="mt-3 h-3 w-28 animate-pulse rounded bg-[rgba(150,175,220,.08)]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A bar with its figure: the shape the panel uses to compare states or
+ * areas.
+ */
+export function MeterRow({
+  label,
+  value,
+  max,
+  display,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  display?: string;
+}) {
+  const percent = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="grid grid-cols-[128px_1fr_48px] items-center gap-3 py-1 text-sm">
+      <span className="truncate">{label}</span>
+      <span className="h-2 overflow-hidden rounded-full bg-[rgba(150,175,220,.13)]">
+        <span
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${percent}%` }}
+          aria-hidden
+        />
+      </span>
+      <span className="text-right font-mono text-xs text-muted-foreground">{display ?? value}</span>
+    </div>
+  );
+}
+
+/**
+ * The counter of the extra schools of a row: "+3".
+ */
+export function ExtraCount({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="inline-flex items-center rounded-full bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-[#7FB8FF]">
+      +{count}
+    </span>
   );
 }

@@ -206,9 +206,38 @@
   }
 }
 
+/*
+ * The card of the panel and of the site.
+ *
+ * The tokens are the raw ones (`--card`, `--border`), not the ones of
+ * the theme (`--color-card`): the theme resolves them once, at the
+ * root, and the scope of the panel would never be seen. With the raw
+ * ones the card takes the colour of the scope it lives in: the dark
+ * card of the panel and the white card of the public site.
+ */
 @utility surface-card {
-  background-color: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow-card);
+}
+
+/*
+ * The header of a table: a band of its own, with the text inverted.
+ * The values come from the scope it lives in: the panel declares them
+ * in panel.css and the public site in site.css.
+ */
+@utility table-head-band {
+  background-color: var(--head-bg);
+  color: var(--head-fg);
+}
+
+/*
+ * The cell that carries a code: the identifier is read character by
+ * character, so it is set in the monospaced face.
+ */
+@utility code-cell {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
 }

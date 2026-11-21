@@ -77,6 +77,20 @@
   /* The shadow is only for the floating things. */
   --shadow-lift: 0 12px 32px -12px rgba(2, 6, 16, 0.85);
 
+  /*
+   * The names of the public site.
+   *
+   * The views of the platform were written against the palette of El
+   * Índice and kept three of its names: the tertiary text, the second
+   * line and the band of the table header. They are declared here with
+   * the values of the panel, so the same class paints the same way in
+   * the two scopes.
+   */
+  --ink-3: #8fa2c0;
+  --line-2: rgba(150, 175, 220, 0.26);
+  --head-bg: #16233c;
+  --head-fg: #e9eff9;
+
   /* The panel is dark: the text does not follow the theme of the site. */
   color: var(--foreground);
   background: var(--background);

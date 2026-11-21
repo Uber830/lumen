@@ -348,7 +348,7 @@ async def test_closing_a_period_is_the_principal_s(client, engine, seeded_school
         from tests.conftest import TEST_USER_ID
 
         for membership in (
-            await session.execute(select_memberships(cycle["school_id"], TEST_USER_ID))
+            await session.execute(select_memberships(cycle["school_id"], uuid.UUID(TEST_USER_ID)))
         ).scalars():
             membership.admin_role = SchoolAdminRole.SECUNDARIO
         await session.commit()

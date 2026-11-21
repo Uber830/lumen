@@ -13,8 +13,9 @@ The modules are grouped by domain:
 - `chat`       — conversations, members, messages.
 - `evaluations`— authored assessments and their attempts.
 - `icfes`      — the question bank, simulations and attempts.
-- `support`    — the requests of the school to the support team.
 - `billing`    — subscriptions, entitlements, the Wompi ledger.
+- `catalog`    — the editorial catalog of the platform role: materials,
+                 their files, their access, their history and the audit trail.
 - `sessions`   — refresh tokens, password resets, email verifications.
 - `notifications` — the in-app notifications of each user.
 """
@@ -31,6 +32,14 @@ from app.db.models.academics import (
     TeacherAssignment,
 )
 from app.db.models.billing import Entitlement, Subscription, WompiEventProcessed
+from app.db.models.catalog import (
+    AuditLog,
+    Material,
+    MaterialCourse,
+    MaterialFile,
+    MaterialHistory,
+    MaterialSchool,
+)
 from app.db.models.chat import ChatConversation, ChatMember, ChatMessage
 from app.db.models.evaluations import (
     Evaluation,
@@ -67,7 +76,6 @@ from app.db.models.learning import (
     Task,
     TaskSubmission,
 )
-from app.db.models.materials import Material, MaterialCourse, MaterialSchool
 from app.db.models.notifications import Notification, NotificationPreference
 from app.db.models.sessions import (
     EmailVerificationToken,
@@ -75,14 +83,13 @@ from app.db.models.sessions import (
     PasswordResetToken,
     RefreshToken,
 )
-from app.db.models.site import CatalogItem, CatalogItemSchool, SiteContent
+from app.db.models.site import SiteContent
 from app.db.models.support import SupportCase, SupportMessage
 
 __all__ = [
     "AcademicPeriod",
+    "AuditLog",
     "Base",
-    "CatalogItem",
-    "CatalogItemSchool",
     "ChatConversation",
     "ChatMember",
     "ChatMessage",
@@ -110,6 +117,8 @@ __all__ = [
     "LoginAttempt",
     "Material",
     "MaterialCourse",
+    "MaterialFile",
+    "MaterialHistory",
     "MaterialSchool",
     "Notification",
     "NotificationPreference",

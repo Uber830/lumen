@@ -20,7 +20,7 @@ export const CONTAINER = "mx-auto w-full max-w-[1220px] px-5 sm:px-8";
 const BUTTON_VARIANTS: Record<SiteActionVariant, string> = {
   solid: "bg-ink text-[var(--on-ink)] hover:bg-[var(--ink-hover)]",
   outline: "border border-line-2 bg-transparent text-ink hover:border-ink hover:bg-paper",
-  accent: "bg-[var(--accent-solid)] text-white hover:bg-[var(--accent-solid-hover)]",
+  accent: "bg-[var(--brand-solid)] text-white hover:bg-[var(--brand-solid-hover)]",
 };
 
 /**

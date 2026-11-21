@@ -2,7 +2,14 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CollapsibleCard, Pagination, PanelTable } from "@/components/ui-kit";
+import {
+  CollapsibleCard,
+  EmptyHint,
+  EmptyState,
+  Pagination,
+  PanelTable,
+  StatusPill,
+} from "@/components/ui-kit";
 
 // React needs to know it is running inside a test to allow `act`.
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -164,5 +171,89 @@ describe("PanelTable", () => {
     // The label of a column that is hidden behind a screen reader only
     // span is read the same way.
     expect(cells[2].getAttribute("data-label")).toBe("Acciones");
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+});
+
+describe("StatusPill", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("shows the state with its point", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<StatusPill label="Publicado" tone="success" />);
+    });
+
+    expect(container.textContent).toContain("Publicado");
+    // The point of the color is decorative: the name carries the state.
+    expect(container.querySelector("[aria-hidden]")).not.toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+});
+
+describe("EmptyState", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("says what happened, why and what to do", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <EmptyState
+          title="Sin material en el catálogo"
+          description="Los filtros no encontraron nada."
+          action={<button type="button">Quitar los filtros</button>}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Sin material en el catálogo");
+    expect(container.textContent).toContain("Los filtros no encontraron nada.");
+    expect(container.textContent).toContain("Quitar los filtros");
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+});
+
+describe("EmptyHint", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("accepts a plain text as the explanation", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<EmptyHint>Aún no hay docentes.</EmptyHint>);
+    });
+
+    expect(container.textContent).toContain("Aún no hay docentes.");
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 });

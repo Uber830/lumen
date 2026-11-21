@@ -84,7 +84,7 @@ export function MemberManageDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-card p-5 sm:rounded-2xl sm:p-6">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-lg bg-card p-5 sm:rounded-lg sm:p-6">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-bold">{member.full_name}</h2>

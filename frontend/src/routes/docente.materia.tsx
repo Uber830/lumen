@@ -118,7 +118,7 @@ function Materia() {
         </SectionCard>
       ) : !selected ? null : (
         <>
-          <div className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1">
+          <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1">
             {tabs.map((t) => (
               <button
                 key={t}

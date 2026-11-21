@@ -17,6 +17,7 @@ What is checked here:
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
 import pytest
@@ -72,7 +73,7 @@ async def _enable(session: AsyncSession, material: Material, school_id: uuid.UUI
 
 
 @pytest.fixture
-async def other_school(engine) -> uuid.UUID:
+async def other_school(engine) -> AsyncGenerator[uuid.UUID, None]:
     """A second school, so the tests can look at a material that is
     not the caller's."""
     school_id = uuid.uuid4()

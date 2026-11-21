@@ -1,0 +1,36 @@
+-- =========================================================================
+-- The editorial catalog leaves the old shape behind.
+-- -------------------------------------------------------------------------
+-- `catalog_items` and `catalog_item_schools` were the first version of
+-- the catalog: the landing showed a list of pieces and the schools
+-- that had access, with the school names written by hand.
+--
+-- The pieces were transformed into `materials` in
+-- `20261119010000_editorial_catalog.sql`, and the site reads them from
+-- there. These tables are now empty and unused: they go.
+--
+-- Rollback:
+--   create table if not exists public.catalog_items (
+--     id         uuid primary key default gen_random_uuid(),
+--     ref        text not null,
+--     title      text not null,
+--     meta       text,
+--     area       text not null,
+--     state      text not null,
+--     position   integer not null default 0,
+--     created_at timestamptz not null default now(),
+--     updated_at timestamptz not null default now(),
+--     constraint catalog_items_ref_uq unique (ref),
+--     constraint catalog_items_state_check
+--       check (state in ('published', 'review', 'draft', 'archived'))
+--   );
+--   create table if not exists public.catalog_item_schools (
+--     id              uuid primary key default gen_random_uuid(),
+--     catalog_item_id uuid not null references public.catalog_items(id) on delete cascade,
+--     school_name     text not null,
+--     position        integer not null default 0
+--   );
+-- =========================================================================
+
+drop table if exists public.catalog_item_schools;
+drop table if exists public.catalog_items;

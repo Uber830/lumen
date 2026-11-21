@@ -127,6 +127,14 @@ returns trigger
 language plpgsql
 as $$
 begin
+  -- A teacher or a student is never an administrator: it has no rank.
+  -- The rule of the table says so, and the trigger keeps it even when
+  -- the row is written by something that only knows the role.
+  if new.role <> 'school_admin' then
+    new.admin_role := null;
+    return new;
+  end if;
+
   if new.role = 'school_admin' and new.admin_role is null then
     if exists (
       select 1
@@ -232,20 +240,37 @@ create trigger school_settings_set_updated_at
 -- sees each piece. A school never writes in these tables.
 -- ---------------------------------------------------------------------------
 create table if not exists public.materials (
-  id               uuid primary key default gen_random_uuid(),
+  id                uuid primary key default gen_random_uuid(),
   -- The short code shown in the tables: C-1041.
-  ref              text not null,
-  title            text not null,
-  description      text,
-  area             text not null,
-  kind             text not null,
-  storage_path     text,
-  file_name        text,
-  file_size_bytes  bigint,
-  state            text not null default 'borrador',
-  published_at     timestamptz,
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now(),
+  ref               text not null,
+  title             text not null,
+  -- What the piece is pedagogically: Libro, Guia, Evaluacion,
+  -- Multimedia o Documento. It is not the format of the file.
+  type              text not null default 'Documento',
+  description       text,
+  area              text not null,
+  -- The format of the file: pdf, docx, epub, mp4 o zip.
+  kind              text not null default 'pdf',
+  storage_path      text,
+  file_name         text,
+  file_size_bytes   bigint,
+  -- The grades it applies to.
+  grades            text[] not null default '{}',
+  -- 'all' (docentes y estudiantes) o 'teachers' (solo los docentes).
+  visible_to        text not null default 'all',
+  publication_year  smallint,
+  -- 'upload' o 'link'.
+  origin            text not null default 'upload',
+  external_url      text,
+  -- The editorial state: borrador, en_revision, publicado o archivado.
+  state             text not null default 'borrador',
+  -- The order of the landing.
+  position          integer not null default 0,
+  created_by        uuid references public.users(id) on delete set null,
+  published_at      timestamptz,
+  archived_at       timestamptz,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now(),
   constraint materials_ref_uq unique (ref),
   constraint materials_kind_ck
     check (kind in ('pdf', 'docx', 'epub', 'mp4', 'zip')),
@@ -260,10 +285,10 @@ comment on table public.materials is
 -- The shape of the catalog is decided here
 --
 -- Another branch of the project (the team of the platform) also declares a
--- table called `materials`, with its own columns: `code`, `type`, `status`
--- and the files in a table of their own. `create table if not exists` does
--- not touch a table that already exists, so when that migration ran first
--- this one would find a catalog it does not understand and the panel of the
+-- table called `materials`, with its own columns: `code` and `status`, and
+-- the files in a table of their own. `create table if not exists` does not
+-- touch a table that already exists, so when that migration ran first this
+-- one would find a catalog it does not understand and the panel of the
 -- school would break.
 --
 -- The decision is that **this shape is the one that stays**: the catalog of
@@ -280,11 +305,19 @@ alter table public.materials add column if not exists storage_path text;
 alter table public.materials add column if not exists file_name text;
 alter table public.materials add column if not exists file_size_bytes bigint;
 alter table public.materials add column if not exists state text;
+alter table public.materials add column if not exists type text default 'Documento';
+alter table public.materials add column if not exists grades text[] default '{}';
+alter table public.materials add column if not exists visible_to text default 'all';
+alter table public.materials add column if not exists publication_year smallint;
+alter table public.materials add column if not exists origin text default 'upload';
+alter table public.materials add column if not exists external_url text;
+alter table public.materials add column if not exists position integer default 0;
+alter table public.materials add column if not exists created_by uuid references public.users(id) on delete set null;
+alter table public.materials add column if not exists archived_at timestamptz;
 
 do $$
 declare
   tiene_code boolean := false;
-  tiene_type boolean := false;
   tiene_status boolean := false;
   tiene_files boolean := false;
 begin
@@ -292,11 +325,6 @@ begin
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'materials' and column_name = 'code'
   ) into tiene_code;
-
-  select exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'materials' and column_name = 'type'
-  ) into tiene_type;
 
   select exists (
     select 1 from information_schema.columns
@@ -316,16 +344,24 @@ begin
   set ref = 'C-' || upper(left(replace(id::text, '-', ''), 8))
   where ref is null;
 
-  -- The kind of the file: the type of the other shape, translated.
-  if tiene_type then
-    update public.materials
-    set kind = case type
-      when 'Libro' then 'epub'
-      when 'Documento' then 'docx'
-      when 'Multimedia' then 'mp4'
+  -- The kind of the file: the format of the primary file, and not the
+  -- pedagogical type, which says something else.
+  if tiene_files then
+    update public.materials m
+    set kind = case f.mime_type
+      when 'application/epub+zip' then 'epub'
+      when 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' then 'docx'
+      when 'video/mp4' then 'mp4'
+      when 'application/zip' then 'zip'
       else 'pdf'
     end
-    where kind is null;
+    from public.material_files f
+    where f.material_id = m.id
+      and (f.is_primary or not exists (
+        select 1 from public.material_files other
+        where other.material_id = m.id and other.is_primary
+      ))
+      and m.kind is null;
   end if;
   update public.materials set kind = 'pdf' where kind is null;
 
@@ -364,9 +400,9 @@ end $$;
 -- teams writes a new material.
 --
 -- The team of the platform adapts its queries to these names: `ref` for
--- the code, `kind` for the type of the file and `state` for the state
--- of the piece. The rest of its columns (the grades, the visibility, the
--- order of the landing) stay as they are.
+-- the code and `state` for the state of the piece. The rest of its columns
+-- (the pedagogical type, the grades, the visibility, the order of the
+-- landing) stay as they are: they say something else.
 do $$
 begin
   if exists (
@@ -374,13 +410,6 @@ begin
     where table_schema = 'public' and table_name = 'materials' and column_name = 'code'
   ) then
     alter table public.materials drop column code;
-  end if;
-
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'materials' and column_name = 'type'
-  ) then
-    alter table public.materials drop column type;
   end if;
 
   if exists (
@@ -417,6 +446,12 @@ end $$;
 
 alter table public.materials alter column ref set not null;
 alter table public.materials alter column kind set not null;
+-- The format of the file is known when the piece is created: a piece
+-- without a file of its own is a pdf by default.
+alter table public.materials alter column kind set default 'pdf';
+-- What the piece is pedagogically: a piece that does not say it is a
+-- document.
+alter table public.materials alter column type set default 'Documento';
 alter table public.materials alter column state set not null;
 alter table public.materials alter column state set default 'borrador';
 
@@ -489,6 +524,7 @@ create table if not exists public.material_courses (
   id          uuid primary key default gen_random_uuid(),
   material_id uuid not null references public.materials(id) on delete cascade,
   course_id   uuid not null references public.courses(id) on delete cascade,
+  created_at  timestamptz not null default now(),
   constraint material_courses_material_course_uq unique (material_id, course_id)
 );
 

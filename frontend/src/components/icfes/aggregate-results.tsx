@@ -145,7 +145,7 @@ export function IcfesAggregateResults() {
         <SectionCard title="Comparativa por curso" bodyClassName="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="table-head-band text-left text-[11px] uppercase tracking-[0.09em]">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Curso</th>
                   <th className="px-5 py-3 font-semibold">Simulacro</th>

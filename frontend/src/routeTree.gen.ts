@@ -49,8 +49,9 @@ import { Route as EstudianteNotasRouteImport } from './routes/estudiante.notas'
 import { Route as EstudianteTareasRouteImport } from './routes/estudiante.tareas'
 import { Route as PerfilIndexRouteImport } from './routes/perfil.index'
 import { Route as SuperIndexRouteImport } from './routes/super.index'
+import { Route as SuperCatalogoRouteImport } from './routes/super.catalogo'
 import { Route as SuperColegiosRouteImport } from './routes/super.colegios'
-import { Route as SuperPlanesRouteImport } from './routes/super.planes'
+import { Route as SuperSoporteRouteImport } from './routes/super.soporte'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -252,14 +253,19 @@ const SuperIndexRoute = SuperIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SuperRoute,
 } as any)
+const SuperCatalogoRoute = SuperCatalogoRouteImport.update({
+  id: '/catalogo',
+  path: '/catalogo',
+  getParentRoute: () => SuperRoute,
+} as any)
 const SuperColegiosRoute = SuperColegiosRouteImport.update({
   id: '/colegios',
   path: '/colegios',
   getParentRoute: () => SuperRoute,
 } as any)
-const SuperPlanesRoute = SuperPlanesRouteImport.update({
-  id: '/planes',
-  path: '/planes',
+const SuperSoporteRoute = SuperSoporteRouteImport.update({
+  id: '/soporte',
+  path: '/soporte',
   getParentRoute: () => SuperRoute,
 } as any)
 
@@ -299,8 +305,9 @@ export interface FileRoutesByFullPath {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
-  '/super/planes': typeof SuperPlanesRoute
+  '/super/soporte': typeof SuperSoporteRoute
   '/admin/': typeof AdminIndexRoute
   '/docente/': typeof DocenteIndexRoute
   '/estudiante/': typeof EstudianteIndexRoute
@@ -338,8 +345,9 @@ export interface FileRoutesByTo {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
-  '/super/planes': typeof SuperPlanesRoute
+  '/super/soporte': typeof SuperSoporteRoute
   '/admin': typeof AdminIndexRoute
   '/docente': typeof DocenteIndexRoute
   '/estudiante': typeof EstudianteIndexRoute
@@ -383,8 +391,9 @@ export interface FileRoutesById {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
-  '/super/planes': typeof SuperPlanesRoute
+  '/super/soporte': typeof SuperSoporteRoute
   '/admin/': typeof AdminIndexRoute
   '/docente/': typeof DocenteIndexRoute
   '/estudiante/': typeof EstudianteIndexRoute
@@ -429,8 +438,9 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/super/catalogo'
     | '/super/colegios'
-    | '/super/planes'
+    | '/super/soporte'
     | '/admin/'
     | '/docente/'
     | '/estudiante/'
@@ -468,8 +478,9 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/super/catalogo'
     | '/super/colegios'
-    | '/super/planes'
+    | '/super/soporte'
     | '/admin'
     | '/docente'
     | '/estudiante'
@@ -512,8 +523,9 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/super/catalogo'
     | '/super/colegios'
-    | '/super/planes'
+    | '/super/soporte'
     | '/admin/'
     | '/docente/'
     | '/estudiante/'
@@ -815,6 +827,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperIndexRouteImport
       parentRoute: typeof SuperRoute
     }
+    '/super/catalogo': {
+      id: '/super/catalogo'
+      path: '/catalogo'
+      fullPath: '/super/catalogo'
+      preLoaderRoute: typeof SuperCatalogoRouteImport
+      parentRoute: typeof SuperRoute
+    }
     '/super/colegios': {
       id: '/super/colegios'
       path: '/colegios'
@@ -822,11 +841,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperColegiosRouteImport
       parentRoute: typeof SuperRoute
     }
-    '/super/planes': {
-      id: '/super/planes'
-      path: '/planes'
-      fullPath: '/super/planes'
-      preLoaderRoute: typeof SuperPlanesRouteImport
+    '/super/soporte': {
+      id: '/super/soporte'
+      path: '/soporte'
+      fullPath: '/super/soporte'
+      preLoaderRoute: typeof SuperSoporteRouteImport
       parentRoute: typeof SuperRoute
     }
   }
@@ -929,14 +948,16 @@ const PerfilRouteWithChildren =
   PerfilRoute._addFileChildren(PerfilRouteChildren)
 
 interface SuperRouteChildren {
+  SuperCatalogoRoute: typeof SuperCatalogoRoute
   SuperColegiosRoute: typeof SuperColegiosRoute
-  SuperPlanesRoute: typeof SuperPlanesRoute
+  SuperSoporteRoute: typeof SuperSoporteRoute
   SuperIndexRoute: typeof SuperIndexRoute
 }
 
 const SuperRouteChildren: SuperRouteChildren = {
+  SuperCatalogoRoute: SuperCatalogoRoute,
   SuperColegiosRoute: SuperColegiosRoute,
-  SuperPlanesRoute: SuperPlanesRoute,
+  SuperSoporteRoute: SuperSoporteRoute,
   SuperIndexRoute: SuperIndexRoute,
 }
 

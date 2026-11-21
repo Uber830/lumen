@@ -67,7 +67,7 @@ export function GradeGrid({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="table-head-band text-left text-[11px] uppercase tracking-[0.09em]">
           <tr>
             <th className="sticky left-0 bg-muted px-5 py-3 font-semibold">Estudiante</th>
             <th className="px-3 py-3 font-semibold">Nota (0 a 5)</th>
