@@ -3,7 +3,7 @@ import { Check, Send } from "lucide-react";
 import { useState } from "react";
 
 import {
-  EmptyHint,
+  EmptyState,
   PageHeader,
   Pagination,
   SearchField,
@@ -24,12 +24,14 @@ import {
 } from "@/lib/platform/hooks";
 import {
   auditEventLabel,
+  CASE_CATEGORY_LABEL,
   CASE_CHANNEL_LABEL,
   CASE_LEVEL_LABEL,
   CASE_LEVEL_TONE,
   CASE_STATUS_LABEL,
   CASE_STATUS_TONE,
   type AuditEntry,
+  type CaseCategory,
   type CaseChannel,
   type CaseLevel,
   type CaseStatus,
@@ -260,7 +262,7 @@ function Soporte() {
           {cases.isLoading ? (
             <SkeletonRows rows={6} columns={7} />
           ) : items.length === 0 ? (
-            <EmptyHint title="Sin casos" description="No hay casos que coincidan con el filtro." />
+            <EmptyState title="Sin casos" description="No hay casos que coincidan con el filtro." />
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -310,7 +312,7 @@ function Soporte() {
                             onClick={() => setOpenId(item.id)}
                             className="text-left font-medium hover:text-primary"
                           >
-                            {item.subject}
+                            {item.title}
                           </button>
                           <span className="code-cell mt-0.5 block text-ink-3">
                             {item.code} · {item.message_count} mensaje(s)
@@ -318,9 +320,9 @@ function Soporte() {
                         </td>
                         <td className="px-5 py-3">{item.school_name ?? "—"}</td>
                         <td className="px-5 py-3">
-                          <span className="block">{item.requester_name}</span>
+                          <span className="block">{item.opened_by_name}</span>
                           <span className="block text-xs text-muted-foreground">
-                            {item.requester_role}
+                            {CASE_CATEGORY_LABEL[item.category as CaseCategory] ?? item.category}
                           </span>
                         </td>
                         <td className="px-5 py-3">
@@ -341,7 +343,7 @@ function Soporte() {
                           />
                         </td>
                         <td className="px-5 py-3 text-right text-xs text-muted-foreground">
-                          {new Date(item.created_at).toLocaleString("es-CO", {
+                          {new Date(item.opened_at).toLocaleString("es-CO", {
                             day: "2-digit",
                             month: "short",
                             hour: "2-digit",
@@ -411,7 +413,7 @@ function Soporte() {
           {audit.isLoading ? (
             <SkeletonRows rows={6} columns={4} />
           ) : (audit.data?.items.length ?? 0) === 0 ? (
-            <EmptyHint
+            <EmptyState
               title="Sin eventos"
               description="No hay movimientos de la red que coincidan con el filtro."
             />

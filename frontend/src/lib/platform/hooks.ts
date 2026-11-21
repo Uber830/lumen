@@ -407,7 +407,7 @@ export function useCase(id: string | null): UseQueryResult<CaseDetail, Error> {
   });
 }
 
-/** Answer a case. The case goes back to "waiting". */
+/** Answer a case. The case goes back to "en_espera". */
 export function useAnswerCase(): UseMutationResult<
   CaseDetail,
   Error,

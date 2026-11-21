@@ -243,15 +243,19 @@ export const MATERIAL_STATUS_HINT: Record<MaterialStatus, string> = {
 // (`GET /v1/platform/case-options`): the frontend never hardcodes them.
 // =============================================================================
 
-export type CaseLevel = "info" | "warning" | "urgent";
+export type CaseLevel = "info" | "aviso" | "urgente";
 
-export type CaseStatus = "open" | "waiting" | "resolved";
+export type CaseStatus = "abierto" | "en_espera" | "resuelto";
 
-export type CaseChannel = "web_form" | "email" | "call";
+export type CaseChannel = "formulario_colegio" | "formulario_web" | "correo" | "llamada";
+
+export type CaseCategory = "problema_tecnico" | "solicitud_material" | "duda_acceso" | "otro";
 
 export interface CaseMessage {
   id: string;
+  author_id: string | null;
   author_name: string;
+  /** `colegio` or `plataforma`: who wrote it. */
   author_role: string;
   body: string;
   created_at: string;
@@ -270,21 +274,21 @@ export interface CaseAuditEvent {
 export interface CaseSummary {
   id: string;
   code: string;
-  subject: string;
+  title: string;
+  category: CaseCategory;
   school_id: string | null;
   school_name: string | null;
-  requester_name: string;
-  requester_role: string;
-  channel: string;
+  opened_by: string | null;
+  opened_by_name: string;
+  channel: CaseChannel;
   level: CaseLevel;
   status: CaseStatus;
   message_count: number;
   last_message_at: string | null;
-  created_at: string;
+  opened_at: string;
 }
 
 export interface CaseDetail extends CaseSummary {
-  detail: string | null;
   messages: CaseMessage[];
   audit: CaseAuditEvent[];
   /** Whether the case can still be closed. */
@@ -295,39 +299,49 @@ export interface CaseOptions {
   levels: string[];
   statuses: string[];
   channels: string[];
+  categories: string[];
 }
 
 /** How urgent a case is, as the panel shows it. */
 export const CASE_LEVEL_LABEL: Record<CaseLevel, string> = {
   info: "Info",
-  warning: "Aviso",
-  urgent: "Urgente",
+  aviso: "Aviso",
+  urgente: "Urgente",
 };
 
 export const CASE_LEVEL_TONE: Record<CaseLevel, "info" | "warning" | "danger"> = {
   info: "info",
-  warning: "warning",
-  urgent: "danger",
+  aviso: "warning",
+  urgente: "danger",
 };
 
 /** The state of a case, as the panel shows it. */
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
-  open: "Abierto",
-  waiting: "En espera",
-  resolved: "Resuelto",
+  abierto: "Abierto",
+  en_espera: "En espera",
+  resuelto: "Resuelto",
 };
 
 export const CASE_STATUS_TONE: Record<CaseStatus, "info" | "warning" | "success"> = {
-  open: "info",
-  waiting: "warning",
-  resolved: "success",
+  abierto: "info",
+  en_espera: "warning",
+  resuelto: "success",
 };
 
 /** How the case arrived. */
 export const CASE_CHANNEL_LABEL: Record<CaseChannel, string> = {
-  web_form: "Formulario web",
-  email: "Correo",
-  call: "Llamada",
+  formulario_colegio: "Formulario del colegio",
+  formulario_web: "Formulario web",
+  correo: "Correo",
+  llamada: "Llamada",
+};
+
+/** What the school is asking for. */
+export const CASE_CATEGORY_LABEL: Record<CaseCategory, string> = {
+  problema_tecnico: "Problema técnico",
+  solicitud_material: "Solicitud de material",
+  duda_acceso: "Duda de acceso",
+  otro: "Otro",
 };
 
 /**

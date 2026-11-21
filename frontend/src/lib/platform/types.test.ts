@@ -48,8 +48,8 @@ describe("the states of the catalog", () => {
  * and a tone in the panel.
  */
 
-const LEVELS: CaseLevel[] = ["info", "warning", "urgent"];
-const CASE_STATUSES: CaseStatus[] = ["open", "waiting", "resolved"];
+const LEVELS: CaseLevel[] = ["info", "aviso", "urgente"];
+const CASE_STATUSES: CaseStatus[] = ["abierto", "en_espera", "resuelto"];
 
 describe("the desk of the support", () => {
   it("has a name and a tone for every level", () => {
@@ -71,9 +71,9 @@ describe("the desk of the support", () => {
   });
 
   it("names the channels in Spanish", () => {
-    expect(CASE_CHANNEL_LABEL.web_form).toBe("Formulario web");
-    expect(CASE_CHANNEL_LABEL.email).toBe("Correo");
-    expect(CASE_CHANNEL_LABEL.call).toBe("Llamada");
+    expect(CASE_CHANNEL_LABEL.formulario_web).toBe("Formulario web");
+    expect(CASE_CHANNEL_LABEL.correo).toBe("Correo");
+    expect(CASE_CHANNEL_LABEL.llamada).toBe("Llamada");
   });
 
   it("reads a movement of the platform in plain words", () => {

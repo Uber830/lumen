@@ -35,7 +35,7 @@ export function CaseComposer({
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const recipients = cases.map((item) => item.school_name ?? item.requester_name);
+  const recipients = cases.map((item) => item.school_name ?? item.opened_by_name);
 
   async function onSubmit() {
     if (!body.trim()) {
@@ -77,7 +77,7 @@ export function CaseComposer({
           </DialogTitle>
           <DialogDescription>
             {cases.length === 1 && cases[0]
-              ? `${cases[0].code} · ${cases[0].subject}`
+              ? `${cases[0].code} · ${cases[0].title}`
               : "La misma respuesta queda en la conversación de cada caso."}
           </DialogDescription>
         </DialogHeader>

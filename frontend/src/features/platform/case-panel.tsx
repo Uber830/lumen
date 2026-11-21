@@ -6,6 +6,7 @@ import { StatusPill, Tag } from "@/components/ui-kit";
 import { useCase, useResolveCase } from "@/lib/platform/hooks";
 import {
   auditEventLabel,
+  CASE_CATEGORY_LABEL,
   CASE_LEVEL_LABEL,
   CASE_LEVEL_TONE,
   CASE_STATUS_LABEL,
@@ -58,7 +59,7 @@ export function CasePanel({
       >
         <div className="flex items-start gap-3 border-b border-border px-5 py-4 text-left">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-[16px]">{detail?.subject ?? "Caso"}</DialogTitle>
+            <DialogTitle className="text-[16px]">{detail?.title ?? "Caso"}</DialogTitle>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {detail && (
                 <>
@@ -105,12 +106,12 @@ export function CasePanel({
                   <dt className="text-muted-foreground">Colegio</dt>
                   <dd>{detail.school_name ?? "Sin colegio"}</dd>
                   <dt className="text-muted-foreground">Solicita</dt>
-                  <dd>
-                    {detail.requester_name} · {detail.requester_role}
-                  </dd>
+                  <dd>{detail.opened_by_name}</dd>
+                  <dt className="text-muted-foreground">Motivo</dt>
+                  <dd>{CASE_CATEGORY_LABEL[detail.category]}</dd>
                   <dt className="text-muted-foreground">Recibido</dt>
                   <dd>
-                    {new Date(detail.created_at).toLocaleString("es-CO", {
+                    {new Date(detail.opened_at).toLocaleString("es-CO", {
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",
@@ -118,11 +119,6 @@ export function CasePanel({
                     })}
                   </dd>
                 </dl>
-                {detail.detail && (
-                  <p className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    {detail.detail}
-                  </p>
-                )}
               </section>
 
               <section>
@@ -135,7 +131,7 @@ export function CasePanel({
                     <li
                       key={message.id}
                       className={`rounded-lg border px-3 py-2.5 ${
-                        message.author_role === "Plataforma"
+                        message.author_role === "plataforma"
                           ? "border-primary/40 bg-primary-soft"
                           : "border-border bg-muted/30"
                       }`}

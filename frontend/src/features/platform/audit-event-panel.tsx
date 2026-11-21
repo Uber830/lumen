@@ -152,14 +152,14 @@ export function AuditEventPanel({
                     />
                     <Tag>{detail.code}</Tag>
                   </div>
-                  <p className="mb-3 text-sm font-medium">{detail.subject}</p>
+                  <p className="mb-3 text-sm font-medium">{detail.title}</p>
 
                   <ul className="flex flex-col gap-3">
                     {detail.messages.map((message) => (
                       <li
                         key={message.id}
                         className={`rounded-lg border px-3 py-2.5 ${
-                          message.author_role === "Plataforma"
+                          message.author_role === "plataforma"
                             ? "border-primary/40 bg-primary-soft"
                             : "border-border bg-muted/30"
                         }`}
