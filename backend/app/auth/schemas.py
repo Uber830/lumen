@@ -167,6 +167,9 @@ class SessionInfo(BaseModel):
     # frontend receives them and never decides on its own what the
     # rank may do.
     permissions: list[str] = Field(default_factory=list)
+    # The academic period the school is in. The top bar shows it as the
+    # context of the session.
+    current_period: str | None = None
 
 
 class AuthResponse(BaseModel):

@@ -229,6 +229,7 @@ describe("destinationForSession", () => {
     primary_school_id: null,
     school: null,
     permissions: [],
+    current_period: null,
     ...overrides,
   });
 

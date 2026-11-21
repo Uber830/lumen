@@ -83,6 +83,8 @@ export type SessionInfo = {
    * disables from it.
    */
   permissions: string[];
+  /** The academic period the school is in, shown in the top bar. */
+  current_period: string | null;
 };
 
 export type AuthResponse = {

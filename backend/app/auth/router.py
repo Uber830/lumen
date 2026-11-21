@@ -148,6 +148,7 @@ def _session_info(context: UserSession) -> SessionInfo:
         # disables what the rank may and may not do. A caller that is
         # not an administrator of its school gets none.
         permissions=_permissions_of(context.memberships),
+        current_period=context.current_period,
     )
 
 
