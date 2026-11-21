@@ -69,6 +69,19 @@ MATERIAL_GRADES: tuple[str, ...] = ("6°", "7°", "8°", "9°", "10°", "11°")
 
 MATERIAL_STATUSES: tuple[str, ...] = ("draft", "review", "published", "archived")
 
+# The catalog of the database speaks Spanish: the state of a piece is
+# "borrador", "en_revision", "publicado" or "archivado". The API keeps
+# its own vocabulary and translates at the edge, so the frontend of the
+# platform does not change.
+STATE_BY_STATUS: dict[str, str] = {
+    "draft": "borrador",
+    "review": "en_revision",
+    "published": "publicado",
+    "archived": "archivado",
+}
+
+STATUS_BY_STATE: dict[str, str] = {state: status for status, state in STATE_BY_STATUS.items()}
+
 VISIBLE_TO: tuple[str, ...] = ("all", "teachers")
 
 # The first code of the catalog. The numbers keep growing.
@@ -97,6 +110,16 @@ TRANSITIONS: dict[str, tuple[str, ...]] = {
     "published": ("archived",),
     "archived": ("published",),
 }
+
+
+def state_of(status: str) -> str:
+    """The state of the database for a state of the API."""
+    return STATE_BY_STATUS.get(status, status)
+
+
+def status_of(state: str) -> str:
+    """The state of the API for a state of the database."""
+    return STATUS_BY_STATE.get(state, state)
 
 
 def available_transitions(status: str) -> list[str]:
@@ -149,9 +172,7 @@ async def next_code(session: AsyncSession) -> str:
     so a race that takes the same number is rejected by the database
     and the caller can try again.
     """
-    result = await session.execute(
-        select(func.max(cast(func.substring(Material.code, 3), Integer)))
-    )
+    result = await session.execute(select(func.max(cast(func.substring(Material.ref, 3), Integer))))
     highest = result.scalar_one_or_none()
     number = FIRST_CODE_NUMBER if highest is None else int(highest) + 1
     return f"C-{number}"
@@ -263,7 +284,10 @@ async def _load_schools(
     result = await session.execute(
         select(MaterialSchool.material_id, MaterialSchool.school_id, School.name)
         .join(School, School.id == MaterialSchool.school_id)
-        .where(MaterialSchool.material_id.in_(material_ids))
+        .where(
+            MaterialSchool.material_id.in_(material_ids),
+            MaterialSchool.enabled.is_(True),
+        )
         .order_by(MaterialSchool.enabled_at, School.name)
     )
 
@@ -291,15 +315,18 @@ async def list_materials(
     conditions: list[ColumnElement[bool]] = []
     if query:
         pattern = f"%{query.strip()}%"
-        conditions.append(Material.title.ilike(pattern) | Material.code.ilike(pattern))
+        conditions.append(Material.title.ilike(pattern) | Material.ref.ilike(pattern))
     if material_type:
         conditions.append(Material.type == material_type)
     if status:
-        conditions.append(Material.status == status)
+        conditions.append(Material.state == state_of(status))
     if school_id:
         conditions.append(
             Material.id.in_(
-                select(MaterialSchool.material_id).where(MaterialSchool.school_id == school_id)
+                select(MaterialSchool.material_id).where(
+                    MaterialSchool.school_id == school_id,
+                    MaterialSchool.enabled.is_(True),
+                )
             )
         )
 
@@ -310,7 +337,7 @@ async def list_materials(
         select(Material)
         .options(selectinload(Material.files))
         .where(*conditions)
-        .order_by(Material.updated_at.desc(), Material.code)
+        .order_by(Material.updated_at.desc(), Material.ref)
         .offset((page - 1) * per_page)
         .limit(per_page)
     )
@@ -354,7 +381,7 @@ async def get_material(
 
 async def get_material_by_code(session: AsyncSession, code: str) -> Material | None:
     """One material, looked up by its code."""
-    result = await session.execute(select(Material).where(Material.code == code))
+    result = await session.execute(select(Material).where(Material.ref == code))
     return result.scalars().first()
 
 
@@ -421,7 +448,10 @@ async def covered_materials(session: AsyncSession, school_id: uuid.UUID) -> int:
     result = await session.execute(
         select(func.count())
         .select_from(MaterialSchool)
-        .where(MaterialSchool.school_id == school_id)
+        .where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+        )
     )
     return int(result.scalar_one())
 
@@ -447,10 +477,13 @@ async def metrics(session: AsyncSession) -> dict[str, Any]:
     materials = int(materials_result.scalar_one())
 
     status_rows = await session.execute(
-        select(Material.status, func.count()).group_by(Material.status)
+        select(Material.state, func.count()).group_by(Material.state)
     )
+    # The count is grouped by the state of the database and is told in
+    # the vocabulary of the API: the frontend of the platform does not
+    # know that the database speaks Spanish.
     by_status = {status: 0 for status in MATERIAL_STATUSES}
-    by_status.update({status: int(count) for status, count in status_rows.all()})
+    by_status.update({status_of(state): int(count) for state, count in status_rows.all()})
 
     area_rows = await session.execute(select(Material.area, func.count()).group_by(Material.area))
     by_area = {area: int(count) for area, count in area_rows.all()}
@@ -518,7 +551,8 @@ async def school_figures(
         .join(Material, Material.id == MaterialSchool.material_id)
         .where(
             MaterialSchool.school_id.in_(school_ids),
-            Material.status == "published",
+            MaterialSchool.enabled.is_(True),
+            Material.state == "publicado",
         )
         .group_by(MaterialSchool.school_id)
     )
@@ -572,31 +606,36 @@ async def school_catalog_access(
     result = await session.execute(
         select(
             Material.id,
-            Material.code,
+            Material.ref,
             Material.title,
             Material.type,
             Material.area,
-            Material.status,
-        ).order_by(Material.code)
+            Material.state,
+        ).order_by(Material.ref)
     )
     rows = result.all()
 
     access = await session.execute(
-        select(MaterialSchool.material_id).where(MaterialSchool.school_id == school_id)
+        select(MaterialSchool.material_id).where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+        )
     )
     enabled = {material_id for (material_id,) in access.all()}
 
     return [
         {
             "id": material_id,
-            "code": code,
+            "code": ref,
             "title": title,
             "type": material_type,
             "area": area,
-            "status": material_status,
+            # The state of the database is told in the vocabulary of the
+            # API: the frontend of the platform does not change.
+            "status": status_of(state),
             "enabled": material_id in enabled,
         }
-        for material_id, code, title, material_type, area, material_status in rows
+        for material_id, ref, title, material_type, area, state in rows
     ]
 
 
@@ -716,6 +755,23 @@ EXTENSION_MIME_TYPES: dict[str, str] = {
 }
 
 
+# The format of the file, as the catalog names it. The mime type says
+# what the browser sent; the kind says what the file is.
+KIND_BY_MIME_TYPE: dict[str, str] = {
+    "application/epub+zip": "epub",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/zip": "zip",
+    "video/mp4": "mp4",
+}
+
+
+def kind_of(mime_type: str | None) -> str:
+    """The format of the catalog for a mime type."""
+    if not mime_type:
+        return "pdf"
+    return KIND_BY_MIME_TYPE.get(mime_type, "pdf")
+
+
 def mime_type_of(file_name: str, declared: str | None) -> str | None:
     """The mime type of an uploaded file.
 
@@ -794,6 +850,8 @@ __all__ = [
     "list_materials",
     "materialize_upload",
     "metrics",
+    "KIND_BY_MIME_TYPE",
+    "kind_of",
     "mime_type_of",
     "next_code",
     "now_utc",

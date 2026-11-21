@@ -20,14 +20,17 @@ class CaseOptions(BaseModel):
     levels: list[str]
     statuses: list[str]
     channels: list[str]
+    categories: list[str]
 
 
 class CaseMessageOut(BaseModel):
     """One turn of the conversation."""
 
     id: UUID
-    author_name: str
-    author_role: str
+    author_id: UUID | None = None
+    author_name: str = ""
+    # colegio or plataforma.
+    author_role: str = "colegio"
     body: str
     created_at: datetime
 
@@ -37,17 +40,18 @@ class CaseSummary(BaseModel):
 
     id: UUID
     code: str
-    subject: str
+    title: str
+    category: str = "otro"
     school_id: UUID | None
     school_name: str | None
-    requester_name: str
-    requester_role: str
-    channel: str
-    level: str
-    status: str
+    opened_by: UUID | None = None
+    opened_by_name: str = "Colegio"
+    channel: str = "formulario_colegio"
+    level: str = "info"
+    status: str = "abierto"
     message_count: int
     last_message_at: datetime | None
-    created_at: datetime
+    opened_at: datetime
 
 
 class CasePage(BaseModel):
@@ -71,9 +75,8 @@ class AuditEventOut(BaseModel):
 
 
 class CaseDetail(CaseSummary):
-    """The whole case: the description, the conversation and the audit."""
+    """The whole case: the conversation and the audit."""
 
-    detail: str | None
     messages: list[CaseMessageOut]
     audit: list[AuditEventOut]
     can_resolve: bool
@@ -99,6 +102,7 @@ def case_options() -> CaseOptions:
         levels=list(support.CASE_LEVELS),
         statuses=list(support.CASE_STATUSES),
         channels=list(support.CASE_CHANNELS),
+        categories=list(support.CASE_CATEGORIES),
     )
 
 

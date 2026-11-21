@@ -13,81 +13,88 @@
 --
 -- It is idempotent: it can be applied again without duplicating
 -- anything.
+--
+-- The vocabulary is the canonical one of the product: the case has a
+-- title, a category, a channel, a level and a state, all in Spanish
+-- (abierto, en_espera, resuelto). The description of the case is the
+-- first message of the thread.
 -- =========================================================================
 
 -- The cases
 -- ---------------------------------------------------------------------------
 insert into public.support_cases (
-  id, code, subject, detail, school_id, requester_name, requester_role,
-  channel, level, status, created_at, updated_at, resolved_at
+  id, code, title, category, channel, level, status,
+  school_id, opened_by, opened_at, resolved_at
 ) values
-  ('e0000001-0000-4000-8000-000000000001', 'SOL-1042',
+  ('c9000001-0000-4000-8000-000000000001', 'SOL-1042',
    'El material de 7° no aparece en el curso de los docentes',
-   'El docente reporta que el material de álgebra no le aparece en el curso 7° A, aunque el colegio tiene acceso habilitado.',
-   'd0000001-0000-4000-8000-000000000001', 'Julio Ramírez', 'Docente',
-   'web_form', 'urgent', 'open',
-   '2026-11-19T13:40:00+00:00', '2026-11-19T13:40:00+00:00', null),
-  ('e0000001-0000-4000-8000-000000000002', 'SOL-1039',
+   'problema_tecnico', 'formulario_web', 'urgente', 'abierto',
+   'd0000001-0000-4000-8000-000000000001',
+   'a0000001-0000-4000-8000-000000000001',
+   '2026-11-19T13:40:00+00:00', null),
+  ('c9000001-0000-4000-8000-000000000002', 'SOL-1039',
    'Solicitud de obra de teatro para 9°',
-   'El colegio pide una obra de teatro en español para 9° A. El material ya está en el catálogo, falta habilitarlo para la institución.',
-   'd0000001-0000-4000-8000-000000000003', 'Ana Restrepo', 'Administradora',
-   'email', 'info', 'waiting',
-   '2026-11-18T21:20:00+00:00', '2026-11-18T22:05:00+00:00', null),
-  ('e0000001-0000-4000-8000-000000000003', 'SOL-1034',
+   'solicitud_material', 'correo', 'info', 'en_espera',
+   'd0000001-0000-4000-8000-000000000003',
+   'a0000001-0000-4000-8000-000000000003',
+   '2026-11-18T21:20:00+00:00', null),
+  ('c9000001-0000-4000-8000-000000000003', 'SOL-1034',
    '¿Cuándo habilitan el material de ciencias?',
-   'El colegio se registró hace una semana y espera el material de Ciencias 7 en la biblioteca de sus docentes.',
-   'd0000001-0000-4000-8000-000000000004', 'Carlos Medina', 'Administrador',
-   'web_form', 'warning', 'open',
-   '2026-11-11T21:30:00+00:00', '2026-11-11T21:30:00+00:00', null),
-  ('e0000001-0000-4000-8000-000000000004', 'SOL-1031',
+   'solicitud_material', 'formulario_web', 'aviso', 'abierto',
+   'd0000001-0000-4000-8000-000000000004',
+   'a0000001-0000-4000-8000-000000000004',
+   '2026-11-11T21:30:00+00:00', null),
+  ('c9000001-0000-4000-8000-000000000007', 'SOL-1031',
    'Restablecimiento de contraseña de la administradora',
-   'La administradora principal no recordaba su contraseña. Se envió clave temporal al correo institucional y el acceso quedó restablecido.',
-   'd0000001-0000-4000-8000-000000000007', 'Coordinación', 'Institución',
-   'call', 'urgent', 'resolved',
-   '2026-11-12T15:02:00+00:00', '2026-11-12T15:02:00+00:00',
-   '2026-11-12T15:02:00+00:00')
+   'duda_acceso', 'llamada', 'urgente', 'resuelto',
+   'd0000001-0000-4000-8000-000000000007',
+   'a0000001-0000-4000-8000-000000000007',
+   '2026-11-12T15:02:00+00:00', '2026-11-12T15:02:00+00:00')
 on conflict (code) do update
-  set subject = excluded.subject,
-      detail = excluded.detail,
-      school_id = excluded.school_id,
-      requester_name = excluded.requester_name,
-      requester_role = excluded.requester_role,
+  set title = excluded.title,
+      category = excluded.category,
       channel = excluded.channel,
       level = excluded.level,
       status = excluded.status,
-      updated_at = excluded.updated_at,
+      school_id = excluded.school_id,
+      opened_by = excluded.opened_by,
+      opened_at = excluded.opened_at,
       resolved_at = excluded.resolved_at;
 
 
 -- The conversation
+--
+-- The school writes with the role "colegio" and the platform team with
+-- the role "plataforma". The author comes from the account: the name
+-- is read from the user, it is not written twice.
 -- ---------------------------------------------------------------------------
 insert into public.support_messages (
-  id, case_id, author_id, author_name, author_role, body, created_at
+  id, case_id, author_id, author_role, body, created_at
 ) values
-  ('f0000001-0000-4000-8000-000000000001', 'e0000001-0000-4000-8000-000000000001',
-   null, 'Julio Ramírez', 'Docente',
-   'El material de álgebra no me aparece en el curso 7° A. ¿Debo habilitar algo o es un error?',
+  ('f0000001-0000-4000-8000-000000000001', 'c9000001-0000-4000-8000-000000000001',
+   'a0000001-0000-4000-8000-000000000001', 'colegio',
+   'El material de álgebra no me aparece en el curso 7° A, aunque el colegio tiene acceso habilitado. ¿Debo habilitar algo o es un error?',
    '2026-11-19T13:40:00+00:00'),
 
-  ('f0000001-0000-4000-8000-000000000002', 'e0000001-0000-4000-8000-000000000002',
-   null, 'Ana Restrepo', 'Administradora',
+  ('f0000001-0000-4000-8000-000000000002', 'c9000001-0000-4000-8000-000000000002',
+   'a0000001-0000-4000-8000-000000000003', 'colegio',
    'Nos gustaría «La vida es sueño» en español para 9° A. ¿Podrían habilitarla?',
    '2026-11-18T21:20:00+00:00'),
-  ('f0000001-0000-4000-8000-000000000003', 'e0000001-0000-4000-8000-000000000002',
-   null, 'Equipo Lumen', 'Plataforma',
+  ('f0000001-0000-4000-8000-000000000003', 'c9000001-0000-4000-8000-000000000002',
+   '00000000-0000-0000-0000-000000000101', 'plataforma',
    'Ya está en el catálogo. Confírmennos si además la quieren para 10° y la habilitamos para ambos cursos.',
    '2026-11-18T22:05:00+00:00'),
 
-  ('f0000001-0000-4000-8000-000000000004', 'e0000001-0000-4000-8000-000000000003',
-   null, 'Carlos Medina', 'Administrador',
+  ('f0000001-0000-4000-8000-000000000004', 'c9000001-0000-4000-8000-000000000003',
+   'a0000001-0000-4000-8000-000000000004', 'colegio',
    'Registramos el colegio la semana pasada. ¿Cuándo queda disponible el material de ciencias para nuestros docentes?',
    '2026-11-11T21:30:00+00:00'),
 
-  ('f0000001-0000-4000-8000-000000000005', 'e0000001-0000-4000-8000-000000000004',
-   null, 'Equipo Lumen', 'Plataforma',
+  ('f0000001-0000-4000-8000-000000000005', 'c9000001-0000-4000-8000-000000000007',
+   '00000000-0000-0000-0000-000000000101', 'plataforma',
    'Enviamos una clave temporal al correo institucional. El acceso se restablece en el siguiente inicio de sesión.',
    '2026-11-12T15:02:00+00:00')
 on conflict (id) do update
   set body = excluded.body,
-      author_name = excluded.author_name,
-      author_role = excluded.author_role;
+      author_role = excluded.author_role,
+      created_at = excluded.created_at;

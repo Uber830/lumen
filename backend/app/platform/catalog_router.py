@@ -16,7 +16,7 @@ from contextlib import suppress
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
@@ -102,12 +102,12 @@ def _summary(row: catalog.MaterialRow) -> MaterialSummary:
     visible = row.school_names[: catalog.SCHOOLS_VISIBLE]
     return MaterialSummary(
         id=row.material.id,
-        code=row.material.code,
+        code=row.material.ref,
         title=row.material.title,
         type=row.material.type,
         area=row.material.area,
         grades=list(row.material.grades),
-        status=row.material.status,
+        status=catalog.status_of(row.material.state),
         origin=row.material.origin,
         visible_to=row.material.visible_to,
         size_label=row.size_label,
@@ -129,6 +129,9 @@ async def _detail(
         select(School, MaterialSchool.enabled_at)
         .join(MaterialSchool, MaterialSchool.school_id == School.id)
         .where(MaterialSchool.material_id == material.id)
+        # A school that lost the access keeps the row, but it is not
+        # one of the schools that see the piece.
+        .where(MaterialSchool.enabled.is_(True))
         .order_by(MaterialSchool.enabled_at, School.name)
     )
     school_rows = schools.all()
@@ -144,7 +147,7 @@ async def _detail(
 
     return MaterialDetail(
         id=material.id,
-        code=material.code,
+        code=material.ref,
         title=material.title,
         type=material.type,
         area=material.area,
@@ -154,7 +157,7 @@ async def _detail(
         description=material.description,
         origin=material.origin,
         external_url=material.external_url,
-        status=material.status,
+        status=catalog.status_of(material.state),
         created_at=material.created_at,
         updated_at=material.updated_at,
         published_at=material.published_at,
@@ -193,7 +196,7 @@ async def _detail(
             )
             for entry in history
         ],
-        available_transitions=catalog.available_transitions(material.status),
+        available_transitions=catalog.available_transitions(catalog.status_of(material.state)),
         missing=catalog.publication_gaps(material, len(school_rows)),
     )
 
@@ -349,17 +352,18 @@ async def create_material(
     highest = position.scalar_one_or_none()
 
     material = Material(
-        code=await catalog.next_code(session),
+        ref=await catalog.next_code(session),
         title=body.title,
         type=body.type,
         area=body.area,
+        kind=catalog.kind_of(uploaded.mime_type) if uploaded is not None else "pdf",
         grades=list(body.grades),
         visible_to=body.visible_to,
         publication_year=body.publication_year,
         description=body.description,
         origin=body.origin,
         external_url=body.external_url,
-        status="draft",
+        state=catalog.state_of("draft"),
         position=(highest or 0) + 1,
         created_by=context.user_id,
     )
@@ -377,7 +381,7 @@ async def create_material(
         # its material.
         final_key = build_storage_key(
             file_name=uploaded.file_name,
-            material_code=material.code,
+            material_code=material.ref,
         )
         await get_storage().move(key=uploaded.storage_key, new_key=final_key)
         uploaded.storage_key = final_key
@@ -410,7 +414,7 @@ async def create_material(
         actor_name=await _actor_name(session, context.user_id),
         subject_type="material",
         subject_id=material.id,
-        detail={"code": material.code, "title": material.title},
+        detail={"code": material.ref, "title": material.title},
     )
 
     await session.commit()
@@ -465,7 +469,7 @@ async def patch_material(
             actor_name=await _actor_name(session, context.user_id),
             subject_type="material",
             subject_id=material.id,
-            detail={"code": material.code, "fields": [c["field"] for c in changes]},
+            detail={"code": material.ref, "fields": [c["field"] for c in changes]},
         )
 
     await session.commit()
@@ -486,7 +490,7 @@ async def change_material_status(
     least one school.
     """
     material = await _load_material(session, material_id)
-    previous = material.status
+    previous = catalog.status_of(material.state)
 
     if previous == body.status:
         raise ConflictError(
@@ -518,7 +522,7 @@ async def change_material_status(
         material.published_at = None
         material.archived_at = None
 
-    material.status = body.status
+    material.state = catalog.state_of(body.status)
 
     await catalog.record_history(
         session,
@@ -541,7 +545,7 @@ async def change_material_status(
         subject_type="material",
         subject_id=material.id,
         level="info",
-        detail={"code": material.code, "from": previous, "to": body.status},
+        detail={"code": material.ref, "from": previous, "to": body.status},
     )
 
     await session.commit()
@@ -633,19 +637,25 @@ async def _replace_schools(
         .join(MaterialSchool, MaterialSchool.school_id == School.id)
         .where(MaterialSchool.material_id == material.id)
     )
-    current = {school.id: school for school, _ in current_rows.all()}
+    # The rows keep the history of the access: a school that lost the
+    # access is archived, not forgotten. The result is read once: the
+    # rows are the access of each school, with the flag that says
+    # whether it is still on.
+    access_rows = current_rows.all()
+    access_by_school = {school.id: access for school, access in access_rows}
+    current = {school.id: school for school, access in access_rows if access.enabled}
 
     added = [school for school in known_schools if school.id not in current]
     removed = [school for school in current.values() if school.id not in set(wanted)]
 
-    if removed and material.status == "published" and not confirm:
+    if removed and catalog.status_of(material.state) == "published" and not confirm:
         raise ConflictError(
             f"Se quitará el acceso de {len(removed)} colegio(s). ¿Confirmas?",
             code="access_revoked",
             extra={"affected": [{"id": str(school.id), "name": school.name} for school in removed]},
         )
 
-    if removed and material.status == "published" and not wanted:
+    if removed and catalog.status_of(material.state) == "published" and not wanted:
         raise ValidationError(
             "A published material needs at least one school with access.",
             code="no_schools_left",
@@ -654,17 +664,35 @@ async def _replace_schools(
 
     for school in removed:
         await session.execute(
-            delete(MaterialSchool).where(
+            update(MaterialSchool)
+            .where(
                 MaterialSchool.material_id == material.id,
                 MaterialSchool.school_id == school.id,
             )
+            .values(enabled=False, archived_at=catalog.now_utc())
         )
 
     for school in added:
+        archived = access_by_school.get(school.id)
+        if archived is not None:
+            # The school had the access and lost it: the row comes
+            # back, with its history.
+            await session.execute(
+                update(MaterialSchool)
+                .where(MaterialSchool.id == archived.id)
+                .values(
+                    enabled=True,
+                    archived_at=None,
+                    enabled_at=catalog.now_utc(),
+                    enabled_by=actor_id,
+                )
+            )
+            continue
         session.add(
             MaterialSchool(
                 material_id=material.id,
                 school_id=school.id,
+                enabled=True,
                 enabled_by=actor_id,
             )
         )
@@ -691,7 +719,7 @@ async def _replace_schools(
             school_id=school.id,
             subject_type="material",
             subject_id=material.id,
-            detail={"code": material.code, "school": school.name},
+            detail={"code": material.ref, "school": school.name},
         )
     for school in removed:
         await catalog.record_audit(
@@ -703,7 +731,7 @@ async def _replace_schools(
             subject_type="material",
             subject_id=material.id,
             level="warning",
-            detail={"code": material.code, "school": school.name},
+            detail={"code": material.ref, "school": school.name},
         )
 
 
@@ -719,11 +747,11 @@ async def delete_material(
     history, and an archived one is desarchived instead.
     """
     material = await _load_material(session, material_id)
-    if material.status != "draft":
+    if catalog.status_of(material.state) != "draft":
         raise ConflictError(
             "Only a draft can be deleted.",
             code="not_deletable",
-            extra={"status": material.status},
+            extra={"status": catalog.status_of(material.state)},
         )
 
     for file in material.files:
@@ -742,7 +770,7 @@ async def delete_material(
         subject_type="material",
         subject_id=material_id,
         level="warning",
-        detail={"code": material.code, "title": material.title},
+        detail={"code": material.ref, "title": material.title},
     )
     await session.commit()
 
@@ -798,7 +826,7 @@ async def upload_file(
             mime_type=duplicate.mime_type,
             duplicate_of={
                 "id": str(owner.id) if owner else "",
-                "code": owner.code if owner else "",
+                "code": owner.ref if owner else "",
             },
         )
 
