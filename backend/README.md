@@ -105,6 +105,7 @@ app/
   notifications/     las notificaciones dentro de la app
   platform/          lo que hace el equipo de plataforma (dar de alta colegios)
   plans/             el catálogo de planes
+  school/            la API del administrador de colegio
   schools/           el perfil de cada colegio
   site/              el contenido editable del sitio público
   subscriptions/     el checkout y el webhook de Wompi
@@ -269,34 +270,10 @@ producto (y del esquema).
 El catálogo que carga el equipo de plataforma vive en `public.materials` y sus
 tablas hijas: `material_files` (los archivos), `material_schools` (qué colegio
 ve cada pieza), `material_history` (qué pasó y quién lo hizo) y `audit_log`
-(la traza de los eventos críticos). La tabla vieja `catalog_items` se
-transformó en `materials` en la migración `20261119010000` y se eliminó.
+(la traza de los eventos críticos).
 
-El ciclo de vida es `borrador → en revisión → publicado → archivado`. **Las
-transiciones válidas las decide el backend** (`available_transitions` en la
-respuesta del detalle): el frontend las muestra, no las adivina. Publicar
-exige título, tipo, área, grados y al menos un colegio; si falta algo, la
-respuesta es un `422` con la lista de lo que falta en `missing`.
-
-Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
-colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
-
-Decisiones que se tomaron sin respuesta del negocio:
-
-- **El prefijo es `/v1/platform`**, no `/api/platform`: es la convención del
-  repositorio (`/v1/auth`, `/v1/schools`, `/v1/public`).
-- **El almacenamiento de los archivos** es el adaptador que ya tenía el
-  proyecto (`app/core/supabase_storage.py`), detrás de la interfaz de
-  `app/platform/storage.py`. Cambiar de destino es cambiar el adaptador, no el
-  catálogo; el bucket es configurable.
-- **Los formatos admitidos** son PDF, EPUB, DOCX, MP4 y ZIP.
-- **ISBN, autor y editorial no bloquean la publicación**: son opcionales.
-- **La cobertura de un colegio** cuenta las piezas publicadas que puede ver.
-- **Los avisos al equipo de plataforma** se registran en `audit_log` y se
-  muestran en la vista de soporte y auditoría; el centro de notificaciones en
-  la aplicación llega con esa vista.
-
----
+El ciclo de vida, el vocabulario (`ref`, `kind`, `state`) y las decisiones de
+producto están en [docs/catalogo.md](../docs/catalogo.md).
 
 ## Autenticación
 
@@ -312,9 +289,9 @@ El backend es el dueño de la autenticación.
 
 **La sesión del navegador vive en cookies httpOnly.** El JavaScript de la
 página no puede leerlas, así que un XSS no puede robarse la sesión. El
-navegador las manda con `credentials: "include"`; las server functions del
-frontend las leen de la petición y las reenvían como `Authorization: Bearer`.
-La API acepta las dos formas.
+navegador las manda con `credentials: "include"`; la API acepta además la
+cabecera `Authorization: Bearer`, que es lo que usan las llamadas desde el
+servidor.
 
 Dos propiedades que los tests imponen:
 
@@ -341,21 +318,11 @@ que la cuenta existe.
 
 ### El alta de los colegios
 
-Nadie se registra solo. El equipo de plataforma da de alta el colegio:
-
-```sh
-curl -X POST http://localhost:8010/v1/platform/schools \
-  -H "Authorization: Bearer $TOKEN_DE_PLATAFORMA" \
-  -H "Content-Type: application/json" \
-  -d '{"school_name":"Colegio Sagrado Corazón","short_code":"SAGCOR",
-       "plan_code":"estandar","admin_email":"ana@colegio.edu.co",
-       "admin_name":"Ana Restrepo"}'
-```
-
-La respuesta trae el **enlace de activación** del administrador: su cuenta
-nace sin contraseña y la define con ese enlace (`POST /v1/auth/reset-password`
-con el token). Nadie tiene que llevar una contraseña escrita de un sitio a
-otro.
+Nadie se registra solo. El equipo de plataforma da de alta el colegio con
+`POST /v1/platform/schools` y la respuesta trae el **enlace de activación** del
+administrador: su cuenta nace sin contraseña y la define con ese enlace
+(`POST /v1/auth/reset-password` con el token). Nadie tiene que llevar una
+contraseña escrita de un sitio a otro.
 
 ---
 
@@ -368,11 +335,11 @@ aplican en ese orden. Eso incluye la tabla de identidad que usa el backend
 
 El backend comprueba el esquema al arrancar y se niega a levantar si falta
 una migración. La comprobación mira **tablas y columnas**: una base que tiene
-la tabla `schools` pero no la columna `mission` es una base desfasada, y antes
+la tabla `schools` pero no la columna `city` es una base desfasada, y antes
 solo se enteraba la API cuando una consulta fallaba con un 500:
 
 ```
-The database is missing 1 column(s): schools.mission.
+The database is missing 1 column(s): schools.city.
 The SQL migrations have not been applied. Apply them with psql (see
 scripts/dev-db.sh) or with the migration tool of your database.
 ```

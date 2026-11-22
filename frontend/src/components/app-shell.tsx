@@ -2,7 +2,6 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   ChevronDown,
-  GraduationCap,
   Info,
   LogOut,
   Menu,
@@ -16,6 +15,7 @@ import {
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { LucideIcon } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
   DropdownMenu,
@@ -67,31 +67,16 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function Brand({
-  role,
-  schoolName,
-  logoUrl,
-}: {
-  role: AppShellRole;
-  schoolName: string | null;
-  logoUrl: string | null;
-}) {
-  // The platform brand is Lumen's own: it does not wear the logo of
-  // the school the super admin happens to belong to.
-  const showLogo = role !== "super" && Boolean(logoUrl);
-  const mark = showLogo ? (
-    <img
-      src={logoUrl ?? ""}
-      alt={`Escudo de ${schoolName ?? "el colegio"}`}
-      className="size-[38px] shrink-0 rounded-[11px] bg-card object-cover"
-      loading="lazy"
-      width={38}
-      height={38}
+function Brand({ role, schoolName }: { role: AppShellRole; schoolName: string | null }) {
+  // The mark of the application is the same everywhere: the logo of
+  // Lumen, the one the public site shows. The shield of the school is
+  // not worn here: it belongs to the school, and the administrator
+  // configures it in Personalización.
+  const mark = (
+    <BrandLogo
+      className="size-[38px] text-sidebar-foreground"
+      cutClassName="fill-[var(--sidebar)] stroke-[var(--sidebar)]"
     />
-  ) : (
-    <span className="grid size-[38px] shrink-0 place-items-center rounded-[11px] bg-gradient-to-br from-primary to-[#1B4FD1]">
-      <GraduationCap className="size-5 text-white" strokeWidth={1.9} />
-    </span>
   );
 
   return (
@@ -355,7 +340,6 @@ export function AppShell({
   // it fresh after the admin saves a change.
   const sessionBrand = session.school;
   const primaryColor = school.data?.primary_color ?? sessionBrand?.primary_color ?? null;
-  const logoUrl = school.data?.logo_url ?? sessionBrand?.logo_url ?? null;
 
   // Paint the theme with the school's colour. The rules are rendered
   // with the page (so the first frame is already in the school's
@@ -457,7 +441,7 @@ export function AppShell({
           "w-[270px] max-[1179px]:w-[68px]",
         )}
       >
-        <Brand role={role} schoolName={resolvedSchoolName} logoUrl={logoUrl} />
+        <Brand role={role} schoolName={resolvedSchoolName} />
         <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
           <NavGroups role={role} icfesEnabled={icfesEnabled} badges={badges} />
         </div>
@@ -473,7 +457,7 @@ export function AppShell({
           />
           <div className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-sidebar">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-              <Brand role={role} schoolName={resolvedSchoolName} logoUrl={logoUrl} />
+              <Brand role={role} schoolName={resolvedSchoolName} />
               <button
                 aria-label="Cerrar menú"
                 className="mt-[18px] grid size-9 shrink-0 place-items-center rounded-lg hover:bg-sidebar-accent"

@@ -13,6 +13,7 @@ token corto que acuña el backend.
 - [Layout](#layout)
 - [Rutas](#rutas)
 - [La sesión](#la-sesión)
+- [El logo](#el-logo)
 - [El sitio público](#el-sitio-público)
 - [Pruebas](#pruebas)
 - [Convenciones](#convenciones)
@@ -63,7 +64,7 @@ muestra errores de red.
 public/                 recursos estáticos (favicon, manifiesto, imagen OG)
 scripts/                los generadores de iconos e imagen de compartir
 src/
-  components/           UI reutilizable (app-shell, icfes/*, ui/*, chat-panel, …)
+  components/           UI reutilizable (app-shell, brand-logo, icfes/*, ui/*, chat-panel, …)
   features/             lógica por módulo
     site/               el sitio público: landing y acceso
       components/       una pieza por sección
@@ -142,6 +143,23 @@ El parámetro `?next=` se respeta solo si es una ruta interna.
 
 ---
 
+## El logo
+
+Hay **un solo logo en toda la aplicación**: el sol de tinta del sitio
+público. Vive en `src/components/brand-logo.tsx` y lo usan el sitio, el
+acceso y la marca del panel de todos los roles (`app-shell.tsx`).
+
+El SVG es el mismo en todas partes; lo que cambia es el color:
+
+- el cuadrado toma el color de su surroundings (`currentColor`);
+- los rayos se recortan contra la superficie que sostiene el logo
+  (`--brand-cut`: el fondo del sitio, el rail del panel).
+
+El escudo del colegio no es el logo de la aplicación: es la marca de cada
+colegio, y el administrador la configura en Personalización.
+
+---
+
 ## El sitio público
 
 La landing (`/`) y el acceso (`/login`) tienen su propia dirección visual,
@@ -184,9 +202,9 @@ LD_LIBRARY_PATH=/ruta/a/las/librerias npx playwright test
   con su `<Outlet />` y sus `<Scripts />`.
 - TanStack Router admite segmentos dinámicos con el prefijo `$` (`$id.tsx`,
   `$.tsx`). El proyecto no los usa todavía.
-- Si una página necesita un diálogo de confirmación, sigue los patrones
+- Si una página necesita un diálogo de confirmación, sigue el patrón
   `<dialog>` + `useState` de `src/routes/admin.docentes.tsx` y
-  `src/routes/admin.planes.tsx` en vez de meter una dependencia nueva.
+  `src/components/confirm-dialog.tsx` en vez de meter una dependencia nueva.
 - Los árboles de rol siguen el patrón padre + hijos; no anides más de lo que
   el rol necesita.
 - La API devuelve snake_case y los componentes usan camelCase. La conversión

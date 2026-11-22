@@ -12,10 +12,13 @@ para todos los colegios que contratan el servicio.
 
 | Rol | Módulos |
 | --- | --- |
-| **Plataforma** | Colegios, planes, contenido editorial |
+| **Plataforma** | Colegios, catálogo editorial, soporte |
 | **Admin de colegio** | Panel del colegio: dashboard, contenido, comunidad, ciclo, ICFES, identidad y soporte |
 | **Docente** | Materias, calificaciones, tareas, evaluaciones, ICFES, chat |
 | **Estudiante** | Clases, notas, tareas, evaluaciones, materiales, ICFES, chat |
+
+Este README es el mapa del proyecto: cómo se levanta y dónde está cada cosa.
+El detalle de cada entorno vive en su propio README.
 
 ---
 
@@ -92,17 +95,31 @@ npm run dev                 # http://localhost:5174
 ### 4. Entrar
 
 `http://localhost:5174/login`. Todas las cuentas de la semilla usan la
-contraseña **`lumen-dev`**:
+contraseña **`lumen-dev`**. Estas cuatro recorren el ciclo completo de la
+aplicación:
 
-| Correo | Rol | Colegio |
-| --- | --- | --- |
-| `super@lumen.co` | Plataforma | — |
-| `ana.restrepo@sagcor.edu.co` | Admin de colegio | Colegio Sagrado Corazón (demo del panel) |
-| `admin6@cms.edu.co` | Admin de colegio | Colegio San Martín |
-| `uber@edu.com` | Admin de colegio | Colegio San Juan |
-| `docente@lumen.co` | Docente | Shared ICFES Bank |
-| `estudiante@lumen.co` | Estudiante | Shared ICFES Bank |
-| `admin@cms.edu.co` … `admin5@cms.edu.co` | Cuentas sin colegio | — |
+| Correo | Rol | Colegio | Vistas |
+| --- | --- | --- | --- |
+| `super@lumen.co` | Plataforma | — | `/super`, `/super/colegios`, `/super/catalogo`, `/super/soporte` |
+| `ana.restrepo@sagcor.edu.co` | Admin de colegio | Sagrado Corazón | `/admin`, `/admin/cursos`, `/admin/docentes`, `/admin/estudiantes`, `/admin/asignaciones`, `/admin/soporte`, `/admin/periodos`, `/admin/icfes` |
+| `docente01@sagcor.edu.co` | Docente | Sagrado Corazón | `/docente`, `/docente/materia`, `/docente/calificaciones`, `/docente/icfes` |
+| `estudiante001@sagcor.edu.co` | Estudiante | Sagrado Corazón | `/estudiante`, `/estudiante/materiales`, `/estudiante/tareas`, `/estudiante/notas`, `/estudiante/evaluaciones` |
+
+Otras cuentas de la semilla: `admin6@cms.edu.co` (Colegio San Martín),
+`uber@edu.com` (Colegio San Juan), `docente@lumen.co` y
+`estudiante@lumen.co` (Shared ICFES Bank), `admin@cms.edu.co` …
+`admin5@cms.edu.co` (cuentas sin colegio).
+
+Si una de las cuatro cuentas deja de entrar —cambiaste la contraseña,
+borraste la membresía o la base se reconstruyó a medias— se deja
+arreglada con:
+
+```bash
+./scripts/dev-accounts.sh
+```
+
+El script es idempotente: restablece la contraseña, asegura el rol de
+plataforma y las membresías del colegio de la demo.
 
 El acceso redirige según el rol: `/super`, `/admin`, `/docente`,
 `/estudiante`. **Nadie se registra solo**: el equipo de plataforma da de alta
@@ -129,6 +146,7 @@ los colegios (ver [backend/README.md](backend/README.md)).
 | La consola dice «CORS» | el origen del frontend no está en `CORS_ALLOWED_ORIGINS` | debe incluir `http://localhost:5174` |
 | El login responde 429 | se agotaron los 5 intentos por minuto | espera un minuto |
 | `npm run dev` dice que el puerto está ocupado | hay otra instancia de Vite | `lsof -i :5174` |
+| La primera carga dice «Esta página no cargó» | Vite está re-optimizando las dependencias | recarga la página |
 
 ---
 
@@ -136,20 +154,10 @@ los colegios (ver [backend/README.md](backend/README.md)).
 
 ```
 backend/          API FastAPI
-  app/            módulos por dominio (auth, schools, academics, site, …)
-  migrations/     migraciones SQL propias del proyecto
-  seeds/          datos semilla propios del proyecto
-  alembic/        andamiaje para el diff de esquema (el esquema vive en SQL)
-  tests/          pytest
 frontend/         app React (TanStack Start)
-  src/routes/     rutas por rol
-  src/features/   lógica por módulo
-  src/lib/        cliente API, auth, tema, storage
-supabase/
-  migrations/     migraciones heredadas del proyecto original
-  seed.sql        datos de desarrollo heredados
-  local-shim.sql  objetos de plataforma para Postgres sin Supabase
-scripts/dev-db.sh ciclo de vida de la base local
+supabase/         migraciones y semilla heredadas del proyecto original
+scripts/          dev-db.sh (la base local) y dev-accounts.sh (las cuentas)
+docs/             las decisiones de producto, por parte
 docker-compose.yml servicio Postgres
 ```
 
@@ -160,52 +168,12 @@ se corre `./scripts/dev-db.sh reset`.
 
 ---
 
-## Documentación por parte
+## Documentación
 
-- [backend/README.md](backend/README.md) — la API: módulos, endpoints,
-  autenticación, permisos, esquema y pruebas.
-- [frontend/README.md](frontend/README.md) — la app: rutas, sesión, variables
-  de entorno y pruebas.
-- [docs/colegio.md](docs/colegio.md) — el rol de administrador de colegio: sus
-  vistas, sus permisos, su API y las decisiones del producto.
-- [docs/site-style-guide.md](docs/site-style-guide.md) — la dirección visual
-  del sitio público (landing y acceso).
-- `ARCHITECTURE.md` y `AUDIT.md` — material heredado de EduSuite, se
-  mantienen como referencia del código heredado.
-
----
-
-## Comandos
-
-```bash
-# Backend (desde backend/)
-uv run pytest                # tests
-uv run ruff format .         # formato
-uv run ruff check .          # lint
-uv run mypy app              # tipos
-
-# Frontend (desde frontend/)
-npm run dev                  # servidor de desarrollo
-npm run build                # build de producción
-npm run typecheck            # tsc --noEmit
-npm run lint                 # eslint
-npm run test                 # vitest
-npm run test:e2e             # playwright
-```
-
----
-
-## El sitio público
-
-La landing (`/`) y la pantalla de acceso (`/login`) tienen su propia dirección
-visual, **«El Índice»**. Nada del texto de la landing está en el frontend:
-todo llega de `GET /v1/public/site`, así que el equipo de plataforma edita la
-página sin redesplegar.
-
-```bash
-curl http://localhost:8010/v1/public/site
-```
-
-> Los nombres de los colegios del catálogo se escriben a mano, uno por uno:
-> publicar un cliente es una decisión explícita, nunca un efecto colateral.
-> La pantalla de acceso muestra filas de ejemplo, no clientes reales.
+| Dónde | Qué hay |
+| --- | --- |
+| [backend/README.md](backend/README.md) | la API: endpoints, autenticación, permisos, esquema y pruebas |
+| [frontend/README.md](frontend/README.md) | la app: rutas, sesión, el logo, pruebas y convenciones |
+| [docs/colegio.md](docs/colegio.md) | el rol de administrador de colegio: vistas, permisos y decisiones |
+| [docs/catalogo.md](docs/catalogo.md) | el catálogo editorial: ciclo de vida, cobertura y reglas |
+| [docs/site-style-guide.md](docs/site-style-guide.md) | la dirección visual del sitio público (landing y acceso) |
