@@ -151,7 +151,7 @@ export function useUploadSupportAttachment(): UseMutationResult<SupportAttachmen
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append("file", file, file.name);
-      const response = await fetch(`${apiBaseUrl()}/v1/school/support/attachments`, {
+      const response = await fetch(`${apiBaseUrl}/v1/school/support/attachments`, {
         method: "POST",
         credentials: "include",
         body: form,

@@ -60,7 +60,7 @@ function dispatch(payload: string) {
 function open() {
   if (source) return;
 
-  const stream = new EventSource(`${apiBaseUrl()}/v1/events`, { withCredentials: true });
+  const stream = new EventSource(`${apiBaseUrl}/v1/events`, { withCredentials: true });
 
   stream.onmessage = (message) => dispatch(message.data);
 

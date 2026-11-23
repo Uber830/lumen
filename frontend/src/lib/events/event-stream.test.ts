@@ -15,10 +15,13 @@ const mocks = vi.hoisted(() => ({
   refreshSession: vi.fn(async () => true),
 }));
 
-vi.mock("@/lib/api/client", () => ({
-  apiBaseUrl: () => "http://api.test",
-  refreshSession: mocks.refreshSession,
-}));
+// Only the session refresh is faked: the address of the API comes from
+// the real module, so a change in its shape (a string that becomes a
+// function, say) breaks this test instead of the app.
+vi.mock("@/lib/api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/client")>();
+  return { ...actual, refreshSession: mocks.refreshSession };
+});
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -103,8 +106,9 @@ describe("the event stream", () => {
 
     await mount(createElement(App));
 
+    const { apiBaseUrl } = await import("@/lib/api/client");
     expect(FakeEventSource.instances).toHaveLength(1);
-    expect(source().url).toBe("http://api.test/v1/events");
+    expect(source().url).toBe(`${apiBaseUrl}/v1/events`);
     expect(source().options?.withCredentials).toBe(true);
   });
 
