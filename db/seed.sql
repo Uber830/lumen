@@ -1,7 +1,7 @@
 -- =========================================================================
 -- The seed data of a development database.
 -- -------------------------------------------------------------------------
--- This mirrors the data of the Supabase project, so a local database
+-- This mirrors the data of the hosted project, so a local database
 -- behaves like the real one: the same schools, the same plans, the same
 -- users and memberships.
 --
@@ -10,7 +10,7 @@
 -- hunting for credentials. The Argon2id hash below is that password.
 --
 -- Apply it with `scripts/dev-db.sh up`, or by hand:
---   psql "$DATABASE_URL" -f supabase/seed.sql
+--   psql "$DATABASE_URL" -f db/seed.sql
 -- =========================================================================
 
 -- The Argon2id hash of "lumen-dev".
@@ -64,7 +64,8 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------------
 -- The users
 --
--- The real project has eight accounts that came from Supabase Auth. They
+-- The real project has eight accounts that came from the previous
+-- identity provider. They
 -- keep their bcrypt hashes there, so their passwords still work. Here
 -- they all use the known development password.
 -- ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 # The Alembic versions directory
 
 **The SQL migrations are the single owner of the schema.** They live in
-`supabase/migrations/` (inherited from the original project) and in
+`db/migrations/` (inherited from the original project) and in
 `backend/migrations/` (owned by this project), and they are applied in
 that order with `psql`.
 

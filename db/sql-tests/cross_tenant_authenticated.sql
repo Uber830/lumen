@@ -2,14 +2,14 @@
 -- Cross-tenant RLS tests with simulated auth.uid().
 --
 -- These tests use SET LOCAL request.jwt.claim.sub to simulate the
--- authenticated user, which is how Supabase RLS reads auth.uid(). Each
+-- authenticated user, which is how the RLS reads auth.uid(). Each
 -- test creates two schools (A and B), two auth users (one per school
 -- school_admin), the school_memberships rows, and then asserts the
 -- cross-tenant RLS invariants.
 --
--- NOTE: creating auth.users rows directly requires the supabase_auth
+-- NOTE: creating auth.users rows directly requires the
 -- schema's insert policy. We insert via the auth schema, which is
--- equivalent to what supabase.auth.admin.create_user does from the
+-- equivalent to what the admin API of the identity provider does from the
 -- admin client.
 -- =========================================================================
 

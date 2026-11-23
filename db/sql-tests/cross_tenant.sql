@@ -5,15 +5,15 @@
 -- assertions that prove the helper RLS predicates actually keep
 -- school A from leaking into school B.
 --
--- The tests rely on Supabase's standard auth simulation pattern:
+-- The tests rely on the standard simulation pattern of the database:
 --   SET LOCAL request.jwt.claim.sub = '<user-uuid>';
--- which Supabase applies through its connection proxy. Inside the
+-- which the host applies through its connection proxy. Inside the
 -- same transaction we can then run RLS-bound queries and check the
 -- result with `SELECT is(empty, format(...))`.
 --
 -- Run via:
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/cross_tenant.sql
--- or via supabase db test (when the supabase CLI is wired into CI).
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/sql-tests/cross_tenant.sql
+-- (the tests are not part of the continuous integration).
 -- =========================================================================
 
 create extension if not exists pgtap with schema extensions;

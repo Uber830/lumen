@@ -12,7 +12,7 @@
 -- Prices are stored in price_cents. For COP the smallest unit is the
 -- peso itself, so 49000 means 49,000 COP. The amount is in cents (or
 -- the smallest currency unit when the provider does not support
--- fractions); Wompi and Stripe treat it identically.
+-- fractions); the money is stored in cents.
 -- =========================================================================
 
 insert into public.plans (code, name, description, price_cents, currency, interval,

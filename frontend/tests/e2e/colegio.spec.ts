@@ -13,7 +13,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const ADMIN = {
   email: "ana.restrepo@sagcor.edu.co",
-  password: "lumen-dev",
+  password: process.env.LUMEN_SEED_PASSWORD ?? "",
 };
 
 /** The wait of the panel: the pages are hydrated and the data arrives. */

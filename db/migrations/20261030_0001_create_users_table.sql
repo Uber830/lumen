@@ -1,22 +1,23 @@
 -- =========================================================================
 -- create the users table, and repoint the identity foreign keys to it.
 -- -------------------------------------------------------------------------
--- Supabase Auth is being replaced by the backend's own authentication
--- (Phase 1). `auth.users` was the identity table; `public.users` takes
--- its place.
+-- The authentication of the platform is being replaced by the backend's
+-- own. `auth.users` was the identity table; `public.users` takes its
+-- place.
 --
 -- The rows are copied over from `auth.users`, preserving the UUIDs, so
 -- the foreign keys that point at a user keep referring to the same
 -- identity.
 --
--- The passwords are copied too, as they are. Supabase stores bcrypt
+-- The passwords are copied too, as they are. The previous identity
+-- provider stored bcrypt
 -- (`$2a$...`) and this backend verifies Argon2id, so `verify_password`
 -- accepts bcrypt for exactly this migration; the first successful
 -- login rehashes the password to Argon2id. Accounts that never log in
 -- keep the bcrypt hash, which is why the check for it stays.
 --
 -- This migration replaces the Alembic revision of the same name. The
--- SQL migrations under supabase/migrations/ are the single owner of the
+-- SQL migrations under db/migrations/ are the single owner of the
 -- schema; see backend/README.md.
 -- =========================================================================
 
@@ -58,9 +59,9 @@ comment on table public.users is
 -- ---------------------------------------------------------------------------
 do $$
 begin
-  -- The table only exists on a real Supabase project. In a plain
-  -- Postgres (CI, local development) there is nothing to copy and the
-  -- identity table starts empty.
+  -- The table only exists in a database that inherited the old
+  -- identity. In a plain Postgres (CI, local development) there is
+  -- nothing to copy and the identity table starts empty.
   if to_regclass('auth.users') is not null then
     execute $copy$
       insert into public.users (id, email, password_hash, full_name,

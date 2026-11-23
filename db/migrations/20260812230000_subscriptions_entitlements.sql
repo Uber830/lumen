@@ -24,8 +24,6 @@ create table public.subscriptions (
   status                   subscription_status not null default 'pending',
   interval                 billing_interval not null,
   customer_email           text,
-  wompi_subscription_id    text,
-  wompi_payment_source_id  text,
   started_at               timestamptz,
   current_period_start     timestamptz,
   current_period_end       timestamptz,
@@ -38,12 +36,9 @@ create table public.subscriptions (
 
 create index subscriptions_status_idx on public.subscriptions (status);
 create index subscriptions_plan_id_idx on public.subscriptions (plan_id);
-create index subscriptions_wompi_subscription_id_idx
-  on public.subscriptions (wompi_subscription_id)
-  where wompi_subscription_id is not null;
 
 comment on table public.subscriptions is
-  'One subscription per school. Upserted by the Wompi webhook when the school subscribes or changes plan.';
+  'One subscription per school. Written by the platform team when the school is registered or its plan changes.';
 
 create trigger subscriptions_set_updated_at
   before update on public.subscriptions
@@ -76,7 +71,7 @@ create table public.entitlements (
 );
 
 comment on table public.entitlements is
-  'Cached entitlement snapshot for the school. One row per school, rewritten by the Wompi webhook when the subscription state changes.';
+  'Cached entitlement snapshot for the school. One row per school, rewritten when the subscription state changes.';
 
 create trigger entitlements_set_updated_at
   before update on public.entitlements

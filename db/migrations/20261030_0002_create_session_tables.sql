@@ -1,7 +1,7 @@
 -- =========================================================================
 -- create the session tables.
 -- -------------------------------------------------------------------------
--- The state that Supabase Auth used to keep:
+-- The state that the previous identity provider used to keep:
 --
 --   refresh_tokens           the long-lived tokens the client exchanges
 --                            for a new access token
@@ -12,7 +12,7 @@
 -- not hand out valid sessions.
 --
 -- This migration replaces the Alembic revision of the same name. The
--- SQL migrations under supabase/migrations/ are the single owner of the
+-- SQL migrations under db/migrations/ are the single owner of the
 -- schema; see backend/README.md.
 -- =========================================================================
 

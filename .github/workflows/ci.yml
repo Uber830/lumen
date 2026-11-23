@@ -59,14 +59,10 @@ jobs:
 
     env:
       # The SQL migrations own the schema: the inherited ones under
-      # supabase/migrations/ and this project's under backend/migrations/.
+      # db/migrations/ and this project's under backend/migrations/.
       # They are applied below, in that order, before the tests run.
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/lumen_test
       JWT_SECRET: ci-jwt-secret-with-enough-entropy-for-hs256
-      SUPABASE_JWT_SECRET: ci-supabase-project-secret-1234567890
-      SUPABASE_URL: https://test.supabase.co
-      SUPABASE_SECRET_KEY: ci-secret-key
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci
       CORS_ALLOWED_ORIGINS: http://localhost:8080
 
     steps:
@@ -85,8 +81,8 @@ jobs:
       - name: Apply the schema
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
-            -v ON_ERROR_STOP=1 -q -f supabase/local-shim.sql
-          for directory in supabase/migrations backend/migrations; do
+            -v ON_ERROR_STOP=1 -q -f db/platform-shim.sql
+          for directory in db/migrations backend/migrations; do
             for migration in $(ls "$directory"/*.sql | sort); do
               echo "applying $migration"
               psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_test" \
@@ -135,10 +131,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/lumen_e2e
       JWT_SECRET: ci-jwt-secret-with-enough-entropy-for-hs256
-      SUPABASE_JWT_SECRET: ci-supabase-project-secret-1234567890
-      SUPABASE_URL: https://test.supabase.co
-      SUPABASE_SECRET_KEY: ci-secret-key
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci
       # The origin of the dev server that Playwright starts.
       CORS_ALLOWED_ORIGINS: http://localhost:5174
       # The API is addressed by the same host as the site: the browser
@@ -162,8 +154,8 @@ jobs:
       - name: Apply the schema and the seed
         run: |
           psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_e2e" \
-            -v ON_ERROR_STOP=1 -q -f supabase/local-shim.sql
-          for directory in supabase/migrations backend/migrations; do
+            -v ON_ERROR_STOP=1 -q -f db/platform-shim.sql
+          for directory in db/migrations backend/migrations; do
             for migration in $(ls "$directory"/*.sql | sort); do
               echo "applying $migration"
               psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_e2e" \
@@ -171,7 +163,7 @@ jobs:
             done
           done
           psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_e2e" \
-            -v ON_ERROR_STOP=1 -q -f supabase/seed.sql
+            -v ON_ERROR_STOP=1 -q -f db/seed.sql
           for seed in $(ls backend/seeds/*.sql | sort); do
             echo "seeding $seed"
             psql "postgresql://postgres:postgres@127.0.0.1:5432/lumen_e2e" \

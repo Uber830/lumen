@@ -1,7 +1,7 @@
 -- =========================================================================
 -- Security hardening for Phase 1 functions.
 -- -------------------------------------------------------------------------
--- Addresses two Supabase linter warnings:
+-- Addresses two linter warnings of the platform:
 --   1. public.set_updated_at() has a mutable search_path.
 --   2. is_school_member/has_school_role/is_platform_admin are callable
 --      via the PostgREST /rest/v1/rpc/ endpoint by anon and authenticated.
@@ -27,7 +27,8 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Helpers: revoke from PUBLIC, then re-grant to authenticated so PostgREST
--- exposes them only to the anon/auth roles that Supabase documents.
+-- exposes them only to the anon/auth roles that the platform
+-- documents.
 -- In practice, the public client only ever invokes these as part of an
 -- RLS policy evaluation; the rpc endpoint is not part of the Lumen API.
 -- ---------------------------------------------------------------------------

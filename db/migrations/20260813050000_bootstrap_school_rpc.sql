@@ -1,7 +1,7 @@
 -- =========================================================================
 -- bootstrap_school: SECURITY DEFINER RPC for the initial school signup.
 -- -------------------------------------------------------------------------
--- A new user just authenticated via supabase.auth.signUp cannot insert
+-- A new user that just signed up cannot insert
 -- a row into public.schools (the RLS policy requires is_platform_admin).
 -- This RPC runs with the function owner's privileges (postgres), validates
 -- the inputs, creates the school, the admin membership, the trial
@@ -106,7 +106,7 @@ begin
     returning id into v_membership_id;
 
     -- Trial subscription: status='trial', interval='monthly' by default
-    -- (Wompi webhook will rewrite this when a paid plan is activated).
+    -- (the platform team rewrites this when the plan of the school changes).
     insert into public.subscriptions (
       school_id, plan_id, status, interval,
       started_at, current_period_start, current_period_end

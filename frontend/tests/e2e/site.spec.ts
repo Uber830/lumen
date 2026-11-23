@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { siteFixture } from "../../src/test/site-fixture";
 
 // The password of the seeded accounts: a fixture of the test, not a secret.
-const SEED_LOGIN = "lumen-dev";
+const SEED_LOGIN = process.env.LUMEN_SEED_PASSWORD ?? "";
 
 /**
  * The public site is served with the content of the API.
