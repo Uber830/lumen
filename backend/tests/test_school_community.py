@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import EnrollmentStatus, SchoolRole
@@ -372,3 +372,90 @@ async def test_the_community_is_not_for_a_teacher(client, engine, seeded_school,
 
     response = client.get("/v1/school/teachers", headers=await _auth())
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Editing a member of the community
+# ---------------------------------------------------------------------------
+
+
+async def test_editing_a_teacher_changes_the_name_and_the_assignments(
+    client, engine, seeded_school, community
+):
+    """The admin edits the name of the teacher and the subject it teaches."""
+    membership_id = await _membership_of(engine, community["teacher_id"])
+
+    response = client.patch(
+        f"/v1/school/members/{membership_id}",
+        headers=await _auth(),
+        json={
+            "full_name": "Lucia Ferreyra Ruiz",
+            "course_subject_ids": [str(community["course_subject_id"])],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["full_name"] == "Lucia Ferreyra Ruiz"
+
+    teachers = client.get("/v1/school/teachers", headers=await _auth()).json()
+    teacher = next(
+        item for item in teachers["items"] if item["user_id"] == str(community["teacher_id"])
+    )
+    assert teacher["full_name"] == "Lucia Ferreyra Ruiz"
+    assert teacher["course_subject_ids"] == [str(community["course_subject_id"])]
+
+
+async def test_editing_a_student_changes_the_courses(client, engine, seeded_school, community):
+    """The admin enrolls the student in the courses it picks."""
+    membership_id = await _membership_of(engine, community["student_id"])
+
+    response = client.patch(
+        f"/v1/school/members/{membership_id}",
+        headers=await _auth(),
+        json={"course_ids": [str(community["course_id"])]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["course_ids"] == [str(community["course_id"])]
+
+    students = client.get("/v1/school/students", headers=await _auth()).json()
+    student = next(
+        item for item in students["items"] if item["user_id"] == str(community["student_id"])
+    )
+    assert student["course_ids"] == [str(community["course_id"])]
+    assert student["courses"] == ["7° A"]
+
+
+async def test_editing_a_member_that_is_not_of_the_school_is_a_404(client, engine, community):
+    """The membership has to belong to the school of the caller."""
+    response = client.patch(
+        f"/v1/school/members/{uuid.uuid4()}",
+        headers=await _auth(),
+        json={"full_name": "Otro nombre"},
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_a_teacher_cannot_edit_a_member(client, engine, seeded_school, community):
+    """The community is administered by the admin of the school."""
+    membership_id = await _membership_of(engine, community["student_id"])
+
+    from tests.conftest import mint_token
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        teacher = await session.get(User, community["teacher_id"])
+        assert teacher is not None
+
+    response = client.patch(
+        f"/v1/school/members/{membership_id}",
+        headers={"Authorization": f"Bearer {mint_token(str(community['teacher_id']))}"},
+        json={"full_name": "Otro nombre"},
+    )
+    assert response.status_code == 403, response.text
+
+
+async def _membership_of(engine, user_id: uuid.UUID) -> uuid.UUID:
+    """The membership of a member of the community."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        result = await session.execute(
+            select(SchoolMembership.id).where(SchoolMembership.user_id == user_id)
+        )
+        return result.scalar_one()
