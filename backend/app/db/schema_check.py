@@ -1,7 +1,7 @@
 """The schema check.
 
 The backend talks to a database whose schema is owned by the SQL
-migrations: the inherited ones under `supabase/migrations/` and the
+migrations: the inherited ones under `db/migrations/` and the
 ones this project owns under `backend/migrations/`. If a migration was
 not applied, the endpoints fail deep inside the request with an opaque
 500: `relation "public.users" does not exist`, or
@@ -75,7 +75,6 @@ REQUIRED_TABLES = (
     "notifications",
     "support_cases",
     "support_messages",
-    "wompi_events_processed",
     "site_content",
     "school_settings",
     "materials",
@@ -101,8 +100,7 @@ class SchemaStatus:
         """A message that says what to do about it."""
         if self.unreachable:
             return (
-                "The database is unreachable. Check DATABASE_URL and that the "
-                "Supabase project is running."
+                "The database is unreachable. Check DATABASE_URL and that the database is running."
             )
         if self.ok:
             return "The schema is up to date."
