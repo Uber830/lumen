@@ -1,19 +1,19 @@
 /**
- * Generates the favicon from the application's brand mark.
+ * Generates the favicon of the application from the brand mark.
  *
- * The mark is the same one the app shell renders: a graduation cap on
- * a primary-colored rounded square. Drawing it here, instead of
- * keeping a binary in the repository, means the favicon follows the
- * theme's colors when they change.
+ * The mark is the one of `assets/brand/logo-lumen.svg`: a badge with the
+ * tape "L" cut out of it. Drawing it here, instead of keeping a binary in
+ * the repository, means the icon always follows the brand: rebuild the
+ * SVG with `python3 tools/build_brand.py` and run this again.
  *
  * Usage:
  *   npm run favicon
  *
  * The output goes to `public/favicon.ico` (with every size packed in)
- * and `public/favicon.png`.
+ * and to `public/favicon.png`.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,34 +21,8 @@ import sharp from "sharp";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, "..", "public");
-
-// The lucide `graduation-cap` icon, at the size the app uses.
-const ICON_PATHS = [
-  "M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z",
-  "M22 10v6",
-  "M6 12.5V16a6 3 0 0 0 12 0v-3.5",
-];
-
-// The light theme's `--primary` and `--primary-foreground`, converted
-// from oklch to sRGB. Keep them in sync with `src/styles.css`.
-const PRIMARY = "#3b5bd4";
-const PRIMARY_FOREGROUND = "#fafcff";
-
-/** The favicon as an SVG: the icon on a rounded square. */
-function svg(size) {
-  // The icon is drawn in a 24x24 box and scaled into the square, the
-  // same way the app shell does it.
-  const inset = size * 0.22;
-  const scale = (size - inset * 2) / 24;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${size * 0.21}" fill="${PRIMARY}" />
-  <g transform="translate(${inset} ${inset}) scale(${scale})"
-     fill="none" stroke="${PRIMARY_FOREGROUND}" stroke-width="1.9"
-     stroke-linecap="round" stroke-linejoin="round">
-    ${ICON_PATHS.map((d) => `<path d="${d}" />`).join("\n    ")}
-  </g>
-</svg>`;
-}
+// The canonical mark, copied here by `tools/build_brand.py`.
+const brandPath = resolve(publicDir, "brand", "logo-lumen.svg");
 
 /** Pack several PNGs into an ICO file. */
 function buildIco(images) {
@@ -80,14 +54,12 @@ function buildIco(images) {
 async function main() {
   await mkdir(publicDir, { recursive: true });
 
+  const svg = await readFile(brandPath, "utf8");
   const sizes = [16, 32, 48, 64, 128, 256];
   const images = [];
 
   for (const size of sizes) {
-    const data = await sharp(Buffer.from(svg(size)))
-      .resize(size, size)
-      .png()
-      .toBuffer();
+    const data = await sharp(Buffer.from(svg)).resize(size, size).png().toBuffer();
     images.push({ size, data });
   }
 
