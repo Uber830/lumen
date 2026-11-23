@@ -98,6 +98,8 @@ function DocentesPage() {
       avatar_url: null,
       revoked_at: row.revoked_at,
       account_activated: row.account_activated,
+      access: row.access,
+      access_reason: row.access_reason,
     };
   }
 

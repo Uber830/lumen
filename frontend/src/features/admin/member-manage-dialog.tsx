@@ -12,7 +12,7 @@
 // =============================================================================
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, KeyRound, Link2, Power, PowerOff, X } from "lucide-react";
+import { KeyRound, Link2, Power, PowerOff, X } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { CopyableActivationLink } from "@/features/admin/activation-links";
@@ -51,6 +51,19 @@ export function MemberManageDialog({
   // The link is not stored: it is issued on demand and the previous one
   // stops working. The admin sees it right after asking for it.
   const token = issuedToken;
+
+  // One signal, not two: whether the member can reach the content of the
+  // school. The backend says why when the answer is "pendiente".
+  const hasAccess = member.access === "activado";
+  const accessReason =
+    member.access_reason ??
+    (hasAccess
+      ? "Puede ver el material de sus cursos."
+      : isRevoked
+        ? "La membresía está desactivada: reactivala para que pueda entrar."
+        : activated
+          ? "Todavía no tiene cursos asignados."
+          : "La cuenta está pendiente de activación: compartí el enlace de abajo.");
 
   async function toggle() {
     try {
@@ -101,43 +114,14 @@ export function MemberManageDialog({
         </div>
 
         <div className="mt-5 space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+          <div className="flex items-start justify-between gap-3 rounded-idx border border-border px-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Membresía</p>
-              <p className="text-xs text-muted-foreground">
-                {isRevoked ? "Desactivado: no puede ingresar." : "Activo en el colegio."}
-              </p>
+              <p className="text-sm font-medium">Acceso</p>
+              <p className="text-xs text-muted-foreground">{accessReason}</p>
             </div>
-            <StatusBadge tone={isRevoked ? "danger" : "success"}>
-              {isRevoked ? "Inactivo" : "Activo"}
+            <StatusBadge tone={hasAccess ? "success" : "warning"}>
+              {hasAccess ? "Activado" : "Pendiente"}
             </StatusBadge>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Cuenta</p>
-              <p className="text-xs text-muted-foreground">
-                {activated
-                  ? "Ya definió su contraseña."
-                  : "Pendiente: aún no activó su cuenta con el enlace."}
-              </p>
-            </div>
-            <span
-              className={
-                "inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold " +
-                (activated ? "text-success" : "text-warning-foreground")
-              }
-            >
-              {activated ? (
-                <>
-                  <CheckCircle2 className="size-4" /> Activada
-                </>
-              ) : (
-                <>
-                  <Clock className="size-4" /> Pendiente
-                </>
-              )}
-            </span>
           </div>
 
           {updateMembership.error && (

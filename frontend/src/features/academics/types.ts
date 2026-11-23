@@ -106,6 +106,10 @@ export type SchoolMember = {
   revoked_at: string | null;
   // True once the user has set a password (redeemed their activation).
   account_activated: boolean;
+  // Whether the member can reach the content of the school, and why not
+  // when they cannot. One signal, not two loose badges.
+  access?: "activado" | "pendiente";
+  access_reason?: string | null;
 };
 
 // --- Hook inputs -----------------------------------------------------------
