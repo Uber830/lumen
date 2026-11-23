@@ -262,3 +262,16 @@ La prioridad no debe ser añadir más pantallas, sino establecer primero:
 5. eliminación de fuentes de autorización controladas por el cliente.
 
 Hasta completar esas bases, el repositorio debe tratarse como prototipo y no como aplicación segura para datos académicos reales.
+
+---
+
+## Nota de estado (2026-11-22)
+
+Este documento es **histórico**: describe el repositorio antes de Supabase y
+antes del backend FastAPI, y no se actualiza a medida que el proyecto avanza.
+No lo tomes como el estado actual del código.
+
+El estado actual está en [ARCHITECTURE.md](./ARCHITECTURE.md) y en el
+[README](./README.md). Desde entonces el proyecto tiene backend propio
+(autenticación, permisos, endpoints y archivos en su propio disco) y ya no
+depende de Supabase ni de Wompi.

@@ -7,7 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log
 
-# Node modules anywhere in the tree (Vite + Vitepress + supabase CLI).
+# Node modules anywhere in the tree (Vite + Vitepress).
 node_modules
 
 # Editor directories and files
@@ -39,9 +39,6 @@ skills-lock.json
 .env.*
 !.env.example
 
-# Supabase CLI scratch directory (created by `supabase db diff` etc).
-supabase/.temp/
-
 # Python virtualenv / build artifacts for the FastAPI backend.
 backend/.venv/
 backend/__pycache__/
@@ -49,6 +46,10 @@ backend/**/__pycache__/
 backend/dist/
 backend/build/
 backend/*.egg-info/
+
+# The comparisons that the logo verification leaves in build/.
+/build/
+tools/__pycache__/
 
 # The files of the catalog while they live on the disk of the server.
 backend/var/

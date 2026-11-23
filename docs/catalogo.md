@@ -43,10 +43,11 @@ toca a los demás colegios de la red.
 
 - **El prefijo es `/v1/platform`**, no `/api/platform`: es la convención del
   repositorio (`/v1/auth`, `/v1/schools`, `/v1/public`).
-- **El almacenamiento de los archivos** es el adaptador que ya tenía el
-  proyecto (`app/core/supabase_storage.py`), detrás de la interfaz de
-  `app/platform/storage.py`. Cambiar de destino es cambiar el adaptador, no el
-  catálogo; el bucket es configurable.
+- **El almacenamiento de los archivos** es `LocalMaterialStorage`, el adaptador
+  que vive detrás de la interfaz de `app/platform/storage.py`. Escribe en el
+  disco del servidor: los archivos van a `backend/var/materiales` (la carpeta
+  que nombra `PLATFORM_STORAGE_DIR`). Cambiar de destino es cambiar el
+  adaptador, no el catálogo; la carpeta es configurable.
 - **Los formatos admitidos** son PDF, EPUB, DOCX, MP4 y ZIP.
 - **ISBN, autor y editorial no bloquean la publicación**: son opcionales.
 - **Los avisos al equipo de plataforma** se registran en `audit_log` y se

@@ -33,7 +33,7 @@ Aplican sin importar qué modelo LLM se esté usando.
   de ahí, sin tipos inline. `lib/api/types.ts` solo tiene auth y enums
   compartidos.
 - Al cambiar el esquema de la base, agregá una migración en
-  `supabase/migrations/` y actualizá el modelo SQLAlchemy. Columnas
+  `db/migrations/` y actualizá el modelo SQLAlchemy. Columnas
   agregadas por `ALTER TABLE` deben registrarse en el test de schema drift.
 
 ## Antes de dar una tarea por terminada

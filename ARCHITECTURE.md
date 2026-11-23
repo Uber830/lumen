@@ -3,10 +3,13 @@
 > **Nota de estado.** Este documento nació como el plan de migración
 > desde una arquitectura híbrida (Supabase + FastAPI) hacia una
 > arquitectura donde el backend es dueño de todo. **La migración ya
-> está completa.** Las secciones de abajo describen el diseño
-> original y lo que se decidió; los apartados marcados con
-> «implementado» reflejan el estado actual. El plan por fases del
-> apartado 12 se conserva como registro de lo que se hizo.
+> está completa.** Supabase y Wompi ya no son parte del proyecto: los
+> archivos viven en el disco del servidor, el chat se actualiza con una
+> consulta periódica a la API y los planes y entitlements son internos.
+> Las secciones de abajo describen el diseño original y lo que se
+> decidió; los apartados marcados con «implementado» reflejan el estado
+> actual. El plan por fases del apartado 12 se conserva como registro de
+> lo que se hizo.
 
 ## 1. Decisiones principales
 
@@ -24,27 +27,26 @@ TanStack Start seguirá siendo el runtime SSR/router del frontend, no el backend
 
 Esto evita una reescritura innecesaria y mantiene la base SSR con Vite + TanStack Start. Una migración a una SPA Vite pura solo se consideraría si aparece un requisito operativo concreto que lo justifique.
 
-### 1.2 Supabase como plataforma de datos — **implementado**
+### 1.2 Postgres y el backend como dueños de los datos — **implementado**
 
-Supabase es responsable de:
+Postgres es responsable de:
 
-- PostgreSQL (el datastore).
-- Supabase Storage (los archivos).
-- Supabase Realtime (el chat en vivo).
+- El almacén de datos. El esquema vive en las migraciones del repositorio.
 
-Supabase **ya no** es responsable de:
+El backend es responsable de todo lo demás:
 
-- Supabase Auth: el backend emite sus propios tokens (Argon2id + JWT).
-- Row Level Security como frontera de autorización: la capa de permisos
-  vive en Python (`app/core/permissions.py`), que es el puerto de las
-  siete funciones `SECURITY DEFINER` que las migraciones declaraban.
-- CRUD desde el navegador: el frontend solo habla con la API.
+- Los archivos: los sube, los guarda en su propio disco y los sirve. No hay
+  un servicio de almacenamiento en el medio.
+- El chat: el panel refresca los mensajes con una consulta periódica a la
+  API. No hay un canal en vivo.
+- La autenticación: el backend emite sus propios tokens (Argon2id + JWT).
+- La autorización: la capa de permisos vive en Python
+  (`app/core/permissions.py`), que es el puerto de las siete funciones
+  `SECURITY DEFINER` que las migraciones declaraban.
 
-Storage y Realtime siguen usando sus políticas de RLS, que llaman
-`auth.uid()`. El puente es un token de una hora que el backend emite
-(`POST /v1/auth/supabase-token`), cuyo `sub` es el id del usuario: con
-él, todas las políticas funcionan sin cambios. No es un token de
-autenticación — la API no lo acepta.
+El navegador no habla con la base de datos ni con ningún otro servicio: solo
+con la API. Las políticas de RLS que traen las migraciones heredadas siguen
+en la base, pero ya no son la frontera de nada.
 
 ### 1.3 FastAPI como backend de negocio — **implementado**
 
@@ -58,14 +60,14 @@ FastAPI es responsable de:
 - Calificación y puntajes ICFES.
 - Agregaciones/comparativos pesados.
 - Finalización segura de evaluaciones cuando las claves no deban llegar al cliente.
-- Suscripciones, webhooks y entitlements.
+- Los archivos: subida, descarga y las reglas de quién puede verlos.
+- Planes, suscripciones y entitlements, que son internas del proyecto.
 - Integraciones externas futuras.
 
-El backend accede a Postgres con SQLAlchemy 2.0 async + asyncpg. Ya
-no usa la credencial service role de Supabase para el CRUD: cada
-petición va con la identidad del llamador y las políticas se aplican
-en Python. La service role sigue usándose para el webhook de Wompi
-y para las operaciones de Storage en el backend.
+El backend accede a Postgres con SQLAlchemy 2.0 async + asyncpg. Cada
+petición va con la identidad del llamador y las políticas se aplican en
+Python. No hay credenciales privilegiadas de un servicio externo: el backend
+es el dueño de la base y de los archivos.
 
 ### 1.4 Estilo funcional en Python
 
@@ -81,59 +83,54 @@ El backend evitará jerarquías de clases de servicios/repositorios. Se preferir
 
 Las clases se reservarán para casos exigidos por Pydantic/FastAPI o cuando aporten una ventaja concreta.
 
-### 1.5 Wompi como proveedor de pagos
+### 1.5 Planes y entitlements internos
 
-[Wompi](https://wompi.com/es/co/desarrolladores) (Bancolombia) es la pasarela elegida para Lumen. Cubre el contexto colombiano con tarjetas, PSE, Nequi y otros métodos. La aplicación nunca maneja datos de tarjeta cruda: el cliente usará el widget oficial o Web Checkout de Wompi para tokenizar, y el backend solo orquestará.
+El plan de cada colegio y sus permisos viven en la base, en las tablas
+`subscriptions` y `entitlements`. **No hay proveedor de pagos**: el proyecto
+no procesa tarjetas, no recibe eventos de una pasarela y no tiene checkout.
 
-Front-end expone solo:
+- El frontend lee `GET /v1/subscriptions`, y de ahí salen el plan que se
+  muestra y el permiso de ICFES (`entitlements.includes_icfes`, con estado
+  `trial` o `active`).
+- El backend valida el entitlement antes de dejar usar un módulo premium. El
+  frontend puede esconder la opción; la puerta real está en la API.
+- El plan lo asigna el equipo de plataforma, dentro del proyecto.
 
-- `VITE_WOMPI_PUBLIC_KEY` (Browser-safe).
-- `VITE_WOMPI_ENVIRONMENT` (`sandbox` o `production`).
-
-Back-end requiere en variables privadas:
-
-- `WOMPI_PUBLIC_KEY` (para `GET /merchants/{public_key}`).
-- `WOMPI_PRIVATE_KEY` (autenticación de servidor).
-- `WOMPI_INTEGRITY_KEY` (firma de integridad de transacciones).
-- `WOMPI_EVENTS_SECRET` (verificación HMAC de webhooks; por defecto Wompi lo devuelve en la respuesta de `/merchants/{public_key}`).
-- `WOMPI_API_BASE` (`https://sandbox.wompi.co/v1` por defecto).
-
-Detalles que aplican a Wompi:
-
-- Webhook events llegan a `POST /v1/webhooks/wompi` con un payload que incluye `signature`, `timestamp`, `data.transaction.{id,status,amount_in_cents}`. El backend valida la firma con HMAC-SHA256 sobre `timestamp + transaction.id + transaction.status + transaction.amount_in_cents` usando `events.secret`.
-- Flujo recomendado: Web Checkout (popup o redirect) para evitar cualquier contacto del cliente con datos sensibles. Si más adelante se necesita tokenización directa, `POST /payment_sources` recibe la tarjeta del cliente (la librería oficial de Wompi la inyecta en un iframe; el código de Lumen nunca la ve).
-- Eventos importantes para Lumen: `transaction.updated` (aprobar/rechazar) y `subscription.updated` si se oferten planes recurrentes.
+Las tablas de planes, suscripciones y entitlements ya existían antes de la
+pasarela y no dependían de ella: por eso sobreviven a su salida.
 
 ## 2. Topología — **implementado**
 
 ```mermaid
 flowchart LR
     U[Usuario] --> F[Frontend React / TanStack Start]
-    F -->|cookie httpOnly + CRUD + permisos| B[FastAPI en Docker]
-    F -->|token de 1h para Storage y Realtime| S[Supabase]
-    F -->|Widget Wompi en iframe| W[Wompi]
+    F -->|cookie httpOnly + CRUD + permisos + archivos| B[FastAPI en Docker]
+    F -->|consulta periódica del chat| B
     B -->|SQLAlchemy async, identidad del llamador| P[(PostgreSQL)]
-    B -->|emite el token de Storage/Realtime| S
-    W -->|webhook firmado| B
+    B -->|escribe y lee| D[(Disco del servidor)]
     B --> R[PDF e integraciones externas]
 ```
 
 El frontend no lee ni escribe la base de datos: `PostgreSQL` solo lo
 alcanza el backend, y siempre con la identidad del llamador, para que
-la capa de permisos de Python sea la que decide.
+la capa de permisos de Python sea la que decide. Los archivos tampoco
+tienen un servicio aparte: los guarda y los sirve el backend.
 
 Despliegues independientes:
 
 1. **Frontend:** build actual TanStack Start/Nitro.
-2. **Supabase:** proyecto administrado con migraciones versionadas en el repositorio. Aporta Postgres, Storage y Realtime.
-3. **Backend:** imagen Docker de FastAPI administrada con `uv`.
+2. **Backend:** imagen Docker de FastAPI administrada con `uv`. Es el dueño
+   de la base y de los archivos.
+3. **Postgres:** base con el esquema de las migraciones del repositorio
+   (`db/migrations/` y `backend/migrations/`).
 
 ## 3. Identidad, tenant y autorización
 
 ### 3.1 Modelo de identidad
 
-- `auth.users` será la identidad de Supabase Auth.
-- `profiles` contendrá datos personales no sensibles del dominio y tendrá `id = auth.users.id`.
+- `public.users` es la identidad: la tabla propia del backend (sustituye a
+  `auth.users`).
+- `profiles` contendrá datos personales no sensibles del dominio y tendrá `id = users.id`.
 - `schools` representará colegios.
 - `school_memberships` relacionará usuario, colegio, rol y estado.
 - Un usuario podrá pertenecer a uno o más colegios si el producto lo necesita; el diseño no debe fijar un único `colegio_id` editable en metadata.
@@ -152,16 +149,17 @@ Nunca se autorizará una operación únicamente porque el cliente envió `school
 
 Para cada endpoint FastAPI autenticado:
 
-1. Leer el access token Supabase del header `Authorization: Bearer`.
-2. Verificar firma, expiración, issuer y audience usando las claves/JWKS del proyecto.
+1. Leer el access token del header `Authorization: Bearer`.
+2. Verificar firma, expiración, issuer y audience con la clave del backend (`JWT_SECRET`).
 3. Obtener `user_id` del token.
 4. Resolver la membresía activa y el rol desde la base de datos.
 5. Derivar el colegio desde la membresía y el recurso; no confiar en un ID aislado del body.
 6. Si aplica, resolver suscripción y entitlement.
-7. Ejecutar la operación con el cliente privilegiado.
+7. Ejecutar la operación con la identidad del llamador.
 8. Registrar la acción sensible sin guardar token, claves, respuestas de examen o PII innecesaria.
 
-El webhook de Wompi no usa sesión de usuario; verifica la firma HMAC-SHA256 del payload con `events.secret` (obtenido en `GET /merchants/{public_key}`) y procesa eventos de forma idempotente.
+El plan y el entitlement se resuelven en el mismo camino: la API es la que
+valida el acceso a ICFES, no el frontend.
 
 ### 3.4 Super Admin
 
@@ -292,8 +290,8 @@ Las claves correctas de evaluaciones e ICFES se almacenarán separadas de las pr
 > ahora en Python (`app/core/permissions.py` y `app/core/access.py`),
 > que es el puerto de las siete funciones `SECURITY DEFINER` que las
 > migraciones declaraban. Las políticas de RLS siguen en la base
-> como red de seguridad: si alguien deja el PostgREST expuesto, el
-> `anon` no puede saltarlas.
+> heredada como red de seguridad, pero ya no hay ningún servicio de
+> base de datos expuesto: la API es la única puerta.
 
 ### 5.1 Reglas base
 
@@ -348,59 +346,73 @@ Las pruebas de aislamiento entre tenants viven en
 `backend/tests/test_tenant_isolation.py`. Las de permisos, en
 `backend/tests/test_permissions.py`.
 
-Referencias oficiales consultadas:
+Referencia oficial consultada para las políticas que siguen en la base:
 
 - [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [RBAC y custom claims](https://supabase.com/docs/guides/api/custom-claims-and-role-based-access-control-rbac)
-- [Storage Access Control](https://supabase.com/docs/guides/storage/security/access-control)
-- [Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization)
-- [API keys](https://supabase.com/docs/guides/getting-started/api-keys)
 
-## 6. Storage
+## 6. Storage — **implementado en el disco del servidor**
 
-Buckets propuestos:
+Los archivos de la aplicación se guardan en el disco del backend, en la
+carpeta que nombra `UPLOADS_DIR` (por defecto `backend/var/archivos`). No hay
+un servicio de almacenamiento en el medio: el backend los sube, los guarda y
+los sirve.
+
+Los «buckets» sobreviven como **prefijo de la ruta**, no como un servicio
+distinto:
 
 | Bucket | Lectura | Escritura |
 | --- | --- | --- |
-| `school-logos` | Pública o autenticada, decisión de producto | School admin del mismo colegio |
-| `class-content` | Miembros con acceso a la materia | Admin/docente asignado |
-| `task-submissions` | Estudiante dueño y docentes/admin autorizados | Estudiante dueño dentro de la ventana permitida |
-| `question-assets` | Usuarios autorizados para el examen/banco | Admin/docente autorizado |
-| `generated-reports` | URL firmada para solicitante autorizado | Solo backend |
+| `avatars` | Pública | El propio usuario (`POST /v1/auth/me/avatar`) |
+| `school-logos` | Pública | School admin del mismo colegio (`POST /v1/schools/me/logo`) |
+| `class-content` | Miembros del colegio | Docente o admin del colegio |
+| `task-submissions` | Miembros del colegio | Estudiante, dentro de la ventana permitida |
 
-Convención de paths: `{school_id}/{resource_id}/{uuid}.{ext}`.
+Convención de paths: `{bucket}/{colegio}/{recurso}/{archivo}`, y en los
+avatares `{bucket}/{usuario}/{archivo}`. La ruta se guarda **relativa** a la
+raíz del almacén (`avatars/<usuario>/avatar-123.png`). El frontend la resuelve
+contra el API con un helper (`fileUrl()`); en la base nunca hay una
+dirección absoluta.
 
-Las policies de `storage.objects` validarán bucket, prefijo y membresía/recurso asociado. El prefijo ayuda a organizar, pero no debe ser la única condición de autorización. Los uploads validarán tipo MIME, extensión, tamaño y ownership. Los buckets académicos serán privados y se descargarán mediante sesión o URLs firmadas de corta duración.
+Los uploads validan tipo MIME, extensión y tamaño, y el rol de quien escribe:
+el material de una materia es del docente o del administrador del colegio, y
+una entrega es del estudiante. En la lectura, el router de archivos
+(`/v1/files/...`) comprueba que el llamador sea miembro del colegio al que
+pertenece el archivo; los avatares y los escudos son públicos.
 
-La credencial privilegiada de Storage solo vivirá en FastAPI. Nunca se expondrá al navegador.
+El material del catálogo editorial es otro almacén: vive en
+`PLATFORM_STORAGE_DIR` (`backend/var/materiales`), detrás del adaptador
+`app/platform/storage.py`. Cambiar cualquiera de los dos destinos es cambiar
+un adaptador, no la lógica de negocio.
 
-## 7. Realtime y chat
-
-Diseño inicial:
+## 7. Chat — **implementado con consulta periódica**
 
 - Mensajes persistidos en `chat_messages`.
 - Membresía de conversación en `chat_members`.
-- CRUD directo cliente ↔ Supabase protegido por RLS.
-- Suscripción a cambios autorizados para mensajes nuevos.
-- Adjuntos, si se implementan, en bucket privado y referenciados desde el mensaje.
-- Cleanup obligatorio de canales al desmontar componentes.
+- El CRUD va por la API, con los permisos de Python.
+- El panel refresca los mensajes consultando
+  `GET /v1/chat/conversations/{id}/messages`: no hay canal en vivo ni
+  suscripción a cambios.
+- Los adjuntos, si se implementan, se suben por `/v1/files` y se referencian
+  desde el mensaje.
 
-Para una primera versión se puede usar Postgres Changes con RLS por su simplicidad. Antes de escalar, se medirá concurrencia y se evaluará migrar distribución a canales privados/Broadcast manteniendo `chat_messages` como fuente persistente. No se usarán canales públicos para conversaciones escolares.
+El tradeoff es conocido: hay una ventana entre un mensaje y su aparición en
+la otra sesión, a cambio de no depender de una conexión permanente y de que
+las reglas de acceso sean las mismas que en el resto de la API.
 
 ## 8. División explícita por módulo
 
-| Módulo | Cliente ↔ Supabase directo | FastAPI | Regla clave |
+| Módulo | En el navegador | FastAPI | Regla clave |
 | --- | --- | --- | --- |
-| `usuarios` | Sign in/out, refresh, reset; lectura/edición de perfil propio; lectura de miembros permitidos; CRUD de datos de perfil/membresía permitido por RLS. | Invitar, crear, desactivar o borrar cuentas Auth; cambios privilegiados de rol; carga masiva que cree identidades. | Excepción necesaria: el navegador no puede recibir credenciales admin de Supabase Auth. |
+| `usuarios` | Entrar y salir, refrescar la sesión, restablecer la contraseña; lectura y edición del perfil propio; lectura de los miembros permitidos. | Invitar, crear, desactivar o borrar cuentas; cambios privilegiados de rol; carga masiva que cree identidades. | El navegador nunca recibe una credencial administrativa: las cuentas las crea el backend. |
 | `cursos_materias` | CRUD de períodos, cursos, materias, matrículas y asignaciones simples según rol. | Validaciones masivas o integraciones futuras; no interviene en CRUD normal. | Todas las filas llevan `school_id`; constraints evitan referencias entre colegios. |
-| `contenido` | CRUD de metadata, progreso y upload/download en Storage. | Procesamiento futuro de archivos, transcodificación o integraciones externas. | Docente solo sobre materias asignadas; estudiante solo matriculadas. |
-| `tareas` | CRUD de tareas, entregas, comentarios y archivos en Storage. | Notificaciones al publicar, entregar y calificar; validaciones extraordinarias. | Estudiante solo modifica su entrega y dentro de reglas permitidas. |
+| `contenido` | CRUD de metadata y progreso; subida y descarga de los archivos por `/v1/files`. | Procesamiento futuro de archivos, transcodificación o integraciones externas. | Docente solo sobre materias asignadas; estudiante solo matriculadas. |
+| `tareas` | CRUD de tareas, entregas, comentarios; la entrega sube su archivo por `/v1/files`. | Notificaciones al publicar, entregar y calificar; validaciones extraordinarias. | Estudiante solo modifica su entrega y dentro de reglas permitidas. |
 | `evaluaciones` | Autoría de evaluación/preguntas y lectura de intentos permitidos; lectura del payload sin claves. | Iniciar/finalizar intentos sensibles, calificación automática, reglas de tiempo y preguntas abiertas cuando aplique. | Las claves nunca se envían al estudiante. |
-| `calificaciones` | Docente/admin escribe notas manuales con RLS; estudiante lee notas propias. | Recalcular promedios, cierres de período, comparativos y reglas complejas. | Guardar nota fuente y resultado derivado de forma auditable. |
-| `simulacros_icfes` | CRUD del banco y definición por admin/docente con RLS; lectura de intentos/resultados propios. | Crear/finalizar intento seguro, scoring ICFES, plan/entitlement, agregados por curso/colegio y operaciones pesadas. | Doble validación: autorización + suscripción antes de usar service role. |
-| `chat` | Conversaciones, mensajes, presencia/realtime y adjuntos. | Moderación/integraciones futuras si se requieren. | Solo miembros de la conversación y del colegio. |
+| `calificaciones` | Docente/admin escribe notas manuales; el estudiante lee las suyas. | Recalcular promedios, cierres de período, comparativos y reglas complejas. | Guardar nota fuente y resultado derivado de forma auditable. |
+| `simulacros_icfes` | El banco y sus simulacros los define el admin/docente; el estudiante ve sus intentos y resultados. | Crear/finalizar intento seguro, scoring ICFES, plan/entitlement, agregados por curso/colegio y operaciones pesadas. | Doble validación: autorización y entitlement, las dos en el backend. |
+| `chat` | Conversaciones y mensajes; la lista se refresca con una consulta periódica a la API. | Moderación/integraciones futuras si se requieren. | Solo miembros de la conversación y del colegio. |
 | `notificaciones` | Lectura del panel y del contador de no leídas; marcado de leída y descarte; lectura y cambio de las preferencias. | Creación de la notificación cuando ocurre el evento; futura entrega por correo. | Cada fila es de un destinatario: el llamador solo ve las suyas y las de otro usuario son 404. Las preferencias se respetan al crear la notificación. |
-| `suscripciones` | Lectura del plan, estado y entitlements; inicio de checkout mediante URL/token del backend. | Checkout, portal, webhooks firmados, upgrade/downgrade, idempotencia, actualización de entitlements y bloqueo de módulos. | El cliente nunca escribe su plan ni envía tarjeta cruda a Lumen. |
+| `suscripciones` | Lectura del plan, estado y entitlements. | Actualización de los entitlements y bloqueo de módulos. | El cliente nunca escribe su plan. |
 | `reportes` | Solicitar reporte y consultar/descargar resultado autorizado. | Consultas agregadas, render HTML, PDF, almacenamiento temporal y URL firmada. | Reporte generado con scope de colegio/rol validado en backend. |
 
 ## 9. Backend FastAPI propuesto
@@ -418,8 +430,11 @@ backend/
     config.py
     auth.py
     errors.py
-    supabase_client.py
     health.py
+    core/
+      storage.py
+    files/
+      router.py
     users/
       router.py
       schemas.py
@@ -428,7 +443,6 @@ backend/
       router.py
       schemas.py
       operations.py
-      webhooks.py
     evaluations/
       router.py
       schemas.py
@@ -451,12 +465,12 @@ backend/
 
 `operations.py`, `scoring.py` y `comparisons.py` expondrán funciones. Los routers validarán entrada, resolverán dependencias y delegarán.
 
-Endpoints implementados (67 en total; el detalle está en
-`backend/README.md` y en `/openapi.json`):
+Endpoints implementados (el detalle está en `backend/README.md` y en
+`/openapi.json`):
 
 - `GET /health`, `GET /ready`
 - Auth: `POST /v1/auth/{register,login,refresh,logout,forgot-password,reset-password,verify-email}`,
-  `GET /v1/auth/me`, `GET /v1/auth/supabase-token`
+  `GET /v1/auth/me`
 - `POST /v1/schools/bootstrap`
 - Académico: `GET|POST /v1/academics/periods`, `courses`, `subjects`,
   `course-subjects`, `teacher-assignments`, `student-enrollments`, y
@@ -476,8 +490,10 @@ Endpoints implementados (67 en total; el detalle está en
   `GET|PATCH /v1/notifications/preferences`
 - `GET /v1/plans`
 - `POST /v1/users/{invitations,bulk-upload}`, `GET /v1/users/memberships`
-- `POST /v1/subscriptions/{checkout,portal}`, `GET /v1/subscriptions`
-- `POST /v1/webhooks/wompi`
+- `GET /v1/subscriptions`
+- Archivos: `POST /v1/files/task-submissions/{task_id}`,
+  `POST /v1/files/class-content/{course_subject_id}`,
+  `GET /v1/files/{bucket}/{path}`
 
 Queda pendiente `POST /v1/reports` y `GET /v1/reports/{report_id}`
 (los reportes en PDF).
@@ -489,34 +505,30 @@ Los nombres son contratos propuestos y pueden ajustarse antes de implementarse.
 Variables públicas del frontend:
 
 - `VITE_API_URL`
-- `VITE_SUPABASE_URL` (solo Storage y Realtime)
-- `VITE_SUPABASE_PUBLISHABLE_KEY` (solo Storage y Realtime)
+- `VITE_SITE_URL`
 
 Variables privadas del backend:
 
-- `DATABASE_URL` (el Postgres de Supabase; se recomienda el pooler)
+- `DATABASE_URL` (el Postgres; en producción se recomienda un pooler)
 - `JWT_SECRET` (firma los access tokens que emite el backend)
 - `PLATFORM_STORAGE_DIR` (la carpeta donde se guarda el material del
   catálogo mientras vive en el disco; por defecto `backend/var/materiales`)
-- `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (Storage, Realtime y el webhook)
-- `SUPABASE_JWT_SECRET` (firma los tokens de una hora que el navegador
-  usa para Storage y Realtime; **no** autentica peticiones a la API)
+- `UPLOADS_DIR` (la carpeta de los archivos de la aplicación; por defecto
+  `backend/var/archivos`)
+- `PUBLIC_BASE_URL` (la dirección pública del API, para armar las URLs de los
+  archivos)
 - `COOKIE_DOMAIN` (opcional; hace falta si el frontend y la API viven
   en subdominios distintos, para que el servidor del frontend pueda
   leer la cookie durante el SSR)
-- `WOMPI_PUBLIC_KEY`, `WOMPI_PRIVATE_KEY`, `WOMPI_INTEGRITY_KEY`,
-  `WOMPI_EVENTS_SECRET`
-- credenciales de integraciones externas
-- `WOMPI_PUBLIC_KEY`, `WOMPI_PRIVATE_KEY`, `WOMPI_INTEGRITY_KEY`, `WOMPI_EVENTS_SECRET` (obtenido en `GET /merchants/{public_key}`)
 - credenciales de integraciones externas
 
 Reglas:
 
 - Nunca usar prefijo `VITE_` para un secreto.
-- Nunca incluir service role, secret key, JWT secret o webhook secret en el frontend.
-- El token de Storage y Realtime que viaja al navegador es de una
-  hora y solo habilita Storage y Realtime: la API no lo acepta como
-  credencial.
+- Nunca incluir el `JWT_SECRET` ni las credenciales de integraciones en el
+  frontend.
+- Los archivos del servidor no se abren con una credencial: se piden a la
+  API con la sesión del llamador, y la API decide.
 - Añadir `.env*` al `.gitignore`, preservando únicamente ejemplos sin valores.
 - Escanear cambios por secretos antes de commits que afecten configuración.
 
@@ -530,12 +542,10 @@ Reglas:
 - Vitest + Testing Library para componentes/hooks.
 - Playwright para flujos críticos por rol.
 
-### Supabase
+### Base de datos
 
-- Supabase CLI local para migraciones y seed reproducible.
-- Pruebas SQL/pgTAP de RLS y constraints.
-- Tipos TypeScript generados desde el esquema y versionados.
-- Advisors de seguridad y rendimiento después de cambios DDL.
+- Postgres local en Docker para las migraciones y una semilla reproducible.
+- Pruebas SQL/pgTAP de constraints y de las políticas heredadas.
 - El MCP puede apoyar inspección y aplicación controlada, pero las migraciones deben existir primero como archivos versionados y probarse localmente.
 
 ### Backend
@@ -543,8 +553,8 @@ Reglas:
 - `uv sync --frozen`.
 - Ruff para lint/format.
 - Type checker elegido y fijado en `pyproject.toml`.
-- Pytest para dominio, auth, webhooks y endpoints.
-- Testcontainers o Supabase local para integración cuando se requiera DB real.
+- Pytest para dominio, auth y endpoints.
+- Testcontainers o el Postgres local de Docker para integración cuando se requiera DB real.
 - Build y healthcheck de Docker.
 
 ## 12. Plan de refactorización por fases
@@ -564,9 +574,17 @@ Reglas:
 | 2 | La capa de permisos: el puerto de las siete funciones `SECURITY DEFINER` y el `RequestContext`. | `feat(authz): port the RLS permission layer to Python` |
 | 3 | Los nueve módulos de dominio con sus endpoints. | `feat(academics)`, `feat(content)`, `feat(evaluations)`, `feat(chat)` |
 | 4 | El frontend deja de hablar con Supabase: la sesión en cookies httpOnly, los hooks contra la API, el puente de Storage y Realtime. | `feat(frontend): move the browser off Supabase and onto the API` |
+| 5 | Supabase sale del todo: el navegador ya no habla con él, los archivos los guarda y los sirve el backend (`app/core/storage.py` y `/v1/files`), el chat se refresca por consulta periódica y se borra el puente de tokens. | — |
+| 6 | Wompi sale: el cliente HTTP, el checkout, el portal y el webhook se borran. Los planes y los entitlements quedan como tablas internas del proyecto. | — |
+
+Las dos últimas filas se hicieron después de la fase 4: la fase 4 había
+dejado un puente de Storage y Realtime que las fases 5 y 6 desmontaron.
 
 El plan original que sigue se conserva como registro de las
-decisiones que lo guiaron.
+decisiones que lo guiaron. Describe el proyecto como se planeó: el
+cliente de Supabase, el puente de Storage y Realtime y la pasarela de
+pagos no llegaron a existir, o se quitaron después, como cuenta la tabla
+de arriba.
 
 Cada fase tiene un resultado demostrable y debe terminar antes de iniciar la siguiente. Los nombres de archivos nuevos son la estructura propuesta, no archivos existentes.
 
@@ -627,9 +645,9 @@ Cada fase tiene un resultado demostrable y debe terminar antes de iniciar la sig
 **Se crea**
 
 - `supabase/config.toml`
-- `supabase/migrations/*_initial_tenant_auth.sql`
-- `supabase/migrations/*_initial_rls.sql`
-- `supabase/seed.sql`
+- `db/migrations/*_initial_tenant_auth.sql`
+- `db/migrations/*_initial_rls.sql`
+- `db/seed.sql`
 - pruebas SQL de RLS
 - `frontend/src/lib/supabase/client.ts`
 - `frontend/src/lib/supabase/server.ts`
@@ -811,9 +829,16 @@ La lectura/edición de perfiles y membresías permitidas será directa. La creac
 - `feat(chat): subscribe to authorized realtime messages`
 - `test(storage): deny cross-school object access`
 
-### Fase 5 — Suscripciones, webhooks y entitlements
+### Fase 5 — Suscripciones, webhooks y entitlements (plan original, no se ejecutó así)
 
 **Objetivo:** convertir plan y bloqueo de módulos en reglas autoritativas antes de procesar ICFES.
+
+> Esta fase se planeó con **Wompi** (Colombia) y **no se ejecutó en esa
+> forma**: la pasarela salió del proyecto (fase 6 de la tabla del apartado 12).
+> Lo que quedó de ella son las tablas `plans`, `subscriptions` y
+> `entitlements`, que el backend usa para el plan del colegio y el permiso de
+> ICFES. El checkout, el portal, el webhook y el cliente HTTP de Wompi se
+> borraron. El texto de abajo se conserva como el plan que se discutió.
 
 Proveedor de pagos: **Wompi** (Colombia). Lumen no almacena datos de tarjeta: el front-end usa el widget oficial o Web Checkout de Wompi; el backend solo verifica webhooks firmados y actualiza entitlements. Ver [Wompi desarrolladores](https://wompi.com/es/co/desarrolladores).
 
