@@ -77,6 +77,8 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+export { refreshSession };
+
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
   if (!query) return url;

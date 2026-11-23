@@ -18,6 +18,7 @@ import {
 } from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 import type {
   ChatConversation,
   ChatMessage,
@@ -33,9 +34,6 @@ import type {
 } from "@/lib/storage/types";
 
 export type { ChatConversation, ChatMessage, ContentItem, Task, TaskSubmission };
-
-/** How often the messages of a conversation are refreshed, in milliseconds. */
-export const CHAT_POLL_INTERVAL = 5_000;
 
 export const queryKeys = {
   contentItems: (schoolId: string) => ["content_items", schoolId] as const,
@@ -214,6 +212,13 @@ export function useGradeSubmission(): UseMutationResult<
 export function useChatConversations(
   schoolId: string | null,
 ): UseQueryResult<ChatConversation[], Error> {
+  const qc = useQueryClient();
+
+  // A message moves its conversation to the top of the list.
+  useEvent("chat.message", () => {
+    qc.invalidateQueries({ queryKey: queryKeys.conversations(schoolId ?? "") });
+  });
+
   return useQuery({
     queryKey: schoolId ? queryKeys.conversations(schoolId) : ["chat_conversations", "none"],
     enabled: !!schoolId,
@@ -224,19 +229,25 @@ export function useChatConversations(
 /**
  * The messages of a conversation.
  *
- * The panel refreshes them every few seconds: there is no push channel,
- * and a message that arrives is read the same way whether it was
- * written a second ago or a minute ago.
+ * They are not polled: the server pushes an event when a message
+ * arrives, and the thread is asked for again. A message that arrives is
+ * read the same way whether it was written a second ago or a minute ago.
  */
 export function useChatMessages(
   conversationId: string | null,
 ): UseQueryResult<ChatMessage[], Error> {
+  const qc = useQueryClient();
+
+  useEvent("chat.message", (event) => {
+    const other = event.data.conversation_id;
+    if (other !== conversationId) return;
+    qc.invalidateQueries({ queryKey: queryKeys.messages(conversationId ?? "") });
+  });
+
   return useQuery({
     queryKey: conversationId ? queryKeys.messages(conversationId) : ["chat_messages", "none"],
     enabled: !!conversationId,
     queryFn: () => api.get<ChatMessage[]>(`/v1/chat/conversations/${conversationId}/messages`),
-    refetchInterval: CHAT_POLL_INTERVAL,
-    refetchIntervalInBackground: false,
   });
 }
 

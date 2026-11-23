@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth/browser";
+import { useEventStream } from "@/lib/events/event-stream";
 import { fileUrl } from "@/lib/storage/files";
 import type { SessionContext } from "@/lib/auth/functions";
 import { useEntitlement } from "@/lib/billing/hooks";
@@ -338,6 +339,10 @@ export function AppShell({
 
   const entitlement = useEntitlement(session.primarySchoolId);
   const school = useSchool(session.primarySchoolId);
+  // The stream of events of the user: the badge of the bell and the
+  // chat panel are told when there is something new, so neither of
+  // them polls.
+  useEventStream(true);
   // The counter of the rail: how much material the school has
   // available. The dashboard reads the same query, so the panel asks
   // for it once.
