@@ -273,7 +273,15 @@ async def test_the_indicators_count_the_simulators_of_the_school(
     assert kpis["available"] == 1
     assert kpis["activated"] == 0
     assert kpis["not_activated"] == 1
-    assert kpis["averages_by_grade"] == [{"grade": "7°", "average_score": 312.0}]
+    assert kpis["averages_by_grade"] == [
+        {
+            "grade": "7°",
+            "average_score": 312.0,
+            "latest_average": 312.0,
+            "previous_average": None,
+            "delta": None,
+        }
+    ]
 
 
 async def test_activating_a_simulator_registers_the_courses(

@@ -32,6 +32,13 @@ class UserInvitationRequest(BaseModel):
     role: SchoolRole
     school_id: UUID | None = None
     is_primary: bool = True
+    # The courses a new student is enrolled in. A student without a
+    # course has no material to see: the admin picks the course when it
+    # creates the student.
+    course_ids: list[UUID] | None = None
+    # The course subjects a new teacher is assigned to. The assignment is
+    # what gives the teacher access to the material of the subject.
+    course_subject_ids: list[UUID] | None = None
 
     @field_validator("full_name")
     @classmethod

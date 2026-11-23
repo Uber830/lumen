@@ -23,12 +23,14 @@ the school reads why the account cannot be used yet.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import Select, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.enums import SchoolRole
 from app.db.models import (
     Course,
@@ -170,6 +172,7 @@ async def list_teachers(
     rows = result.all()
 
     assignments = await _assignments_of(session, school_id, [row[1] for row in rows])
+    assignment_ids = await _assignment_ids_of(session, school_id, [row[1] for row in rows])
 
     items = []
     for membership_id, user_id, full_name, email, password_hash, joined_at, revoked_at in rows:
@@ -199,6 +202,7 @@ async def list_teachers(
                 "account_activated": bool(password_hash),
                 "courses": course_names,
                 "subjects": subject_names,
+                "course_subject_ids": assignment_ids.get(user_id, []),
                 "access": access,
                 "access_reason": reason,
                 "status": "inactivo" if revoked_at is not None else "activo",
@@ -249,6 +253,35 @@ async def _assignments_of(
     return assignments
 
 
+async def _assignment_ids_of(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    teacher_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[str]]:
+    """The course subjects each teacher is assigned to.
+
+    The edit form needs the ids, not the names: it works with the
+    course subjects the school offers.
+    """
+    if not teacher_ids:
+        return {}
+
+    result = await session.execute(
+        select(TeacherAssignment.teacher_id, TeacherAssignment.course_subject_id).where(
+            TeacherAssignment.school_id == school_id,
+            TeacherAssignment.teacher_id.in_(teacher_ids),
+        )
+    )
+
+    assignments: dict[uuid.UUID, list[str]] = {}
+    for teacher_id, course_subject_id in result.all():
+        ids = assignments.setdefault(teacher_id, [])
+        if str(course_subject_id) not in ids:
+            ids.append(str(course_subject_id))
+
+    return assignments
+
+
 async def list_students(
     session: AsyncSession,
     school_id: uuid.UUID,
@@ -286,7 +319,8 @@ async def list_students(
 
     student_ids = [row[1] for row in rows]
     courses = await _courses_of(session, school_id, student_ids)
-    averages = await _averages_of(session, school_id, student_ids)
+    course_ids = await _course_ids_of(session, school_id, student_ids)
+    averages = await _averages_of(session, school_id, student_ids, course_id)
 
     items = []
     for membership_id, user_id, full_name, email, password_hash, joined_at, revoked_at in rows:
@@ -308,6 +342,7 @@ async def list_students(
                 "revoked_at": revoked_at,
                 "account_activated": bool(password_hash),
                 "courses": course_names,
+                "course_ids": course_ids.get(user_id, []),
                 "average": averages.get(user_id),
                 "access": access,
                 "access_reason": reason,
@@ -353,26 +388,65 @@ async def _courses_of(
     return courses
 
 
+async def _course_ids_of(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    student_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[str]]:
+    """The courses each student is enrolled in, by id.
+
+    The edit form needs the ids, not the names.
+    """
+    if not student_ids:
+        return {}
+
+    result = await session.execute(
+        select(StudentEnrollment.student_id, StudentEnrollment.course_id).where(
+            StudentEnrollment.school_id == school_id,
+            StudentEnrollment.student_id.in_(student_ids),
+            StudentEnrollment.status == "active",
+        )
+    )
+
+    courses: dict[uuid.UUID, list[str]] = {}
+    for student_id, course_id in result.all():
+        ids = courses.setdefault(student_id, [])
+        if str(course_id) not in ids:
+            ids.append(str(course_id))
+
+    return courses
+
+
 async def _averages_of(
     session: AsyncSession,
     school_id: uuid.UUID,
     student_ids: list[uuid.UUID],
+    course_id: uuid.UUID | None = None,
 ) -> dict[uuid.UUID, Decimal]:
     """The average of each student, over the grades of the school.
+
+    When the list is filtered by course, the average is the one of that
+    course: the number on the screen has to answer the filter that is
+    on the screen.
 
     A student without grades has no average: it is `null`, not a zero.
     """
     if not student_ids:
         return {}
 
-    result = await session.execute(
-        select(Grade.student_id, func.round(func.avg(Grade.score), 2))
-        .where(
-            Grade.school_id == school_id,
-            Grade.student_id.in_(student_ids),
-        )
-        .group_by(Grade.student_id)
+    statement = select(Grade.student_id, func.round(func.avg(Grade.score), 2)).where(
+        Grade.school_id == school_id,
+        Grade.student_id.in_(student_ids),
     )
+
+    if course_id is not None:
+        statement = statement.join(
+            CourseSubject, CourseSubject.id == Grade.course_subject_id
+        ).where(
+            CourseSubject.course_id == course_id,
+        )
+
+    result = await session.execute(statement.group_by(Grade.student_id))
 
     return {student_id: average for student_id, average in result.all() if average is not None}
 
@@ -486,4 +560,157 @@ async def list_subjects(session: AsyncSession, school_id: uuid.UUID) -> list[dic
     return subjects
 
 
-__all__ = ["list_courses", "list_students", "list_subjects", "list_teachers"]
+# ---------------------------------------------------------------------------
+# Editing a member of the community
+# ---------------------------------------------------------------------------
+
+
+async def update_member(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    membership_id: uuid.UUID,
+    *,
+    full_name: str | None = None,
+    email: str | None = None,
+    course_ids: list[uuid.UUID] | None = None,
+    course_subject_ids: list[uuid.UUID] | None = None,
+) -> dict[str, Any]:
+    """Edit a teacher or a student of the school.
+
+    The name and the email are the person's. The courses (of a student) or
+    the course subjects (of a teacher) are what the admin edits from the
+    form: the list is replaced by the one that comes in, so what the form
+    shows is what the member has.
+
+    The membership has to belong to the school: an admin of another school
+    does not get to edit this one.
+    """
+    result = await session.execute(
+        select(SchoolMembership, User)
+        .join(User, User.id == SchoolMembership.user_id)
+        .where(
+            SchoolMembership.id == membership_id,
+            SchoolMembership.school_id == school_id,
+        )
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise NotFoundError("Member not found.")
+    membership, user = row
+
+    if full_name is not None:
+        name = full_name.strip()
+        if not name:
+            raise ValidationError("The name must not be blank.")
+        profile = await session.get(Profile, user.id)
+        if profile is None:
+            profile = Profile(id=user.id, full_name=name)
+            session.add(profile)
+        profile.full_name = name
+        # The name lives in the profile, but the user row keeps it too
+        # for the moments before the profile exists.
+        user.full_name = name
+
+    if email is not None:
+        new_email = email.strip().lower()
+        if new_email and new_email != user.email:
+            existing = await session.execute(
+                select(User.id).where(User.email == new_email, User.id != user.id)
+            )
+            if existing.scalar_one_or_none() is not None:
+                raise ConflictError("A user with that email already exists.")
+            user.email = new_email
+
+    if membership.role == SchoolRole.STUDENT and course_ids is not None:
+        await _sync_enrollments(session, school_id, user.id, course_ids)
+
+    if membership.role == SchoolRole.TEACHER and course_subject_ids is not None:
+        await _sync_assignments(session, school_id, user.id, course_subject_ids)
+
+    await session.flush()
+
+    return {
+        "membership_id": str(membership.id),
+        "user_id": str(user.id),
+        "role": membership.role.value,
+        "full_name": full_name.strip() if full_name is not None else user.full_name,
+        "email": user.email,
+        "course_ids": [str(course_id) for course_id in (course_ids or [])],
+        "course_subject_ids": [str(item) for item in (course_subject_ids or [])],
+    }
+
+
+async def _sync_enrollments(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    student_id: uuid.UUID,
+    course_ids: list[uuid.UUID],
+) -> None:
+    """Make the enrollments of a student be exactly these courses."""
+    result = await session.execute(
+        select(StudentEnrollment).where(
+            StudentEnrollment.school_id == school_id,
+            StudentEnrollment.student_id == student_id,
+            StudentEnrollment.status == "active",
+        )
+    )
+    current = {row.course_id: row for row in result.scalars().all()}
+
+    for course_id, enrollment in current.items():
+        if course_id not in course_ids:
+            await session.delete(enrollment)
+
+    for course_id in course_ids:
+        if course_id in current:
+            continue
+        course = await session.get(Course, course_id)
+        if course is None or course.school_id != school_id:
+            raise ValidationError("That course is not part of this school.")
+        session.add(
+            StudentEnrollment(
+                id=uuid.uuid4(),
+                school_id=school_id,
+                course_id=course_id,
+                student_id=student_id,
+                status="active",
+                enrolled_at=datetime.now(UTC),
+            )
+        )
+
+
+async def _sync_assignments(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    teacher_id: uuid.UUID,
+    course_subject_ids: list[uuid.UUID],
+) -> None:
+    """Make the assignments of a teacher be exactly these course subjects."""
+    result = await session.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.school_id == school_id,
+            TeacherAssignment.teacher_id == teacher_id,
+        )
+    )
+    current = {row.course_subject_id: row for row in result.scalars().all()}
+
+    for course_subject_id, assignment in current.items():
+        if course_subject_id not in course_subject_ids:
+            await session.delete(assignment)
+
+    for course_subject_id in course_subject_ids:
+        if course_subject_id in current:
+            continue
+        course_subject = await session.get(CourseSubject, course_subject_id)
+        if course_subject is None or course_subject.school_id != school_id:
+            raise ValidationError("That course subject is not part of this school.")
+        session.add(
+            TeacherAssignment(
+                id=uuid.uuid4(),
+                school_id=school_id,
+                course_subject_id=course_subject_id,
+                teacher_id=teacher_id,
+            )
+        )
+
+
+__all__ = ["list_courses", "list_students", "list_subjects", "list_teachers", "update_member"]

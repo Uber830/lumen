@@ -465,9 +465,24 @@ async def list_material(
     )
     areas = [str(area) for area in areas_result.scalars().all()]
 
+    # How much material the school has, with no filters: the counter of
+    # the toolbar talks about the whole library, not about the search.
+    available_total = await _count(
+        session,
+        select(func.count(Material.id))
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+            MaterialSchool.archived_at.is_(None),
+            Material.state == PUBLISHED_STATE,
+        ),
+    )
+
     return {
         "items": items,
         "total": total,
+        "available_total": available_total,
         "page": page,
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if total else 0,

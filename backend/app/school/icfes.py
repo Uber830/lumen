@@ -142,18 +142,36 @@ def _averages_by_grade(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     A simulator without average (it was not corrected yet) does not
     lower the average of its grade: it simply does not count.
+
+    Each grade also carries its last cut and the difference with the
+    one before it, so the panel can say whether the school is going up
+    or down.
     """
     totals: dict[str, list[float]] = {}
+    cuts: dict[str, list[tuple[date | None, float]]] = {}
     for item in items:
         score = item["average_score"]
         if score is None:
             continue
         totals.setdefault(item["grade"], []).append(score)
+        cuts.setdefault(item["grade"], []).append((item["scheduled_at"], score))
 
-    return [
-        {"grade": grade, "average_score": round(sum(scores) / len(scores), 2)}
-        for grade, scores in sorted(totals.items())
-    ]
+    averages = []
+    for grade, scores in sorted(totals.items()):
+        ordered = sorted(cuts[grade], key=lambda cut: (cut[0] is None, cut[0] or date.min))
+        latest = ordered[-1][1]
+        previous = ordered[-2][1] if len(ordered) > 1 else None
+        averages.append(
+            {
+                "grade": grade,
+                "average_score": round(sum(scores) / len(scores), 2),
+                "latest_average": round(latest, 2),
+                "previous_average": round(previous, 2) if previous is not None else None,
+                "delta": round(latest - previous, 2) if previous is not None else None,
+            }
+        )
+
+    return averages
 
 
 async def _activations_of(

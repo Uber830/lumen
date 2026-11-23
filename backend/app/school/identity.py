@@ -24,9 +24,14 @@ from app.core.errors import ValidationError
 from app.db.models import School
 
 # The colours of the panel, as the stylesheet declares them. The
-# contrast is checked against the two surfaces the text sits on.
-PANEL_BACKGROUND = "#080D1A"
-PANEL_SURFACE = "#101A2E"
+# contrast is checked against the two surfaces the accent sits on: the
+# paper of the panel and the white of the cards and of the text that
+# rides on the buttons.
+#
+# The panel is light by default, so a colour that reads well on it is
+# one that also keeps the white text of the buttons legible.
+PANEL_BACKGROUND = "#FCFCFD"
+PANEL_SURFACE = "#FFFFFF"
 
 # The minimum ratio a text colour needs to be readable (WCAG 2.1 AA).
 MINIMUM_CONTRAST = 4.5
