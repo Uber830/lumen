@@ -2,6 +2,7 @@ import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { ClipboardList, GraduationCap, Link2, Pencil, Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { StudyPlanImportDialog } from "@/features/admin/study-plan-import-dialog";
 import {
   Button,
   PanelTable,
@@ -73,6 +74,8 @@ function AsignacionesPage() {
   const [teacherId, setTeacherId] = useState("");
   const [courseSubjectId, setCourseSubjectId] = useState("");
   const [justAssigned, setJustAssigned] = useState<string | null>(null);
+  // The import of the study plan: the courses come ready to assign.
+  const [planOpen, setPlanOpen] = useState(false);
 
   // Removing an assignment asks for confirmation: the teacher stops
   // seeing the content of that subject.
@@ -115,7 +118,7 @@ function AsignacionesPage() {
   function openEdit(assignment: SchoolAssignment) {
     setEditing(assignment);
     setTeacherId(assignment.teacher_id);
-    setCourseSubjectId("");
+    setCourseSubjectId(assignment.course_subject_id);
     setJustAssigned(null);
     setFormOpen(true);
   }
@@ -290,10 +293,13 @@ function AsignacionesPage() {
             ))}
           </select>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <Chip tone="muted">
               {assignments.data ? `${assignments.data.length} asignaciones` : "—"}
             </Chip>
+            <Button variant="outline" size="sm" icon={Link2} onClick={() => setPlanOpen(true)}>
+              Importar desde plan de estudios
+            </Button>
           </div>
         </Toolbar>
 
@@ -427,6 +433,13 @@ function AsignacionesPage() {
           </p>
         )}
       </SectionCard>
+
+      {planOpen && (
+        <StudyPlanImportDialog
+          onClose={() => setPlanOpen(false)}
+          onImported={(message) => setJustAssigned(message)}
+        />
+      )}
 
       <ConfirmDialog
         open={assignmentToDelete.target !== null}

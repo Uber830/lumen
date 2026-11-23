@@ -25,6 +25,8 @@ import { api } from "@/lib/api/client";
 export type SchoolAssignment = {
   id: string;
   teacher_id: string;
+  /** The course subject this assignment points to. */
+  course_subject_id: string;
   teacher_name: string | null;
   teacher_email: string | null;
   teacher_avatar_url: string | null;
