@@ -32,11 +32,14 @@ BUCKETS = (
     "school-logos",
     "class-content",
     "task-submissions",
+    "support-attachments",
 )
 
 # The limits of each kind of file.
 MAX_AVATAR_BYTES = 5 * 1024 * 1024
 MAX_LOGO_BYTES = 5 * 1024 * 1024
+# The file a school attaches to a support request.
+MAX_SUPPORT_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 _AVATAR_MIME_EXT = {
     "image/png": "png",
@@ -243,6 +246,35 @@ def replace_file(
     target = _safe_path(root, relative)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
+    return relative
+
+
+def upload_support_attachment(
+    *,
+    school_id: str,
+    filename: str,
+    content: bytes,
+    content_type: str | None = None,
+    settings: Settings | None = None,
+) -> str:
+    """Store a file a school attaches to a support request.
+
+    The file goes to ``support-attachments/{school_id}/{name}``: it
+    belongs to the school, so only the members of the school (and the
+    support team) read it.
+    """
+    if len(content) > MAX_SUPPORT_ATTACHMENT_BYTES:
+        raise ValidationError(
+            "The file exceeds the 10 MB limit.",
+            code="file_too_large",
+        )
+
+    name = safe_name(filename)
+    relative = f"support-attachments/{school_id}/{int(time.time())}-{name}"
+    try:
+        write_file(relative, content, content_type=content_type, settings=settings)
+    except OSError as exc:
+        raise ServiceUnavailableError("The file store is not available.") from exc
     return relative
 
 

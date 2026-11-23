@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class AdminUserOut(BaseModel):
@@ -167,6 +167,8 @@ class MaterialPage(BaseModel):
 
     items: list[MaterialListItem] = Field(default_factory=list)
     total: int = 0
+    # How much material the school has with no filters applied.
+    available_total: int = 0
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=6, ge=1)
     pages: int = Field(default=0, ge=0)
@@ -242,6 +244,9 @@ class TeacherListItem(BaseModel):
     # The courses the teacher teaches and the subjects of each one.
     courses: list[str] = Field(default_factory=list)
     subjects: list[str] = Field(default_factory=list)
+    # The course subjects of the teacher, by id: the edit form works
+    # with ids, not with names.
+    course_subject_ids: list[str] = Field(default_factory=list)
     # `activado` or `pendiente`: one signal, not two loose badges.
     access: str = "pendiente"
     # Why the access is pending, in the words of the panel.
@@ -261,6 +266,9 @@ class StudentListItem(BaseModel):
     revoked_at: datetime | None = None
     account_activated: bool = False
     courses: list[str] = Field(default_factory=list)
+    # The courses of the student, by id: the edit form works with ids,
+    # not with names.
+    course_ids: list[str] = Field(default_factory=list)
     # `null` when the student has no grades: it is not a zero.
     average: float | None = None
     access: str = "pendiente"
@@ -280,6 +288,34 @@ class MemberPage(BaseModel):
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=10, ge=1)
     pages: int = Field(default=0, ge=0)
+
+
+class MemberEditIn(BaseModel):
+    """What the admin can change of a member of the community.
+
+    What is not sent is left alone: the form of the admin sends the
+    name, the email and the courses (of a student) or the course
+    subjects (of a teacher).
+    """
+
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
+    # The courses a student is enrolled in.
+    course_ids: list[uuid.UUID] | None = None
+    # The course subjects a teacher is assigned to.
+    course_subject_ids: list[uuid.UUID] | None = None
+
+
+class MemberEditOut(BaseModel):
+    """The member, after the edit."""
+
+    membership_id: str
+    user_id: str
+    role: str
+    full_name: str | None = None
+    email: str | None = None
+    course_ids: list[str] = Field(default_factory=list)
+    course_subject_ids: list[str] = Field(default_factory=list)
 
 
 class CourseOut(BaseModel):
@@ -483,6 +519,12 @@ class GradeAverageOut(BaseModel):
 
     grade: str
     average_score: float
+    # The score of the last cut of the grade.
+    latest_average: float = 0
+    # The score of the cut before it, when there is one.
+    previous_average: float | None = None
+    # How many points the last cut gained over the previous one.
+    delta: float | None = None
 
 
 class IcfesKpisOut(BaseModel):
@@ -555,6 +597,8 @@ class SupportMessageOut(BaseModel):
     author_role: str = "colegio"
     author_name: str = ""
     body: str
+    # The files the author attached to the message.
+    attachment_ids: list[str] = Field(default_factory=list)
     created_at: datetime
 
 
@@ -600,9 +644,23 @@ class SupportCaseIn(BaseModel):
     # problema_tecnico, solicitud_material, duda_acceso or otro.
     category: str = "otro"
     body: str
+    # The files the admin attached to the request.
+    attachment_ids: list[str] = Field(default_factory=list)
 
 
 class SupportMessageIn(BaseModel):
     """What the school adds to the thread of a case."""
 
     body: str
+    # The files the admin attached to the message.
+    attachment_ids: list[str] = Field(default_factory=list)
+
+
+class SupportAttachmentOut(BaseModel):
+    """A file uploaded to attach to a request."""
+
+    # The path of the file in the store: it is what the thread keeps.
+    id: str
+    name: str
+    size: int = 0
+    url: str = ""

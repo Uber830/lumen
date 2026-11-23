@@ -172,6 +172,7 @@ async def _messages_of(session: AsyncSession, case_id: uuid.UUID) -> list[dict[s
             SupportMessage.created_at,
             Profile.full_name,
             User.email,
+            SupportMessage.attachment_ids,
         )
         .outerjoin(Profile, Profile.id == SupportMessage.author_id)
         .outerjoin(User, User.id == SupportMessage.author_id)
@@ -190,6 +191,7 @@ async def _messages_of(session: AsyncSession, case_id: uuid.UUID) -> list[dict[s
             or row[6]
             or ("Equipo Lumen" if row[2] == "plataforma" else "Colegio"),
             "body": row[3],
+            "attachment_ids": list(row[7] or []),
             "created_at": row[4],
         }
         for row in result.all()
@@ -204,6 +206,7 @@ async def create_case(
     title: str,
     category: str,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Open a request to the support team.
 
@@ -239,6 +242,7 @@ async def create_case(
             author_id=user_id,
             author_role="colegio",
             body=body,
+            attachment_ids=list(attachment_ids or []),
         )
     )
 
@@ -269,6 +273,7 @@ async def add_message(
     case_id: uuid.UUID,
     user_id: uuid.UUID,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Add information to the thread of a case.
 
@@ -294,6 +299,7 @@ async def add_message(
             author_id=user_id,
             author_role="colegio",
             body=body,
+            attachment_ids=list(attachment_ids or []),
         )
     )
     await session.commit()

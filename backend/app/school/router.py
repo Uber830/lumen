@@ -17,9 +17,10 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import storage
 from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
 from app.core.context import Membership, RequestContext
 from app.core.errors import ConflictError, NotFoundError
@@ -42,6 +43,8 @@ from app.school.schemas import (
     IcfesSimulatorsOut,
     MaterialDetailOut,
     MaterialPage,
+    MemberEditIn,
+    MemberEditOut,
     MemberPage,
     PeriodClosedOut,
     PeriodCurrentOut,
@@ -52,6 +55,7 @@ from app.school.schemas import (
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
+    SupportAttachmentOut,
     SupportCaseIn,
     SupportCaseOut,
     SupportCaseSummaryOut,
@@ -259,6 +263,33 @@ async def list_school_students(
         per_page=per_page,
     )
     return MemberPage.model_validate(page_data)
+
+
+@router.patch("/members/{membership_id}", response_model=MemberEditOut)
+async def update_school_member(
+    membership_id: uuid.UUID,
+    body: MemberEditIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MemberEditOut:
+    """Edit a teacher or a student of the school.
+
+    The form of the admin sends the name, the email and the courses (of a
+    student) or the course subjects (of a teacher). What is not sent is
+    left alone.
+    """
+    membership = _require_admin(context)
+    updated = await community.update_member(
+        session,
+        membership.school_id,
+        membership_id,
+        full_name=body.full_name,
+        email=body.email,
+        course_ids=body.course_ids,
+        course_subject_ids=body.course_subject_ids,
+    )
+    await session.commit()
+    return MemberEditOut.model_validate(updated)
 
 
 @router.get("/courses", response_model=list[CourseOut])
@@ -623,6 +654,7 @@ async def open_school_support_case(
         title=body.title,
         category=body.category,
         body=body.body,
+        attachment_ids=body.attachment_ids,
     )
     return SupportCaseOut.model_validate(case)
 
@@ -647,8 +679,44 @@ async def add_school_support_message(
         case_id,
         context.user_id,
         body.body,
+        attachment_ids=body.attachment_ids,
     )
     return SupportCaseOut.model_validate(case)
+
+
+@router.post("/support/attachments", response_model=SupportAttachmentOut, status_code=201)
+async def upload_support_attachment(
+    file: Annotated[UploadFile, File()],
+    context: Annotated[RequestContext, Depends(get_context)],
+) -> SupportAttachmentOut:
+    """Upload a file to attach to a support request.
+
+    The file belongs to the school: it goes to the store under the id of
+    the school and only the members of the school read it. It is up to
+    10 MB.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.SUPPORT_WRITE)
+
+    content = await file.read()
+    if len(content) > storage.MAX_SUPPORT_ATTACHMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="El archivo supera el límite de 10 MB.",
+        )
+
+    path = storage.upload_support_attachment(
+        school_id=str(membership.school_id),
+        filename=file.filename or "archivo",
+        content=content,
+        content_type=file.content_type,
+    )
+    return SupportAttachmentOut(
+        id=path,
+        name=file.filename or "archivo",
+        size=len(content),
+        url=storage.public_path(path),
+    )
 
 
 __all__ = ["router"]

@@ -46,6 +46,7 @@ COLUMNS_ADDED_BY_ALTER = {
     "academic_periods": {"closed_at", "delivery_modality"},
     "material_schools": {"archived_at"},
     "icfes_simulations": {"material_id", "average_score", "status"},
+    "support_messages": {"attachment_ids"},
 }
 
 # Columns that a migration creates and another one drops.
