@@ -197,9 +197,9 @@ function CursosPage() {
             <div className="px-[18px] py-4" aria-hidden>
               {[0, 1, 2].map((row) => (
                 <div key={row} className="flex items-center gap-4 py-[11px]">
-                  <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                  <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
+                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
                 </div>
               ))}
             </div>
@@ -244,18 +244,18 @@ function CursosPage() {
                 </thead>
                 <tbody>
                   {(courses.data ?? []).map((course) => (
-                    <tr key={course.id} className="transition-colors hover:bg-white/[0.025]">
+                    <tr key={course.id} className="transition-colors hover:bg-muted">
                       <td className={`${tableCellClass} font-medium text-foreground`}>
                         {course.name}
                       </td>
                       <td className={tableCellClass}>{course.grade_label}</td>
                       <td
-                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
                       >
                         {course.subject_count}
                       </td>
                       <td
-                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
                       >
                         {course.teacher_count}
                       </td>
@@ -296,8 +296,8 @@ function CursosPage() {
             <div className="px-[18px] py-4" aria-hidden>
               {[0, 1, 2].map((row) => (
                 <div key={row} className="flex items-center gap-3 py-[11px]">
-                  <span className="h-[11px] w-[130px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                  <span className="h-[18px] w-[64px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                  <span className="h-[11px] w-[130px] animate-pulse rounded bg-muted" />
+                  <span className="h-[18px] w-[64px] animate-pulse rounded-full bg-muted" />
                 </div>
               ))}
             </div>
@@ -312,7 +312,7 @@ function CursosPage() {
               {(subjects.data ?? []).map((subject) => (
                 <li
                   key={subject.id}
-                  className="border-b border-[rgba(150,175,220,.08)] px-[18px] py-[13px] last:border-b-0"
+                  className="border-b border-border px-[18px] py-[13px] last:border-b-0"
                 >
                   <div className="flex items-center gap-2">
                     <BookOpen
@@ -324,7 +324,7 @@ function CursosPage() {
                     <span className="shrink-0 text-[12px] text-muted-foreground">
                       {subject.area ?? "Sin área"}
                     </span>
-                    <span className="ml-auto shrink-0 font-mono text-[12.4px] text-[#A0B2CE]">
+                    <span className="ml-auto shrink-0 font-mono text-[12.4px] text-foreground">
                       {subject.course_count}
                     </span>
                   </div>

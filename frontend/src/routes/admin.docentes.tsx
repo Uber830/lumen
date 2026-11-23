@@ -319,7 +319,7 @@ function DocentesPage() {
               onChange={(event) => applyQuery(event.target.value)}
               placeholder="Buscar por nombre o correo"
               aria-label="Buscar por nombre o correo"
-              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+              className="w-full rounded-idx border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
 
@@ -327,7 +327,7 @@ function DocentesPage() {
             value={status}
             onChange={(event) => applyStatus(event.target.value)}
             aria-label="Filtrar por estado"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los estados</option>
             <option value="activo">Activos</option>
@@ -338,7 +338,7 @@ function DocentesPage() {
             value={courseId}
             onChange={(event) => applyCourse(event.target.value)}
             aria-label="Filtrar por curso"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los cursos</option>
             {(courses.data ?? []).map((course) => (
@@ -361,10 +361,10 @@ function DocentesPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[180px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[180px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-muted" />
               </div>
             ))}
           </div>
@@ -410,10 +410,7 @@ function DocentesPage() {
                 </thead>
                 <tbody>
                   {(teachers.data?.items ?? []).map((teacher) => (
-                    <tr
-                      key={teacher.membership_id}
-                      className="transition-colors hover:bg-white/[0.025]"
-                    >
+                    <tr key={teacher.membership_id} className="transition-colors hover:bg-muted">
                       <td className={tableCellClass}>
                         <p className="font-medium text-foreground">{teacher.full_name ?? "—"}</p>
                         <p className="text-[12px] text-muted-foreground">
@@ -434,7 +431,7 @@ function DocentesPage() {
                           <span className="text-muted-foreground">Sin curso</span>
                         )}
                       </td>
-                      <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                         {formatShortDate(teacher.joined_at)}
                       </td>
                       <td className={tableCellClass}>

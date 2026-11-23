@@ -1,6 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
-  Bell,
   ChevronDown,
   Info,
   LogOut,
@@ -25,9 +24,13 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth/browser";
+import { fileUrl } from "@/lib/storage/files";
 import type { SessionContext } from "@/lib/auth/functions";
 import { useEntitlement } from "@/lib/billing/hooks";
 import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
@@ -72,12 +75,7 @@ function Brand({ role, schoolName }: { role: AppShellRole; schoolName: string | 
   // Lumen, the one the public site shows. The shield of the school is
   // not worn here: it belongs to the school, and the administrator
   // configures it in Personalización.
-  const mark = (
-    <BrandLogo
-      className="size-[38px] text-sidebar-foreground"
-      cutClassName="fill-[var(--sidebar)] stroke-[var(--sidebar)]"
-    />
-  );
+  const mark = <BrandLogo className="size-[34px]" />;
 
   return (
     <div className="flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]">
@@ -145,11 +143,11 @@ function NavGroups({
                       aria-label={item.label}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex w-full items-center gap-[11px] rounded-[10px] border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
+                        "flex w-full items-center gap-[11px] rounded-idx border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
                         ICON_ONLY_ITEM,
                         active
                           ? "border-sidebar-border bg-sidebar-accent font-medium text-white"
-                          : "text-sidebar-foreground hover:bg-white/[0.045] hover:text-foreground",
+                          : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <item.icon
@@ -164,7 +162,7 @@ function NavGroups({
                       {count !== null && count > 0 && (
                         <span
                           className={cn(
-                            "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-[#7FB8FF]",
+                            "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-primary",
                             ICON_ONLY,
                           )}
                         >
@@ -188,11 +186,7 @@ function RoleNote({ role }: { role: AppShellRole }) {
   return (
     <div className="border-t border-sidebar-border p-3">
       <div className="flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground">
-        <Info
-          className="mt-0.5 size-[15px] shrink-0 text-[#2DD4BF]"
-          strokeWidth={1.9}
-          aria-hidden
-        />
+        <Info className="mt-0.5 size-[15px] shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
         <p className={cn("min-w-0 leading-snug", ICON_ONLY)}>
           <span className="font-semibold text-sidebar-foreground">{ROLE_LABEL[role]}</span>
           <br />
@@ -227,7 +221,7 @@ function UserMenu({
   signingOut: boolean;
   onSignOut: () => void;
 }) {
-  const avatar = session.profile?.avatar_url;
+  const avatar = fileUrl(session.profile?.avatar_url);
   // The theme is a personal preference that lives in the browser: the
   // store is the source of truth, so the menu reads it directly.
   const theme = useSyncExternalStore(subscribeTheme, getStoredTheme, getStoredTheme);
@@ -237,19 +231,19 @@ function UserMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-[9px] rounded-xl border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-[rgba(150,175,220,.26)]"
+          className="flex items-center gap-[9px] rounded-xl border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-input"
         >
           {avatar ? (
             <img
               src={avatar}
               alt={`Foto de ${displayName}`}
-              className="size-8 shrink-0 rounded-[9px] object-cover"
+              className="size-8 shrink-0 rounded-idx object-cover"
               loading="lazy"
               width={32}
               height={32}
             />
           ) : (
-            <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-primary to-[#6D4BE0] text-[12px] font-bold text-white">
+            <span className="grid size-8 shrink-0 place-items-center rounded-idx bg-primary text-[12px] font-bold text-white">
               {initials(displayName)}
             </span>
           )}
@@ -273,28 +267,29 @@ function UserMenu({
             Mi perfil y seguridad
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/perfil">
-            <Bell className="size-4" strokeWidth={1.9} aria-hidden />
-            Notificaciones
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="flex items-center gap-2">
-          <Palette className="size-3.5" strokeWidth={1.9} aria-hidden />
-          Tema
-        </DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={theme}
-          onValueChange={(value) => setTheme(value as ThemePreference)}
-        >
-          {THEME_CHOICES.map((choice) => (
-            <DropdownMenuRadioItem key={choice.value} value={choice.value}>
-              <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
-              {choice.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Palette className="size-4" strokeWidth={1.9} aria-hidden />
+            Tema
+            <span className="ml-auto pl-4 text-xs text-muted-foreground">
+              {THEME_CHOICES.find((choice) => choice.value === theme)?.label}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={theme}
+              onValueChange={(value) => setTheme(value as ThemePreference)}
+            >
+              {THEME_CHOICES.map((choice) => (
+                <DropdownMenuRadioItem key={choice.value} value={choice.value}>
+                  <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
+                  {choice.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(event: Event) => {
@@ -428,7 +423,7 @@ export function AppShell({
   })();
 
   return (
-    <div className="lumen-panel min-h-screen w-full bg-background">
+    <div className="lumen-panel idx-site min-h-screen w-full bg-background">
       {/* The school's colour, painted with the page: the first frame is
           already in the school's colour, so there is no flash of the
           default theme while the browser catches up. */}
@@ -483,7 +478,7 @@ export function AppShell({
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-6">
           <button
             aria-label="Abrir menú"
-            className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground hover:text-foreground min-[900px]:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-idx border border-border bg-card text-muted-foreground hover:text-foreground min-[900px]:hidden"
             onClick={() => setOpen(true)}
           >
             <Menu className="size-[18px]" strokeWidth={1.9} />
@@ -512,7 +507,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-7">
+        <main className="relative z-10 mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-7">
           <Outlet />
         </main>
       </div>

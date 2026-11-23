@@ -266,7 +266,7 @@ function AsignacionesPage() {
             value={teacherFilter}
             onChange={(event) => setTeacherFilter(event.target.value)}
             aria-label="Filtrar por docente"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los docentes</option>
             {teacherOptions.map((option) => (
@@ -280,7 +280,7 @@ function AsignacionesPage() {
             value={courseFilter}
             onChange={(event) => setCourseFilter(event.target.value)}
             aria-label="Filtrar por curso"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los cursos</option>
             {(courses.data ?? []).map((course) => (
@@ -305,10 +305,10 @@ function AsignacionesPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[190px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[110px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[92px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[190px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[110px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[92px] animate-pulse rounded-full bg-muted" />
               </div>
             ))}
           </div>
@@ -350,7 +350,7 @@ function AsignacionesPage() {
               </thead>
               <tbody>
                 {(assignments.data ?? []).map((assignment) => (
-                  <tr key={assignment.id} className="transition-colors hover:bg-white/[0.025]">
+                  <tr key={assignment.id} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="flex min-w-0 items-center gap-2.5">
                         <MemberAvatar

@@ -10,6 +10,7 @@ import {
   useUploadSchoolLogo,
 } from "@/lib/school/identity";
 import { applyPrimaryColor } from "@/lib/school/theme";
+import { fileUrl } from "@/lib/storage/files";
 
 export const Route = createFileRoute("/admin/personalizacion")({
   head: () => ({
@@ -67,7 +68,7 @@ function Personalizacion() {
   const data = identity.data;
   const effectiveName = displayName ?? data?.display_name ?? "";
   const effectiveColor = color ?? data?.primary_color ?? COLOR_SAMPLES[0].value;
-  const currentLogo = logoPreview ?? data?.logo_url ?? null;
+  const currentLogo = logoPreview ?? fileUrl(data?.logo_url);
   const currentLogoName = logoName ?? (data?.logo_url ? "escudo actual" : null);
   // The contrast the backend calculated for the saved colour. The
   // colour that is being picked has no ratio until it is saved: the
@@ -154,7 +155,7 @@ function Personalizacion() {
       {errorMsg && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-[rgba(240,93,94,.3)] bg-destructive-soft px-4 py-3 text-[13px] text-[#FF9293]"
+          className="mb-4 rounded-xl border border-[rgba(240,93,94,.3)] bg-destructive-soft px-4 py-3 text-[13px] text-destructive"
         >
           {errorMsg}
         </p>
@@ -177,7 +178,7 @@ function Personalizacion() {
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Colegio Sagrado Corazón"
                 aria-describedby="display-name-help"
-                className="mt-1.5 w-full rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:opacity-60"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:opacity-60"
               />
               <p id="display-name-help" className="mt-1.5 text-[12px] text-muted-foreground">
                 Aparece en la barra lateral y los encabezados. Si lo dejas vacío se usa "Colegio
@@ -187,8 +188,8 @@ function Personalizacion() {
 
             <div>
               <span className="text-[12.4px] font-medium text-foreground">Escudo</span>
-              <div className="mt-1.5 flex items-center gap-3.5 rounded-[12px] border border-dashed border-[rgba(150,175,220,.22)] bg-[#0B1222] px-4 py-3.5">
-                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-card">
+              <div className="mt-1.5 flex items-center gap-3.5 rounded-idx border border-dashed border-input bg-secondary px-4 py-3.5">
+                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-idx bg-card">
                   {currentLogo ? (
                     <img
                       src={currentLogo}
@@ -259,7 +260,7 @@ function Personalizacion() {
                   aria-pressed={selected}
                   aria-label={`${sample.name} ${sample.value}`}
                   title={`${sample.name} · ${sample.value}`}
-                  className="flex items-center gap-2 rounded-[12px] border border-border bg-[#0B1222] px-3 py-2 text-[12.4px] text-muted-foreground transition-colors hover:border-[rgba(150,175,220,.26)] disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-idx border border-border bg-secondary px-3 py-2 text-[12.4px] text-muted-foreground transition-colors hover:border-input disabled:opacity-60"
                   style={
                     selected ? { borderColor: sample.value, color: "var(--foreground)" } : undefined
                   }
@@ -277,7 +278,7 @@ function Personalizacion() {
           </div>
 
           {contrast ? (
-            <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(43,217,138,.28)] bg-success-soft p-3 text-[12.5px] text-[#A0B2CE]">
+            <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-success/30 bg-success-soft p-3 text-[12.5px] text-foreground">
               <Info className="mt-px size-4 shrink-0 text-success" strokeWidth={1.9} aria-hidden />
               <span>
                 <b className="font-semibold text-foreground">Contraste verificado.</b>
@@ -300,11 +301,8 @@ function Personalizacion() {
           title="Vista previa"
           description="Así se ve la barra lateral del colegio con los cambios"
         >
-          <div
-            className="flex items-center gap-3 rounded-[12px] border border-border px-4 py-4"
-            style={{ backgroundColor: "#0B1222" }}
-          >
-            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-card">
+          <div className="flex items-center gap-3 rounded-idx border border-border bg-secondary px-4 py-4">
+            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-idx bg-card">
               {currentLogo ? (
                 <img
                   src={currentLogo}

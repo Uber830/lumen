@@ -51,12 +51,12 @@ export function PageHeader({
  */
 const buttonVariants = {
   primary:
-    "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_rgba(46,143,255,.9)] hover:bg-primary/90",
+    "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_rgba(26,76,240,.55)] hover:bg-primary/90",
   outline:
-    "border border-[rgba(150,175,220,.26)] bg-card text-foreground hover:bg-secondary hover:border-[rgba(150,175,220,.4)]",
-  ghost: "bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+    "border border-input bg-card text-foreground hover:bg-secondary hover:border-foreground/40",
+  ghost: "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
   danger:
-    "border border-[rgba(240,93,94,.35)] bg-destructive-soft text-[#FF9293] hover:bg-destructive/20",
+    "border border-destructive/35 bg-destructive-soft text-destructive hover:bg-destructive/20",
 } as const;
 
 export type ButtonVariant = keyof typeof buttonVariants;
@@ -84,7 +84,7 @@ export function Button({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center justify-center gap-[7px] whitespace-nowrap rounded-[10px] border border-transparent font-medium transition-[background,border-color,transform] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
+        "inline-flex items-center justify-center gap-[7px] whitespace-nowrap rounded-idx border border-transparent font-medium transition-[background,border-color,transform] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
         size === "sm" ? "px-[11px] py-1.5 text-[12.4px]" : "px-[15px] py-2 text-[13.2px]",
         buttonVariants[variant],
         unavailable && "cursor-not-allowed opacity-45",
@@ -103,15 +103,16 @@ export function Button({
  *
  * The accent is a line at the bottom of the card and the colour of
  * the icon: the number is what matters, the colour only helps to find
- * it again.
+ * it again. The colours are the ones of El Indice: the brand, the
+ * three states and the ink.
  */
 const statAccents = {
-  primary: "#2E8FFF",
-  success: "#2BD98A",
-  warning: "#F5A524",
-  danger: "#F05D5E",
-  teal: "#2DD4BF",
-  muted: "#6B7D9C",
+  primary: "var(--accent-solid)",
+  success: "var(--ok-fg)",
+  warning: "var(--warn-fg)",
+  danger: "var(--bad-fg)",
+  teal: "var(--ink)",
+  muted: "var(--ink-2)",
 } as const;
 
 export type StatTone = keyof typeof statAccents;
@@ -143,7 +144,7 @@ export function StatCard({
         <p className="text-[12.6px] font-medium text-muted-foreground">{label}</p>
         {Icon && (
           <span
-            className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-secondary"
+            className="grid size-8 shrink-0 place-items-center rounded-idx bg-secondary"
             style={{ color: accent }}
           >
             <Icon className="size-4" strokeWidth={1.9} aria-hidden />
@@ -152,12 +153,9 @@ export function StatCard({
       </div>
       {loading ? (
         <>
+          <span className="block h-[26px] w-[62px] animate-pulse rounded-lg bg-muted" aria-hidden />
           <span
-            className="block h-[26px] w-[62px] animate-pulse rounded-lg bg-[rgba(150,175,220,.13)]"
-            aria-hidden
-          />
-          <span
-            className="mt-[7px] block h-[11px] w-[128px] animate-pulse rounded bg-[rgba(150,175,220,.09)]"
+            className="mt-[7px] block h-[11px] w-[128px] animate-pulse rounded bg-muted"
             aria-hidden
           />
         </>
@@ -231,7 +229,7 @@ export function EmptyState({
   return (
     <div className="px-6 py-11 text-center text-muted-foreground">
       {Icon && (
-        <span className="mx-auto mb-3.5 grid size-12 place-items-center rounded-[14px] bg-secondary">
+        <span className="mx-auto mb-3.5 grid size-12 place-items-center rounded-idx bg-secondary">
           <Icon className="size-[22px]" strokeWidth={1.9} aria-hidden />
         </span>
       )}
@@ -264,12 +262,12 @@ export function EmptyHint({ children }: { children: ReactNode }) {
 export type ChipTone = "ok" | "warn" | "danger" | "info" | "teal" | "muted";
 
 const chipTones: Record<ChipTone, string> = {
-  ok: "border-[rgba(43,217,138,.28)] bg-success-soft text-success",
-  warn: "border-[rgba(245,165,36,.28)] bg-warning-soft text-warning",
-  danger: "border-[rgba(240,93,94,.28)] bg-destructive-soft text-[#FF9293]",
-  info: "border-[rgba(46,143,255,.28)] bg-primary-soft text-[#7FB8FF]",
-  teal: "border-[rgba(45,212,191,.28)] bg-[rgba(45,212,191,.13)] text-[#2DD4BF]",
-  muted: "border-border bg-[rgba(150,175,220,.1)] text-muted-foreground",
+  ok: "border-success/30 bg-success-soft text-success",
+  warn: "border-warning/30 bg-warning-soft text-warning",
+  danger: "border-destructive/30 bg-destructive-soft text-destructive",
+  info: "border-primary/30 bg-primary-soft text-primary",
+  teal: "border-primary/30 bg-primary-soft text-primary",
+  muted: "border-border bg-muted text-muted-foreground",
 };
 
 export function Chip({
@@ -335,7 +333,7 @@ export function Tag({ children, className }: { children: ReactNode; className?: 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full bg-[rgba(150,175,220,.1)] px-[9px] py-[3px] text-[11.8px] font-medium text-muted-foreground",
+        "inline-flex items-center rounded-full bg-muted px-[9px] py-[3px] text-[11.8px] font-medium text-muted-foreground",
         className,
       )}
     >
@@ -378,7 +376,7 @@ export function SearchField({
   label?: string;
 }) {
   return (
-    <label className={cn("flex h-9 items-center gap-2 rounded-[10px] bg-card px-3", className)}>
+    <label className={cn("flex h-9 items-center gap-2 rounded-idx bg-card px-3", className)}>
       <svg
         viewBox="0 0 24 24"
         fill="none"
@@ -501,10 +499,10 @@ export function PanelTable({ children, ...props }: React.TableHTMLAttributes<HTM
 }
 
 export const tableHeadClass =
-  "sticky top-0 z-[1] border-b border-border bg-secondary px-[14px] py-[11px] text-left text-[11px] font-semibold uppercase tracking-[0.09em] text-muted-foreground";
+  "sticky top-0 z-[1] border-b border-border bg-[var(--head-bg)] px-[14px] py-[11px] text-left font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--head-fg)]";
 
 export const tableCellClass =
-  "border-b border-[rgba(150,175,220,.08)] px-[14px] py-[13px] text-[13.4px] align-middle";
+  "border-b border-border px-[14px] py-[13px] text-[13.4px] align-middle";
 
 /**
  * The page numbers to show: all of them when there are few, and a
@@ -543,13 +541,13 @@ export function Pagination({
   const to = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex flex-wrap items-center gap-3.5 border-t border-border bg-[#0B1222] px-4 py-3 text-[12.6px] text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-3.5 border-t border-border bg-secondary px-4 py-3 text-[12.6px] text-muted-foreground">
       <span>
         Mostrando{" "}
-        <b className="font-semibold text-[#A0B2CE]">
+        <b className="font-semibold text-foreground">
           {from}–{to}
         </b>{" "}
-        de <b className="font-semibold text-[#A0B2CE]">{total}</b>
+        de <b className="font-semibold text-foreground">{total}</b>
       </span>
       <div className="ml-auto flex items-center gap-1">
         <button
@@ -557,7 +555,7 @@ export function Pagination({
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
           aria-label="Página anterior"
-          className="grid size-[30px] place-items-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-[rgba(150,175,220,.26)] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+          className="grid size-[30px] place-items-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
         >
           <ChevronLeft className="size-[13px]" strokeWidth={1.9} aria-hidden />
           <span className="sr-only">Anterior</span>
@@ -573,7 +571,7 @@ export function Pagination({
               "grid size-[30px] place-items-center rounded-lg border font-mono text-[12.4px] transition-colors",
               number === page
                 ? "border-primary bg-primary text-white"
-                : "border-border bg-card text-muted-foreground hover:border-[rgba(150,175,220,.26)] hover:text-foreground",
+                : "border-border bg-card text-muted-foreground hover:border-input hover:text-foreground",
             )}
           >
             {number}
@@ -584,7 +582,7 @@ export function Pagination({
           onClick={() => onPageChange(page + 1)}
           disabled={page >= pageCount}
           aria-label="Página siguiente"
-          className="grid size-[30px] place-items-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-[rgba(150,175,220,.26)] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+          className="grid size-[30px] place-items-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-input hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
         >
           <ChevronRight className="size-[13px]" strokeWidth={1.9} aria-hidden />
           <span className="sr-only">Siguiente</span>
@@ -624,7 +622,7 @@ export function CollapsibleCard({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 px-[18px] py-[15px] text-left transition-colors hover:bg-white/[0.045]"
+        className="flex w-full items-center gap-3 px-[18px] py-[15px] text-left transition-colors hover:bg-muted"
       >
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
@@ -658,7 +656,7 @@ export function SkeletonRows({ rows = 6, columns = 5 }: { rows?: number; columns
           {Array.from({ length: columns }).map((__, columnIndex) => (
             <div
               key={columnIndex}
-              className="h-4 animate-pulse rounded bg-[rgba(150,175,220,.12)]"
+              className="h-4 animate-pulse rounded bg-muted"
               style={{
                 width: columnIndex === 0 ? "34%" : `${Math.max(10, 60 - columnIndex * 8)}%`,
               }}
@@ -676,9 +674,9 @@ export function SkeletonCards({ count = 4 }: { count?: number }) {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className="rounded-2xl border border-border bg-card p-5">
-          <div className="h-3 w-24 animate-pulse rounded bg-[rgba(150,175,220,.12)]" />
-          <div className="mt-3 h-7 w-16 animate-pulse rounded bg-[rgba(150,175,220,.12)]" />
-          <div className="mt-3 h-3 w-28 animate-pulse rounded bg-[rgba(150,175,220,.08)]" />
+          <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+          <div className="mt-3 h-7 w-16 animate-pulse rounded bg-muted" />
+          <div className="mt-3 h-3 w-28 animate-pulse rounded bg-muted" />
         </div>
       ))}
     </div>
@@ -704,7 +702,7 @@ export function MeterRow({
   return (
     <div className="grid grid-cols-[128px_1fr_48px] items-center gap-3 py-1 text-sm">
       <span className="truncate">{label}</span>
-      <span className="h-2 overflow-hidden rounded-full bg-[rgba(150,175,220,.13)]">
+      <span className="h-2 overflow-hidden rounded-full bg-muted">
         <span
           className="block h-full rounded-full bg-primary"
           style={{ width: `${percent}%` }}
@@ -726,7 +724,7 @@ export function MeterRow({
 export function ExtraCount({ count, onClick }: { count: number; onClick?: () => void }) {
   if (count <= 0) return null;
   const style =
-    "inline-flex items-center rounded-full bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-[#7FB8FF]";
+    "inline-flex items-center rounded-full bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-primary";
   if (!onClick) {
     return <span className={style}>+{count}</span>;
   }

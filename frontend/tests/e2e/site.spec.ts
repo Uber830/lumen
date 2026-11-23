@@ -182,7 +182,6 @@ test.describe("login", () => {
             primary_school_id: "s",
             school: null,
           },
-          supabase_token: null,
         }),
       });
     });
@@ -224,7 +223,6 @@ test.describe("login", () => {
             primary_school_id: "s",
             school: null,
           },
-          supabase_token: null,
         }),
       });
     });

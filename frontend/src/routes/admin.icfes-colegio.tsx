@@ -215,7 +215,7 @@ function IcfesColegioPage() {
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="h-11 animate-pulse rounded-lg bg-[rgba(150,175,220,.08)]"
+                className="h-11 animate-pulse rounded-lg bg-muted"
                 style={{ animationDelay: `${index * 70}ms` }}
               />
             ))}
@@ -262,7 +262,7 @@ function IcfesColegioPage() {
               </thead>
               <tbody>
                 {(simulators.data?.items ?? []).map((simulator) => (
-                  <tr key={simulator.id} className="transition-colors hover:bg-white/[0.028]">
+                  <tr key={simulator.id} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="font-medium">{simulator.name}</div>
                       <div className="mt-px font-mono text-[12px] text-muted-foreground">
@@ -344,7 +344,7 @@ function IcfesColegioPage() {
         )}
 
         <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
-          <Info className="mt-px size-4 shrink-0 text-[#2DD4BF]" strokeWidth={1.9} aria-hidden />
+          <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
           <span>
             El equipo de Lumen carga y habilita los simulacros; tu colegio decide en qué cursos se
             aplican y hasta qué fecha. Un simulacro sin activar no llega a los estudiantes.
@@ -371,10 +371,10 @@ function IcfesColegioPage() {
                   return (
                     <label
                       key={course.id}
-                      className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2 text-[13px] transition-colors ${
+                      className={`flex cursor-pointer items-center gap-2 rounded-idx border px-3 py-2 text-[13px] transition-colors ${
                         checked
                           ? "border-primary/50 bg-primary-soft text-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-[rgba(150,175,220,.26)]"
+                          : "border-border bg-background text-muted-foreground hover:border-input"
                       }`}
                     >
                       <input
@@ -387,7 +387,7 @@ function IcfesColegioPage() {
                               : [...current, course.id],
                           )
                         }
-                        className="size-[15px] accent-[#2E8FFF]"
+                        className="size-[15px] accent-primary"
                       />
                       {course.name}
                     </label>
@@ -451,10 +451,7 @@ function IcfesColegioPage() {
 
           <div className="flex-1 overflow-y-auto px-[18px] py-4">
             {results.isLoading ? (
-              <div
-                className="h-24 animate-pulse rounded-xl bg-[rgba(150,175,220,.08)]"
-                aria-hidden
-              />
+              <div className="h-24 animate-pulse rounded-xl bg-muted" aria-hidden />
             ) : results.data ? (
               <>
                 <dl className="grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
@@ -484,7 +481,7 @@ function IcfesColegioPage() {
                     {results.data.courses.map((course) => (
                       <li
                         key={course.course_id}
-                        className="rounded-xl border border-border bg-[#0B1222] p-3"
+                        className="rounded-xl border border-border bg-secondary p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[13.2px] font-medium">{course.course_name}</span>
@@ -513,7 +510,7 @@ function IcfesColegioPage() {
           </div>
 
           <div className="border-t border-border px-[18px] py-4">
-            <DrawerClose className="inline-flex w-full items-center justify-center gap-2 rounded-[10px] border border-[rgba(150,175,220,.26)] bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
+            <DrawerClose className="inline-flex w-full items-center justify-center gap-2 rounded-idx border border-input bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
               <X className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
               Cerrar
             </DrawerClose>

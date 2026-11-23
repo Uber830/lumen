@@ -202,8 +202,8 @@ function AdministradoresPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[190px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[18px] w-[84px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[190px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[84px] animate-pulse rounded-full bg-muted" />
               </div>
             ))}
           </div>
@@ -240,10 +240,7 @@ function AdministradoresPage() {
               </thead>
               <tbody>
                 {(admins.data ?? []).map((admin) => (
-                  <tr
-                    key={admin.membership_id}
-                    className="transition-colors hover:bg-white/[0.025]"
-                  >
+                  <tr key={admin.membership_id} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="flex min-w-0 items-center gap-2.5">
                         <MemberAvatar name={admin.full_name} size="sm" />
@@ -255,7 +252,7 @@ function AdministradoresPage() {
                         </div>
                       </div>
                     </td>
-                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                       {formatShortDate(admin.joined_at)}
                     </td>
                     <td className={tableCellClass}>

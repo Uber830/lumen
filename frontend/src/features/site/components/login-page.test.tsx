@@ -190,7 +190,6 @@ describe("LoginPage", () => {
         primary_school_id: "s",
         school: null,
       },
-      supabase_token: null,
     });
 
     const onSignedIn = vi.fn();

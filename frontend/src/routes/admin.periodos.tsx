@@ -299,10 +299,10 @@ function PeriodosPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[70px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[70px] animate-pulse rounded-full bg-muted" />
               </div>
             ))}
           </div>
@@ -347,14 +347,14 @@ function PeriodosPage() {
               </thead>
               <tbody>
                 {(periods.data ?? []).map((period) => (
-                  <tr key={period.id} className="transition-colors hover:bg-white/[0.025]">
+                  <tr key={period.id} className="transition-colors hover:bg-muted">
                     <td className={`${tableCellClass} font-medium text-foreground`}>
                       {period.name}
                     </td>
-                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                       {shortDate(period.start_date)}
                     </td>
-                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                       {shortDate(period.end_date)}
                     </td>
                     <td className={tableCellClass}>
