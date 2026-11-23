@@ -4,8 +4,9 @@
 > desde una arquitectura híbrida (Supabase + FastAPI) hacia una
 > arquitectura donde el backend es dueño de todo. **La migración ya
 > está completa.** Supabase y Wompi ya no son parte del proyecto: los
-> archivos viven en el disco del servidor, el chat se actualiza con una
-> consulta periódica a la API y los planes y entitlements son internos.
+> archivos viven en el disco del servidor, el chat y las notificaciones se
+> actualizan con un flujo de eventos (SSE) y los planes y entitlements son
+> internos.
 > Las secciones de abajo describen el diseño original y lo que se
 > decidió; los apartados marcados con «implementado» reflejan el estado
 > actual. El plan por fases del apartado 12 se conserva como registro de
@@ -37,8 +38,9 @@ El backend es responsable de todo lo demás:
 
 - Los archivos: los sube, los guarda en su propio disco y los sirve. No hay
   un servicio de almacenamiento en el medio.
-- El chat: el panel refresca los mensajes con una consulta periódica a la
-  API. No hay un canal en vivo.
+- El chat: el panel y la campana de notificaciones reciben un flujo de
+  eventos (SSE) del backend y piden a la API lo que cambió. No hay
+  sondeo.
 - La autenticación: el backend emite sus propios tokens (Argon2id + JWT).
 - La autorización: la capa de permisos vive en Python
   (`app/core/permissions.py`), que es el puerto de las siete funciones
@@ -105,7 +107,7 @@ pasarela y no dependían de ella: por eso sobreviven a su salida.
 flowchart LR
     U[Usuario] --> F[Frontend React / TanStack Start]
     F -->|cookie httpOnly + CRUD + permisos + archivos| B[FastAPI en Docker]
-    F -->|consulta periódica del chat| B
+    F -->|flujo de eventos (SSE)| B
     B -->|SQLAlchemy async, identidad del llamador| P[(PostgreSQL)]
     B -->|escribe y lee| D[(Disco del servidor)]
     B --> R[PDF e integraciones externas]
@@ -384,20 +386,26 @@ El material del catálogo editorial es otro almacén: vive en
 `app/platform/storage.py`. Cambiar cualquiera de los dos destinos es cambiar
 un adaptador, no la lógica de negocio.
 
-## 7. Chat — **implementado con consulta periódica**
+## 7. Chat — **implementado con flujo de eventos (SSE)**
 
 - Mensajes persistidos en `chat_messages`.
 - Membresía de conversación en `chat_members`.
 - El CRUD va por la API, con los permisos de Python.
-- El panel refresca los mensajes consultando
-  `GET /v1/chat/conversations/{id}/messages`: no hay canal en vivo ni
-  suscripción a cambios.
+- El panel no sondea: el backend publica un evento `chat.message` por
+  cada mensaje que sale, y el cliente vuelve a pedir
+  `GET /v1/chat/conversations/{id}/messages`. El evento dice **qué pasó**,
+  no qué es: lo que se muestra siempre viene de la API.
 - Los adjuntos, si se implementan, se suben por `/v1/files` y se referencian
   desde el mensaje.
 
-El tradeoff es conocido: hay una ventana entre un mensaje y su aparición en
-la otra sesión, a cambio de no depender de una conexión permanente y de que
-las reglas de acceso sean las mismas que en el resto de la API.
+El canal es un `text/event-stream` en `GET /v1/events`, abierto por el
+navegador con la cookie de sesión. Reutiliza la cookie httpOnly, el
+navegador reconecta solo y el servidor manda un ping cada 20 segundos para
+que los proxies no cierren la conexión ociosa. Los eventos se publican
+**después del commit**, así que el cliente nunca pide una fila que todavía
+no existe. El hub vive en el proceso: con más de un worker los eventos
+tienen que viajar entre ellos (`LISTEN/NOTIFY` de Postgres es el paso
+siguiente, y la interfaz del hub no cambia cuando llegue).
 
 ## 8. División explícita por módulo
 
@@ -410,8 +418,8 @@ las reglas de acceso sean las mismas que en el resto de la API.
 | `evaluaciones` | Autoría de evaluación/preguntas y lectura de intentos permitidos; lectura del payload sin claves. | Iniciar/finalizar intentos sensibles, calificación automática, reglas de tiempo y preguntas abiertas cuando aplique. | Las claves nunca se envían al estudiante. |
 | `calificaciones` | Docente/admin escribe notas manuales; el estudiante lee las suyas. | Recalcular promedios, cierres de período, comparativos y reglas complejas. | Guardar nota fuente y resultado derivado de forma auditable. |
 | `simulacros_icfes` | El banco y sus simulacros los define el admin/docente; el estudiante ve sus intentos y resultados. | Crear/finalizar intento seguro, scoring ICFES, plan/entitlement, agregados por curso/colegio y operaciones pesadas. | Doble validación: autorización y entitlement, las dos en el backend. |
-| `chat` | Conversaciones y mensajes; la lista se refresca con una consulta periódica a la API. | Moderación/integraciones futuras si se requieren. | Solo miembros de la conversación y del colegio. |
-| `notificaciones` | Lectura del panel y del contador de no leídas; marcado de leída y descarte; lectura y cambio de las preferencias. | Creación de la notificación cuando ocurre el evento; futura entrega por correo. | Cada fila es de un destinatario: el llamador solo ve las suyas y las de otro usuario son 404. Las preferencias se respetan al crear la notificación. |
+| `chat` | Conversaciones y mensajes; la lista se refresca cuando llega un evento `chat.message` del flujo de eventos. | Moderación/integraciones futuras si se requieren. | Solo miembros de la conversación y del colegio. |
+| `notificaciones` | Lectura del panel y del contador de no leídas; marcado de leída y descarte; lectura y cambio de las preferencias. El contador se actualiza cuando llega un evento `notification`. | Creación de la notificación cuando ocurre el evento; futura entrega por correo. | Cada fila es de un destinatario: el llamador solo ve las suyas y las de otro usuario son 404. Las preferencias se respetan al crear la notificación. |
 | `suscripciones` | Lectura del plan, estado y entitlements. | Actualización de los entitlements y bloqueo de módulos. | El cliente nunca escribe su plan. |
 | `reportes` | Solicitar reporte y consultar/descargar resultado autorizado. | Consultas agregadas, render HTML, PDF, almacenamiento temporal y URL firmada. | Reporte generado con scope de colegio/rol validado en backend. |
 
@@ -489,6 +497,8 @@ Endpoints implementados (el detalle está en `backend/README.md` y en
   `DELETE /v1/notifications/{id}`,
   `GET|PATCH /v1/notifications/preferences`
 - `GET /v1/plans`
+- Eventos: `GET /v1/events` (flujo `text/event-stream` de lo que le pasa
+  al usuario), `GET /v1/events/status`
 - `POST /v1/users/{invitations,bulk-upload}`, `GET /v1/users/memberships`
 - `GET /v1/subscriptions`
 - Archivos: `POST /v1/files/task-submissions/{task_id}`,
@@ -574,7 +584,7 @@ Reglas:
 | 2 | La capa de permisos: el puerto de las siete funciones `SECURITY DEFINER` y el `RequestContext`. | `feat(authz): port the RLS permission layer to Python` |
 | 3 | Los nueve módulos de dominio con sus endpoints. | `feat(academics)`, `feat(content)`, `feat(evaluations)`, `feat(chat)` |
 | 4 | El frontend deja de hablar con Supabase: la sesión en cookies httpOnly, los hooks contra la API, el puente de Storage y Realtime. | `feat(frontend): move the browser off Supabase and onto the API` |
-| 5 | Supabase sale del todo: el navegador ya no habla con él, los archivos los guarda y los sirve el backend (`app/core/storage.py` y `/v1/files`), el chat se refresca por consulta periódica y se borra el puente de tokens. | — |
+| 5 | Supabase sale del todo: el navegador ya no habla con él, los archivos los guarda y los sirve el backend (`app/core/storage.py` y `/v1/files`), el chat se actualiza por flujo de eventos y se borra el puente de tokens. | — |
 | 6 | Wompi sale: el cliente HTTP, el checkout, el portal y el webhook se borran. Los planes y los entitlements quedan como tablas internas del proyecto. | — |
 
 Las dos últimas filas se hicieron después de la fase 4: la fase 4 había

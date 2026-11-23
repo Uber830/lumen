@@ -97,8 +97,10 @@ disco y los sirve. Un archivo viaja como **ruta relativa**
 (`avatars/<usuario>/avatar-123.png`) y el helper `fileUrl()`
 (`lib/storage/files.ts`) la resuelve contra la URL del API.
 
-El chat tampoco tiene canal en vivo: el panel refresca los mensajes con una
-consulta periódica a `GET /v1/chat/conversations/{id}/messages`.
+El chat y la campana de notificaciones ya no sondean: el backend tiene un
+flujo de eventos (`GET /v1/events`, SSE) y el cliente, al recibir uno, pide
+a la API lo que cambió. El helper está en `lib/events/event-stream.ts` y la
+conexión se comparte entre todas las partes de la app que la piden.
 
 ---
 

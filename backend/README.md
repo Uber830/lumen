@@ -6,8 +6,8 @@ regla de negocio: el navegador solo habla con este servicio.
 Postgres es el almacén de datos y el backend se conecta a él directamente con
 asyncpg. El material del catálogo y los archivos de la aplicación (avatares,
 escudos, contenido de curso y entregas de tareas) se guardan en el disco del
-servidor: el backend los sube y los sirve, y el chat se actualiza con
-consultas periódicas a la API.
+servidor: el backend los sube y los sirve, y el chat y las notificaciones se
+actualizan con un flujo de eventos (SSE) en `GET /v1/events`.
 
 - [Arranque rápido](#arranque-rápido)
 - [Layout](#layout)
@@ -95,6 +95,7 @@ app/
     storage.py       el almacén de archivos en disco (bucket y ruta)
     tokens.py        emisión de tokens de acceso y de refresco
     errors.py        excepciones del dominio y su mapeo HTTP
+    events.py        el hub de eventos: quién está suscrito a qué
   db/
     base.py          DeclarativeBase y helpers de columnas
     enums.py         enums que reflejan los tipos enum de Postgres
@@ -102,6 +103,7 @@ app/
     session.py       engine async, session factory, dependencia get_db
     schema_check.py  la verificación del esquema al arrancar
   evaluations/       las evaluaciones escritas y sus intentos
+  events/            el flujo de eventos del usuario (SSE)
   files/             la subida y la descarga de los archivos de la aplicación
   grades/            las notas que registra un docente
   health.py          las sondas /health y /ready
@@ -229,6 +231,20 @@ que devuelve el enlace de activación del administrador.
 | GET/POST/PATCH/DELETE | `/v1/grades` | las notas |
 | GET/POST/PATCH/DELETE | `/v1/evaluations` | las evaluaciones y sus intentos |
 | GET/POST/PATCH/DELETE | `/v1/chat/conversations` | el chat |
+
+### Eventos
+
+Un solo flujo por navegador: el backend avisa lo que le pasa al usuario y el
+cliente vuelve a pedir a la API lo que cambió. El evento dice **qué pasó**,
+no qué es, así que lo que se muestra siempre viene de la API.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/events` | el flujo `text/event-stream` de lo que le pasa al llamador |
+| GET | `/v1/events/status` | cuántas conexiones tiene abiertas el llamador |
+
+Los eventos se publican **después del commit** de la transacción que los
+origina, así que el cliente nunca pide una fila que todavía no existe.
 
 ### Archivos
 

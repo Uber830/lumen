@@ -31,7 +31,7 @@ El detalle de cada entorno vive en su propio README.
 | Base de datos | PostgreSQL 16 (Docker en local) |
 | Autenticación | JWT propio (HS256) + Argon2id, cookies httpOnly |
 | Archivos | Disco del servidor (`UPLOADS_DIR`), subidos y servidos por el backend |
-| Chat | Consulta periódica a la API |
+| Chat | Flujo de eventos del servidor (SSE) |
 
 ---
 
