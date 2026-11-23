@@ -107,19 +107,15 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
         { label: "Cursos y materias", to: "/admin/cursos", icon: BookOpen },
         { label: "Asignaciones", to: "/admin/asignaciones", icon: ClipboardList },
         { label: "Períodos", to: "/admin/periodos", icon: CalendarRange },
-      ],
-    },
-    {
-      // The simulators of the school are the ones the platform enabled:
-      // the school activates them by course. The rest of the ICFES work
-      // (the bank, the builder and the aggregate results) stays for the
-      // roles that author the exams.
-      label: "ICFES",
-      items: [
-        { label: "Simulacros del colegio", to: "/admin/icfes-colegio", icon: Target, icfes: true },
-        { label: "Banco de preguntas", to: "/admin/icfes", icon: ListChecks, icfes: true },
-        { label: "Crear simulacro", to: "/admin/icfes-simulacros", icon: ListChecks, icfes: true },
-        { label: "Resultados", to: "/admin/icfes-resultados", icon: PieChart, icfes: true },
+        {
+          // The simulators of the school are the ones the platform
+          // enabled: the school activates them by course. Authoring
+          // exams is not the college's business.
+          label: "ICFES",
+          to: "/admin/icfes-colegio",
+          icon: Target,
+          icfes: true,
+        },
       ],
     },
     {
