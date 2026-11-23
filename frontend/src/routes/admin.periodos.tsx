@@ -435,9 +435,13 @@ function PeriodosPage() {
         open={toClose !== null}
         title={toClose ? `Cerrar ${toClose.name}` : "Cerrar periodo"}
         description={
-          toClose
-            ? `Se cerrará el ${toClose.name}. Las tareas y notas del periodo quedarán en histórico y el material de este ciclo se archivará para el colegio.`
-            : undefined
+          toClose ? (
+            <>
+              Se cerrará <strong className="font-semibold text-foreground">{toClose.name}</strong>.
+              El material del ciclo pasa a archivado y deja de estar visible para docentes y
+              estudiantes.
+            </>
+          ) : undefined
         }
         confirmLabel="Cerrar periodo"
         pending={close.isPending}

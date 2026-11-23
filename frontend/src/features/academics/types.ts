@@ -110,6 +110,14 @@ export type SchoolMember = {
   // when they cannot. One signal, not two loose badges.
   access?: "activado" | "pendiente";
   access_reason?: string | null;
+  // The courses of the member: taught by a teacher, attended by a student.
+  courses?: string[];
+  // The subjects the teacher teaches.
+  subjects?: string[];
+  // The courses of a student, by id.
+  course_ids?: string[];
+  // The course subjects of a teacher, by id.
+  course_subject_ids?: string[];
 };
 
 // --- Hook inputs -----------------------------------------------------------

@@ -17,7 +17,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import { api } from "@/lib/api/client";
+import { api, apiBaseUrl } from "@/lib/api/client";
 
 /** One message of the thread of a case. */
 export type SupportMessage = {
@@ -27,7 +27,18 @@ export type SupportMessage = {
   author_role: string;
   author_name: string;
   body: string;
+  /** The files the author attached to the message. */
+  attachment_ids: string[];
   created_at: string;
+};
+
+/** A file uploaded to attach to a request. */
+export type SupportAttachment = {
+  /** The path of the file in the store: it is what the thread keeps. */
+  id: string;
+  name: string;
+  size: number;
+  url: string;
 };
 
 /** One request of the school, as it appears in the list. */
@@ -98,7 +109,7 @@ export function useSchoolSupportCase(caseId: string | null): UseQueryResult<Supp
 export function useOpenSupportCase(): UseMutationResult<
   SupportCase,
   Error,
-  { title: string; category: string; body: string }
+  { title: string; category: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
@@ -113,15 +124,49 @@ export function useOpenSupportCase(): UseMutationResult<
 export function useAddSupportMessage(): UseMutationResult<
   SupportCase,
   Error,
-  { caseId: string; body: string }
+  { caseId: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ caseId, body }) =>
-      api.post<SupportCase>(`/v1/school/support/cases/${caseId}/messages`, { body }),
+    mutationFn: ({ caseId, body, attachment_ids }) =>
+      api.post<SupportCase>(`/v1/school/support/cases/${caseId}/messages`, {
+        body,
+        attachment_ids,
+      }),
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: supportKeys.cases() });
       qc.setQueryData(supportKeys.case(updated.id), updated);
+    },
+  });
+}
+
+/**
+ * Upload a file to attach to a request.
+ *
+ * The file goes to the store of the school and the path it gets back is
+ * what the thread keeps: the message points at the file.
+ */
+export function useUploadSupportAttachment(): UseMutationResult<SupportAttachment, Error, File> {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const response = await fetch(`${apiBaseUrl()}/v1/school/support/attachments`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) {
+        let detail = `No se pudo adjuntar el archivo (${response.status}).`;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? detail;
+        } catch {
+          // The answer was not JSON: the message above is enough.
+        }
+        throw new Error(detail);
+      }
+      return (await response.json()) as SupportAttachment;
     },
   });
 }

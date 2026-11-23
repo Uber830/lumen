@@ -181,8 +181,19 @@ function IcfesColegioPage() {
           <StatCard
             key={average.grade}
             label={`Promedio ${average.grade}`}
-            value={`${average.average_score} / ${kpis?.max_score ?? 500}`}
-            delta="en los simulacros corregidos de tu colegio"
+            value={`${average.latest_average || average.average_score} / ${kpis?.max_score ?? 500}`}
+            delta={
+              average.delta === null || average.delta === undefined ? (
+                "primer corte medido del grado"
+              ) : (
+                <>
+                  <b className="font-semibold text-foreground">
+                    {average.delta > 0 ? `+${average.delta}` : average.delta}
+                  </b>{" "}
+                  frente al corte anterior
+                </>
+              )
+            }
             icon={BarChart3}
             tone="teal"
             loading={simulators.isLoading}

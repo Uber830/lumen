@@ -49,6 +49,12 @@ export type SchoolSimulator = {
 export type GradeAverage = {
   grade: string;
   average_score: number;
+  /** The score of the last cut of the grade. */
+  latest_average: number;
+  /** The score of the cut before it, when there is one. */
+  previous_average: number | null;
+  /** How many points the last cut gained over the previous one. */
+  delta: number | null;
 };
 
 /** The indicators of the view. */

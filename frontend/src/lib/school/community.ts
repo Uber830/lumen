@@ -14,7 +14,13 @@
 //            without an assignment has no content to see.
 // =============================================================================
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
 
@@ -31,6 +37,10 @@ export type SchoolMemberRow = {
   courses: string[];
   /** The subjects of the teacher. */
   subjects?: string[];
+  /** The courses of the student, by id: the edit form works with ids. */
+  course_ids?: string[];
+  /** The course subjects of the teacher, by id: the edit form works with ids. */
+  course_subject_ids?: string[];
   /** The average of the student. `null` when it has no grades. */
   average?: number | null;
   /** `activado` or `pendiente`: one signal, not two loose badges. */
@@ -130,5 +140,48 @@ export function useSchoolSubjects(): UseQueryResult<SchoolSubject[], Error> {
   return useQuery({
     queryKey: communityKeys.subjects(),
     queryFn: () => api.get<SchoolSubject[]>("/v1/school/subjects"),
+  });
+}
+
+/** What the admin can change of a member of the community. */
+export type UpdateMemberInput = {
+  membershipId: string;
+  full_name?: string;
+  email?: string;
+  /** The courses of a student. */
+  course_ids?: string[];
+  /** The course subjects of a teacher. */
+  course_subject_ids?: string[];
+};
+
+/** The member, after the edit. */
+export type UpdatedMember = {
+  membership_id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
+  course_ids: string[];
+  course_subject_ids: string[];
+};
+
+/**
+ * Edit a teacher or a student of the school.
+ *
+ * The list of the community and the assignments change with it: the
+ * admin sees the new state without reloading.
+ */
+export function useUpdateMember(): UseMutationResult<UpdatedMember, Error, UpdateMemberInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, ...changes }) =>
+      api.patch<UpdatedMember>(`/v1/school/members/${membershipId}`, changes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
+      qc.invalidateQueries({ queryKey: ["school", "students"] });
+      qc.invalidateQueries({ queryKey: ["school", "assignments"] });
+      qc.invalidateQueries({ queryKey: ["teacher_assignments"] });
+      qc.invalidateQueries({ queryKey: ["student_enrollments"] });
+    },
   });
 }

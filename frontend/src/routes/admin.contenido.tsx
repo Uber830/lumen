@@ -118,7 +118,9 @@ function Contenido() {
           </select>
 
           <div className="ml-auto">
-            <Chip tone="muted">{material.data ? `${material.data.total} materiales` : "—"}</Chip>
+            <Chip tone="muted">
+              {material.data ? `${material.data.available_total} materiales` : "—"}
+            </Chip>
           </div>
         </Toolbar>
 

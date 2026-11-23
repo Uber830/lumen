@@ -17,7 +17,10 @@ import {
 } from "@/components/ui-kit";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
+import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
+import { Select } from "@/components/select-field";
+import { useCourseSubjects } from "@/features/academics/hooks";
 import type { SchoolMember } from "@/features/academics/types";
 import {
   activationLink,
@@ -60,6 +63,7 @@ function DocentesPage() {
 
   const teachers = useSchoolTeachers({ q: query, status, course_id: courseId, page });
   const courses = useSchoolCourses();
+  const courseSubjects = useCourseSubjects(schoolId);
 
   const invite = useInviteUser();
   const bulkInvite = useBulkInviteUsers();
@@ -67,6 +71,8 @@ function DocentesPage() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  // The course and the subject the new teacher is assigned to.
+  const [newCourseSubjectId, setNewCourseSubjectId] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [csvText, setCsvText] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -77,8 +83,9 @@ function DocentesPage() {
     created: number;
     failures: BulkImportFailure[];
   } | null>(null);
-  // The teacher whose management modal is open.
+  // The teacher whose management modal is open, and the one being edited.
   const [selectedTeacher, setSelectedTeacher] = useState<SchoolMemberRow | null>(null);
+  const [editingTeacher, setEditingTeacher] = useState<SchoolMemberRow | null>(null);
 
   const total = teachers.data?.total ?? 0;
 
@@ -100,6 +107,9 @@ function DocentesPage() {
       account_activated: row.account_activated,
       access: row.access,
       access_reason: row.access_reason,
+      courses: row.courses,
+      subjects: row.subjects,
+      course_subject_ids: row.course_subject_ids,
     };
   }
 
@@ -129,6 +139,9 @@ function DocentesPage() {
       role: "teacher",
       school_id: schoolId,
       is_primary: true,
+      // The course and the subject the admin picked: the teacher is
+      // assigned to it, so it has material to see from the start.
+      ...(newCourseSubjectId ? { course_subject_ids: [newCourseSubjectId] } : {}),
     });
     if (created.activation_token) {
       setActivations((prev) => [
@@ -138,6 +151,7 @@ function DocentesPage() {
     }
     setEmail("");
     setFullName("");
+    setNewCourseSubjectId("");
     setOpen(false);
   }
 
@@ -254,7 +268,11 @@ function DocentesPage() {
       )}
 
       {open && (
-        <SectionCard title="Nuevo docente" bodyClassName="p-0">
+        <SectionCard
+          title="Nuevo docente"
+          description="Entra con el acceso pendiente hasta que le asignes un curso."
+          bodyClassName="p-0"
+        >
           <form className="space-y-3 p-4" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -281,6 +299,26 @@ function DocentesPage() {
                 placeholder="docente@colegio.edu"
                 className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Curso y materia
+              </span>
+              <div className="mt-1.5">
+                <Select
+                  value={newCourseSubjectId}
+                  onChange={setNewCourseSubjectId}
+                  options={(courseSubjects.data ?? []).map((courseSubject) => ({
+                    value: courseSubject.id,
+                    label: `${courseSubject.course_name} · ${courseSubject.subject_name}`,
+                  }))}
+                  placeholder="7° A · Matemáticas"
+                  emptyLabel="Todavía no hay materias ofrecidas en los cursos"
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Sin asignación el docente entra con el acceso pendiente.
+              </p>
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -438,7 +476,7 @@ function DocentesPage() {
                       </td>
                       <td className={tableCellClass}>
                         <Chip tone={teacher.access === "activado" ? "ok" : "warn"} dot>
-                          {teacher.access === "activado" ? "Activado" : "Pendiente"}
+                          {teacher.access === "activado" ? "Activado" : "Sin activar"}
                         </Chip>
                       </td>
                       <td className={tableCellClass}>
@@ -488,6 +526,25 @@ function DocentesPage() {
           member={asMember(selectedTeacher)}
           roleLabel="docente"
           onClose={() => setSelectedTeacher(null)}
+          onEdit={() => {
+            setEditingTeacher(selectedTeacher);
+            setSelectedTeacher(null);
+          }}
+        />
+      )}
+
+      {editingTeacher && (
+        <MemberEditDialog
+          member={{
+            membership_id: editingTeacher.membership_id,
+            full_name: editingTeacher.full_name,
+            email: editingTeacher.email,
+            course_subject_ids: editingTeacher.course_subject_ids,
+          }}
+          role="teacher"
+          schoolId={schoolId}
+          onClose={() => setEditingTeacher(null)}
+          onSaved={() => setEditingTeacher(null)}
         />
       )}
     </>

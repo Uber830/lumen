@@ -48,7 +48,10 @@ export type MaterialDetail = MaterialListItem & { access: MaterialAccess };
 /** A page of the material of the school. */
 export type MaterialPage = {
   items: MaterialListItem[];
+  /** How many materials the filters leave. */
   total: number;
+  /** How much material the school has, with no filters. */
+  available_total: number;
   page: number;
   per_page: number;
   pages: number;

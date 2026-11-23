@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ShieldCheck, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ShieldCheck, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -268,7 +268,7 @@ function AdministradoresPage() {
                     <td className={`${tableCellClass} text-right`}>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => setDetail(admin)}>
-                          Ver permisos
+                          Gestionar
                         </Button>
                         <Button
                           variant="ghost"
@@ -327,9 +327,37 @@ function AdministradoresPage() {
           title={`${detail.full_name} · ${detail.admin_role === "principal" ? "Principal" : "Secundario"}`}
           description="Qué puede hacer este rango en el colegio"
           actions={
-            <Button variant="ghost" size="sm" icon={X} onClick={() => setDetail(null)}>
-              Cerrar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                icon={ShieldCheck}
+                aria-disabled={!canManage}
+                aria-describedby={canManage ? undefined : "admins-manage-reason"}
+                title={
+                  canManage
+                    ? "Cambiar el rango de este administrador"
+                    : "Esta acción la hace el administrador principal del colegio."
+                }
+                disabled={updateRank.isPending}
+                onClick={async () => {
+                  if (!canManage) return;
+                  const next = detail.admin_role === "principal" ? "secundario" : "principal";
+                  try {
+                    await updateRank.mutateAsync({
+                      membership_id: detail.membership_id,
+                      admin_role: next,
+                    });
+                    setDetail(null);
+                  } catch {
+                    // Surfaced below via updateRank.error.
+                  }
+                }}
+              >
+                {detail.admin_role === "principal" ? "Pasar a secundario" : "Pasar a principal"}
+              </Button>
+              <Button variant="ghost" size="sm" icon={X} onClick={() => setDetail(null)}>
+                Cerrar
+              </Button>
+            </div>
           }
         >
           <ul className="grid gap-1.5 sm:grid-cols-2">
@@ -340,6 +368,16 @@ function AdministradoresPage() {
               </li>
             ))}
           </ul>
+
+          {/* What separates the two ranks, in one place. */}
+          <p className="mt-4 flex items-start gap-2 rounded-idx bg-warning-soft px-3 py-2.5 text-[13px] text-warning-foreground">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={1.9} aria-hidden />
+            <span>
+              <strong className="font-semibold">Permisos por rol.</strong> El administrador
+              principal administra personas, períodos y personalizaciones. El secundario hace lo
+              mismo, menos administrar a otros administradores.
+            </span>
+          </p>
         </SectionCard>
       )}
 

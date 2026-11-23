@@ -155,7 +155,7 @@ function AdminDashboard() {
           delta={
             teachers && teachers.pending > 0 ? (
               <>
-                <b className="font-semibold text-foreground">{teachers.pending}</b> sin acceso
+                <b className="font-semibold text-foreground">{teachers.pending}</b> sin activar
               </>
             ) : (
               "todos con acceso al material"
@@ -192,7 +192,7 @@ function AdminDashboard() {
                 <b className="font-semibold text-foreground">{tasks.stale}</b> con más de 3 días
               </>
             ) : (
-              "entregas por calificar"
+              "creadas por tus docentes"
             )
           }
         />
@@ -299,6 +299,14 @@ function AdminDashboard() {
           title="Actividad reciente"
           description="Cargas y cambios de la última semana"
           bodyClassName="p-0"
+          actions={
+            <Link to="/admin/contenido">
+              <Button variant="ghost" size="sm">
+                Ver catálogo
+                <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
+              </Button>
+            </Link>
+          }
         >
           {loading ? (
             <ul aria-hidden>

@@ -18,6 +18,7 @@ import {
 import { Select } from "@/components/select-field";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
+import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import type { SchoolMember } from "@/features/academics/types";
 import {
@@ -79,6 +80,8 @@ function EstudiantesPage() {
     failures: BulkImportFailure[];
   } | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<SchoolMemberRow | null>(null);
+  // The student whose edit form is open.
+  const [editingStudent, setEditingStudent] = useState<SchoolMemberRow | null>(null);
 
   const total = students.data?.total ?? 0;
 
@@ -108,6 +111,8 @@ function EstudiantesPage() {
       account_activated: row.account_activated,
       access: row.access,
       access_reason: row.access_reason,
+      courses: row.courses,
+      course_ids: row.course_ids,
     };
   }
 
@@ -135,6 +140,9 @@ function EstudiantesPage() {
       role: "student",
       school_id: schoolId,
       is_primary: true,
+      // The course the admin picked: the student is enrolled in it, so
+      // it has material to see from the start.
+      ...(newCourseId ? { course_ids: [newCourseId] } : {}),
     });
     const activationToken = created.activation_token;
     if (activationToken) {
@@ -462,7 +470,7 @@ function EstudiantesPage() {
                       </td>
                       <td className={tableCellClass}>
                         <Chip tone={student.access === "activado" ? "ok" : "warn"} dot>
-                          {student.access === "activado" ? "Activado" : "Pendiente"}
+                          {student.access === "activado" ? "Activado" : "Sin activar"}
                         </Chip>
                       </td>
                       <td
@@ -517,6 +525,25 @@ function EstudiantesPage() {
           member={asMember(selectedStudent)}
           roleLabel="estudiante"
           onClose={() => setSelectedStudent(null)}
+          onEdit={() => {
+            setEditingStudent(selectedStudent);
+            setSelectedStudent(null);
+          }}
+        />
+      )}
+
+      {editingStudent && (
+        <MemberEditDialog
+          member={{
+            membership_id: editingStudent.membership_id,
+            full_name: editingStudent.full_name,
+            email: editingStudent.email,
+            course_ids: editingStudent.course_ids,
+          }}
+          role="student"
+          schoolId={schoolId}
+          onClose={() => setEditingStudent(null)}
+          onSaved={() => setEditingStudent(null)}
         />
       )}
     </>

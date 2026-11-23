@@ -1,10 +1,12 @@
 // =============================================================================
-// The member management modal (admin).
+// The member management drawer (admin).
 // -----------------------------------------------------------------------------
 // Opens when an admin clicks a teacher or a student in the list. Shows the
-// account state (activated or pending) and lets the admin activate/deactivate
-// the membership. Deactivating soft-revokes it; the backend refuses to
-// revoke the admin themselves or the last admin.
+// data of the person (Correo, curso, ingreso, acceso, estado) and lets the
+// admin edit them or turn the access off.
+//
+// Deactivating soft-revokes the membership: the backend refuses to revoke
+// the admin themselves or the last admin.
 //
 // A self-contained overlay (the pattern used elsewhere in the app, e.g.
 // the ICFES question modal) rather than the Radix dialog barrel, which
@@ -12,7 +14,7 @@
 // =============================================================================
 
 import { useEffect, useState } from "react";
-import { KeyRound, Link2, Power, PowerOff, X } from "lucide-react";
+import { Info, KeyRound, Link2, Power, PowerOff, X } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { CopyableActivationLink } from "@/features/admin/activation-links";
@@ -24,11 +26,14 @@ export function MemberManageDialog({
   member,
   roleLabel,
   onClose,
+  onEdit,
 }: {
   member: SchoolMember;
   /** How the role is named in the button: "docente" or "estudiante". */
   roleLabel: string;
   onClose: () => void;
+  /** Opens the edit form of the person. */
+  onEdit: () => void;
 }) {
   const updateMembership = useUpdateMembership();
   const createActivationLink = useCreateActivationLink();
@@ -64,6 +69,11 @@ export function MemberManageDialog({
         : activated
           ? "Todavía no tiene cursos asignados."
           : "La cuenta está pendiente de activación: compartí el enlace de abajo.");
+
+  // What the person is teaching or attending: the courses and the
+  // subjects of a teacher, the courses of a student.
+  const courses = member.courses?.length ? member.courses.join(" · ") : "Sin asignar";
+  const subjects = member.subjects?.length ? member.subjects.join(" · ") : null;
 
   async function toggle() {
     try {
@@ -113,23 +123,56 @@ export function MemberManageDialog({
           </button>
         </div>
 
-        <div className="mt-5 space-y-3">
-          <div className="flex items-start justify-between gap-3 rounded-idx border border-border px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Acceso</p>
-              <p className="text-xs text-muted-foreground">{accessReason}</p>
-            </div>
-            <StatusBadge tone={hasAccess ? "success" : "warning"}>
-              {hasAccess ? "Activado" : "Pendiente"}
-            </StatusBadge>
-          </div>
+        {/* The data of the person, as the panel writes it. */}
+        <dl className="mt-5 grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
+          <dt className="text-[12.4px] text-muted-foreground">Correo</dt>
+          <dd className="min-w-0 truncate">{member.email ?? "Sin correo"}</dd>
 
-          {updateMembership.error && (
-            <p role="alert" className="text-sm text-destructive">
-              {updateMembership.error.message}
-            </p>
-          )}
-        </div>
+          <dt className="text-[12.4px] text-muted-foreground">
+            {roleLabel === "docente" ? "Curso · Materia" : "Cursos"}
+          </dt>
+          <dd className="min-w-0">
+            <span className="block truncate">{courses}</span>
+            {subjects && <span className="block truncate text-muted-foreground">{subjects}</span>}
+          </dd>
+
+          <dt className="text-[12.4px] text-muted-foreground">Ingreso</dt>
+          <dd className="font-mono text-[12.4px]">
+            {new Date(member.joined_at).toLocaleDateString("es-CO")}
+          </dd>
+
+          <dt className="text-[12.4px] text-muted-foreground">Acceso</dt>
+          <dd>
+            <StatusBadge tone={hasAccess ? "success" : "warning"}>
+              {hasAccess ? "Activado" : "Sin activar"}
+            </StatusBadge>
+          </dd>
+
+          <dt className="text-[12.4px] text-muted-foreground">Estado</dt>
+          <dd>
+            <StatusBadge tone={isRevoked ? "neutral" : "success"}>
+              {isRevoked ? "Inactivo" : "Activo"}
+            </StatusBadge>
+          </dd>
+        </dl>
+
+        <p className="mt-4 flex items-start gap-2 rounded-idx bg-primary-soft/40 px-3 py-2.5 text-[13px] text-foreground">
+          <Info className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
+          <span>
+            <strong className="font-semibold">Acceso al material.</strong>{" "}
+            {roleLabel === "docente"
+              ? "El docente ve el material publicado de los cursos en los que imparte. Activar el acceso no cambia sus asignaciones."
+              : "El estudiante ve el material publicado de sus cursos. Activar el acceso le permite entrar a la plataforma."}
+          </span>
+        </p>
+
+        <p className="mt-3 text-[12.5px] text-muted-foreground">{accessReason}</p>
+
+        {updateMembership.error && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {updateMembership.error.message}
+          </p>
+        )}
 
         {/* The activation link is issued on demand. It is shown right
             after the admin asks for it, and it is never kept: the next
@@ -137,7 +180,11 @@ export function MemberManageDialog({
         {!activated && (
           <div className="mt-3 rounded-lg border border-border bg-primary-soft/40 p-4">
             <div className="flex items-start gap-2">
-              <KeyRound className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={1.75} />
+              <KeyRound
+                className="mt-0.5 size-4 shrink-0 text-primary"
+                strokeWidth={1.75}
+                aria-hidden
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Enlace de activación</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -194,6 +241,13 @@ export function MemberManageDialog({
           </button>
           <button
             type="button"
+            onClick={onEdit}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"
+          >
+            Editar
+          </button>
+          <button
+            type="button"
             onClick={toggle}
             disabled={updateMembership.isPending}
             className={
@@ -207,8 +261,8 @@ export function MemberManageDialog({
             {updateMembership.isPending
               ? "Guardando..."
               : isRevoked
-                ? `Reactivar ${roleLabel}`
-                : `Desactivar ${roleLabel}`}
+                ? "Activar acceso"
+                : "Desactivar acceso"}
           </button>
         </div>
       </div>

@@ -39,16 +39,71 @@ export type SchoolIdentity = {
 
 /**
  * The samples of the mockup. Every one of them passes the contrast
- * check against the dark panel: the backend calculates it, and this
- * list is the one the panel offers.
+ * check against the panel: the backend calculates it, and this list is
+ * the one the panel offers.
+ *
+ * The panel is light, so the samples are the darker shade of each hue:
+ * the accent is the background of the buttons, and the text on them is
+ * white.
  */
 export const COLOR_SAMPLES = [
-  { name: "Azul", value: "#2E8FFF" },
-  { name: "Verde", value: "#2BD98A" },
-  { name: "Rojo", value: "#F05D5E" },
-  { name: "Turquesa", value: "#2DD4BF" },
-  { name: "Ámbar", value: "#F5A524" },
+  { name: "Azul", value: "#1A4CF0" },
+  { name: "Verde", value: "#0E7A3D" },
+  { name: "Rojo", value: "#B3261E" },
+  { name: "Turquesa", value: "#00707A" },
+  { name: "Ámbar", value: "#8A5A00" },
 ] as const;
+
+/** The surfaces the accent of the school sits on. */
+const PANEL_BACKGROUND = "#fcfcfd";
+const PANEL_SURFACE = "#ffffff";
+
+/** The minimum ratio a colour needs to keep the text readable (WCAG AA). */
+export const MINIMUM_CONTRAST = 4.5;
+
+/** The relative luminance of a colour, as WCAG 2.1 defines it. */
+function luminance(color: string): number | null {
+  const match = /^#?([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return null;
+  const value = parseInt(match[1], 16);
+  const channels = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((channel) => {
+    const srgb = channel / 255;
+    return srgb <= 0.03928 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+/**
+ * The contrast of a colour against the panel.
+ *
+ * It is the same calculation the backend does, so the notice of the
+ * view can talk about the colour that is being picked, not only about
+ * the one that was saved. The backend still has the last word when the
+ * colour is saved.
+ */
+export function colorContrast(color: string): {
+  min_ratio: number;
+  minimum: number;
+  passes: boolean;
+} | null {
+  const foreground = luminance(color);
+  if (foreground === null) return null;
+
+  const ratios = [PANEL_BACKGROUND, PANEL_SURFACE].map((surface) => {
+    const background = luminance(surface);
+    if (background === null) return 1;
+    const lighter = Math.max(foreground, background);
+    const darker = Math.min(foreground, background);
+    return (lighter + 0.05) / (darker + 0.05);
+  });
+
+  const min = Math.min(...ratios);
+  return {
+    min_ratio: Math.round(min * 100) / 100,
+    minimum: MINIMUM_CONTRAST,
+    passes: min >= MINIMUM_CONTRAST,
+  };
+}
 
 export const identityKeys = {
   settings: () => ["school", "settings"] as const,

@@ -11,7 +11,7 @@
 // does not depend on a portal or on a dialog library.
 // =============================================================================
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 /** What is about to be deleted: the row and how to name it in the modal. */
@@ -48,7 +48,7 @@ export type ConfirmDialogProps = {
   /** The question, in the language of the app: "Eliminar el curso 4to A?". */
   title: string;
   /** What happens if the user confirms. One or two short sentences. */
-  description?: string;
+  description?: ReactNode;
   /** The label of the destructive button. */
   confirmLabel?: string;
   /** The label of the button that leaves things as they are. */

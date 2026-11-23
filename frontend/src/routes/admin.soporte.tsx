@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { Info, Inbox, Search, Send, X } from "lucide-react";
+import { Info, Inbox, Paperclip, Search, Send, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -22,6 +22,10 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  SupportAttachmentField,
+  type PickedAttachment,
+} from "@/features/admin/support-attachments";
 import {
   SUPPORT_CATEGORIES,
   useAddSupportMessage,
@@ -80,6 +84,14 @@ function shortDate(value: string): string {
   return `${day}/${month}/${date.getFullYear()}`;
 }
 
+/** The name of an attached file, read from the path it has in the store. */
+function attachmentName(path: string): string {
+  const file = path.split("/").pop() ?? path;
+  // The store prefixes the name with the moment of the upload.
+  const dash = file.indexOf("-");
+  return dash > 0 ? file.slice(dash + 1) : file;
+}
+
 function SoportePage() {
   const { session } = useRouteContext({ from: "/admin" });
 
@@ -93,8 +105,10 @@ function SoportePage() {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>("problema_tecnico");
   const [body, setBody] = useState("");
+  const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
+  const [replyAttachments, setReplyAttachments] = useState<PickedAttachment[]>([]);
 
   const detail = useSchoolSupportCase(selected?.id ?? null);
 
@@ -116,9 +130,15 @@ function SoportePage() {
     }
     setFormError(null);
     try {
-      await openCase.mutateAsync({ title: title.trim(), category, body: body.trim() });
+      await openCase.mutateAsync({
+        title: title.trim(),
+        category,
+        body: body.trim(),
+        attachment_ids: attachments.map((attachment) => attachment.id),
+      });
       setTitle("");
       setBody("");
+      setAttachments([]);
       setCategory("problema_tecnico");
       setFormOpen(false);
     } catch {
@@ -130,8 +150,13 @@ function SoportePage() {
     event.preventDefault();
     if (!selected || !reply.trim()) return;
     try {
-      await addMessage.mutateAsync({ caseId: selected.id, body: reply.trim() });
+      await addMessage.mutateAsync({
+        caseId: selected.id,
+        body: reply.trim(),
+        attachment_ids: replyAttachments.map((attachment) => attachment.id),
+      });
       setReply("");
+      setReplyAttachments([]);
     } catch {
       // The error is shown under the form, in Spanish.
     }
@@ -214,7 +239,12 @@ function SoportePage() {
                 placeholder="Cuéntale qué pasó, con qué curso y qué material."
                 className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
+              <span className="mt-1.5 block text-xs text-muted-foreground">
+                Queda registrado en el historial del caso.
+              </span>
             </label>
+
+            <SupportAttachmentField attachments={attachments} onChange={setAttachments} />
 
             {formError && (
               <p role="alert" className="text-[13px] text-destructive">
@@ -413,6 +443,27 @@ function SoportePage() {
                         </span>
                       </p>
                       <p className="mt-1 text-[13.2px] leading-relaxed">{message.body}</p>
+                      {message.attachment_ids.length > 0 && (
+                        <ul className="mt-2 flex flex-wrap gap-1.5">
+                          {message.attachment_ids.map((attachment) => (
+                            <li key={attachment}>
+                              <a
+                                href={`/v1/files/${attachment}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground transition-colors hover:bg-secondary"
+                              >
+                                <Paperclip
+                                  className="size-3.5 shrink-0"
+                                  strokeWidth={1.9}
+                                  aria-hidden
+                                />
+                                {attachmentName(attachment)}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       <p className="mt-1.5 font-mono text-[11.6px] text-muted-foreground">
                         {shortDate(message.created_at)}
                       </p>
@@ -445,6 +496,10 @@ function SoportePage() {
                     {addMessage.error.message}
                   </p>
                 )}
+                <SupportAttachmentField
+                  attachments={replyAttachments}
+                  onChange={setReplyAttachments}
+                />
                 <Button
                   type="submit"
                   icon={Send}

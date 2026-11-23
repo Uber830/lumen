@@ -70,12 +70,30 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function Brand({ role, schoolName }: { role: AppShellRole; schoolName: string | null }) {
-  // The mark of the application is the same everywhere: the logo of
-  // Lumen, the one the public site shows. The shield of the school is
-  // not worn here: it belongs to the school, and the administrator
-  // configures it in Personalización.
-  const mark = <BrandLogo className="size-[34px]" />;
+function Brand({
+  role,
+  schoolName,
+  schoolLogo,
+}: {
+  role: AppShellRole;
+  schoolName: string | null;
+  schoolLogo: string | null;
+}) {
+  // The mark of the platform is the logo of Lumen. The roles of a school
+  // wear the shield of their school instead: it is the identity of the
+  // institution, and the administrator configures it in Personalización.
+  const shield = role !== "super" ? fileUrl(schoolLogo) : null;
+  const mark = shield ? (
+    <img
+      src={shield}
+      alt=""
+      className="size-[34px] shrink-0 rounded-idx object-cover"
+      width={34}
+      height={34}
+    />
+  ) : (
+    <BrandLogo className="size-[34px]" />
+  );
 
   return (
     <div className="flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]">
@@ -335,6 +353,10 @@ export function AppShell({
   // it fresh after the admin saves a change.
   const sessionBrand = session.school;
   const primaryColor = school.data?.primary_color ?? sessionBrand?.primary_color ?? null;
+  // The shield of the school, the same one the administrator uploads in
+  // Personalización. It travels with the session, so the rail wears it
+  // from the first frame.
+  const schoolLogo = school.data?.logo_url ?? sessionBrand?.logo_url ?? null;
 
   // Paint the theme with the school's colour. The rules are rendered
   // with the page (so the first frame is already in the school's
@@ -436,7 +458,7 @@ export function AppShell({
           "w-[270px] max-[1179px]:w-[68px]",
         )}
       >
-        <Brand role={role} schoolName={resolvedSchoolName} />
+        <Brand role={role} schoolName={resolvedSchoolName} schoolLogo={schoolLogo} />
         <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
           <NavGroups role={role} icfesEnabled={icfesEnabled} badges={badges} />
         </div>
@@ -452,7 +474,7 @@ export function AppShell({
           />
           <div className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-sidebar">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-              <Brand role={role} schoolName={resolvedSchoolName} />
+              <Brand role={role} schoolName={resolvedSchoolName} schoolLogo={schoolLogo} />
               <button
                 aria-label="Cerrar menú"
                 className="mt-[18px] grid size-9 shrink-0 place-items-center rounded-lg hover:bg-sidebar-accent"
