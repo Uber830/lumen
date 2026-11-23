@@ -6,6 +6,7 @@
 // of people uses it, so a teacher looks the same everywhere.
 // =============================================================================
 
+import { fileUrl } from "@/lib/storage/files";
 import { cn } from "@/lib/utils";
 
 const SIZES = {
@@ -35,13 +36,15 @@ function initials(name: string): string {
 }
 
 export function MemberAvatar({ name, avatarUrl, size = "md", className }: MemberAvatarProps) {
-  if (avatarUrl) {
+  // The row keeps the path of the photo; the API serves the file.
+  const src = fileUrl(avatarUrl);
+  if (src) {
     return (
       <img
-        src={avatarUrl}
+        src={src}
         alt={`Foto de ${name}`}
         className={cn(
-          "shrink-0 rounded-full object-cover ring-1 ring-border",
+          "shrink-0 rounded-idx object-cover ring-1 ring-border",
           SIZES[size],
           className,
         )}
@@ -53,7 +56,7 @@ export function MemberAvatar({ name, avatarUrl, size = "md", className }: Member
     <span
       aria-hidden
       className={cn(
-        "grid shrink-0 place-items-center rounded-full bg-primary-soft font-bold text-primary",
+        "grid shrink-0 place-items-center rounded-idx bg-primary-soft font-bold text-primary",
         SIZES[size],
         className,
       )}

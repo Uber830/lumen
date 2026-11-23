@@ -3,12 +3,12 @@ import { Check, Copy, Loader2, Sparkles, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { PageHeader, SectionCard } from "@/components/ui-kit";
-import { NotificationPreferences } from "@/components/notifications/notification-preferences";
 import { PasswordInput } from "@/components/password-input";
 import { generatePassword } from "@/lib/auth/password";
 import { getCurrentSession, updateProfile, type SessionContext } from "@/lib/auth/functions";
-import { notificationRoleFor } from "@/features/notifications/format";
+import { ProfileNav } from "@/features/profile/profile-nav";
 import { AvatarUploadError, uploadAvatar } from "@/lib/profile/upload";
+import { fileUrl } from "@/lib/storage/files";
 
 export const Route = createFileRoute("/perfil/")({
   head: () => ({
@@ -162,7 +162,7 @@ function AvatarField({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [localUrl, setLocalUrl] = useState<string | null>(avatarUrl);
+  const [localUrl, setLocalUrl] = useState<string | null>(fileUrl(avatarUrl));
   const initials =
     displayName
       .split(" ")
@@ -176,7 +176,9 @@ function AvatarField({
     setUploading(true);
     try {
       const result = await uploadAvatar(userId, file, localUrl);
-      setLocalUrl(result.avatarUrl);
+      // The API answers with the path of the file; the browser needs
+      // the address the API serves it under.
+      setLocalUrl(fileUrl(result.avatarUrl));
       onUploaded(result.avatarUrl);
     } catch (err) {
       if (err instanceof AvatarUploadError) {
@@ -196,12 +198,12 @@ function AvatarField({
           <img
             src={localUrl}
             alt={`Foto de perfil de ${displayName}`}
-            className="size-24 shrink-0 rounded-full object-cover ring-1 ring-border"
+            className="size-24 shrink-0 rounded-idx object-cover ring-1 ring-border"
           />
         ) : (
           <span
             aria-hidden
-            className="grid size-24 shrink-0 place-items-center rounded-full bg-primary-soft text-2xl font-bold text-primary"
+            className="grid size-24 shrink-0 place-items-center rounded-idx bg-primary-soft text-2xl font-bold text-primary"
           >
             {initials}
           </span>
@@ -209,7 +211,7 @@ function AvatarField({
         {uploading && (
           <span
             aria-hidden
-            className="absolute inset-0 grid place-items-center rounded-full bg-card/70"
+            className="absolute inset-0 grid place-items-center rounded-idx bg-card/70"
           >
             <Loader2 className="size-5 animate-spin text-primary" />
           </span>
@@ -348,83 +350,71 @@ function Perfil() {
   return (
     <>
       <PageHeader title="Mi perfil" subtitle="Datos visibles para tu comunidad educativa" />
+      <ProfileNav active="perfil" />
 
-      <SectionCard title="Datos personales">
-        {session?.user.id ? (
-          <AvatarField
-            userId={session.user.id}
-            avatarUrl={serverSnapshot?.avatar_url ?? null}
-            displayName={displayName}
-            onUploaded={refreshSession}
-          />
-        ) : null}
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Nombre" htmlFor="profile-name" value={fullName} onChange={setFullName} />
-          <Field
-            label="Apellido"
-            htmlFor="profile-lastname"
-            value={familyName}
-            onChange={setFamilyName}
-            placeholder="Sin especificar"
-          />
-          <Field
-            label="Correo institucional"
-            htmlFor="profile-email"
-            type="email"
-            value={email}
-            onChange={setEmail}
-          />
-          <Field
-            label="Teléfono"
-            htmlFor="profile-phone"
-            type="tel"
-            value={phone}
-            onChange={setPhone}
-          />
-        </div>
-      </SectionCard>
+      <div className="space-y-4">
+        <SectionCard title="Datos personales">
+          {session?.user.id ? (
+            <AvatarField
+              userId={session.user.id}
+              avatarUrl={serverSnapshot?.avatar_url ?? null}
+              displayName={displayName}
+              onUploaded={refreshSession}
+            />
+          ) : null}
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <Field label="Nombre" htmlFor="profile-name" value={fullName} onChange={setFullName} />
+            <Field
+              label="Apellido"
+              htmlFor="profile-lastname"
+              value={familyName}
+              onChange={setFamilyName}
+              placeholder="Sin especificar"
+            />
+            <Field
+              label="Correo institucional"
+              htmlFor="profile-email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+            />
+            <Field
+              label="Teléfono"
+              htmlFor="profile-phone"
+              type="tel"
+              value={phone}
+              onChange={setPhone}
+            />
+          </div>
+        </SectionCard>
 
-      <SectionCard
-        title="Notificaciones"
-        description="Elegí qué querés que te avisen y por dónde te lo avisos."
-      >
-        {session?.user.id ? (
-          <NotificationPreferences
-            userId={session.user.id}
-            role={notificationRoleFor({
-              platformRole: session.platformRole,
-              memberships: session.memberships,
-            })}
-          />
-        ) : null}
-      </SectionCard>
+        <SectionCard
+          title="Seguridad"
+          description="Cambiá tu contrasena cuando lo necesites. Si no se te ocurre una, generamos una por vos."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Contraseña actual"
+              htmlFor="current-password"
+              type="password"
+              value=""
+              onChange={() => {}}
+              readOnly
+              placeholder="No se puede cambiar en esta versión"
+            />
+            <PasswordFieldWithActions
+              id="new-password"
+              name="newPassword"
+              value={newPassword}
+              onChange={setNewPassword}
+              autoComplete="new-password"
+              placeholder="********"
+            />
+          </div>
+        </SectionCard>
+      </div>
 
-      <SectionCard
-        title="Seguridad"
-        description="Cambiá tu contrasena cuando lo necesites. Si no se te ocurre una, generamos una por vos."
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="Contraseña actual"
-            htmlFor="current-password"
-            type="password"
-            value=""
-            onChange={() => {}}
-            readOnly
-            placeholder="No se puede cambiar en esta versión"
-          />
-          <PasswordFieldWithActions
-            id="new-password"
-            name="newPassword"
-            value={newPassword}
-            onChange={setNewPassword}
-            autoComplete="new-password"
-            placeholder="********"
-          />
-        </div>
-      </SectionCard>
-
-      <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
         {saveError && (
           <p role="alert" className="grow text-sm text-destructive">
             {saveError}
