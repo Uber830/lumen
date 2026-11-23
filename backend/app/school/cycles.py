@@ -67,6 +67,9 @@ async def list_assignments(
         select(
             TeacherAssignment.id,
             TeacherAssignment.teacher_id,
+            # The course subject is the assignment itself: the form needs it
+            # to edit the row without losing the link.
+            TeacherAssignment.course_subject_id,
             # The name lives in the profile when the account has one, and
             # in the user otherwise.
             func.coalesce(Profile.full_name, User.full_name),
@@ -107,6 +110,7 @@ async def list_assignments(
         (
             assignment_id,
             teacher_id,
+            course_subject_id,
             full_name,
             email,
             avatar_url,
@@ -126,6 +130,7 @@ async def list_assignments(
             {
                 "id": str(assignment_id),
                 "teacher_id": str(teacher_id),
+                "course_subject_id": str(course_subject_id),
                 "teacher_name": full_name,
                 "teacher_email": email,
                 "teacher_avatar_url": avatar_url,

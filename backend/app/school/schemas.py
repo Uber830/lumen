@@ -315,6 +315,9 @@ class AssignmentOut(BaseModel):
 
     id: str
     teacher_id: str
+    # The course subject the assignment points to: the edit form needs it
+    # to change the row without losing the link.
+    course_subject_id: str
     teacher_name: str | None = None
     teacher_email: str | None = None
     teacher_avatar_url: str | None = None

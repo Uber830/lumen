@@ -42,6 +42,9 @@ from app.academics.schemas import (
     StudentEnrollmentOut,
     StudentEnrollmentUpdate,
     StudentTeacherOut,
+    StudyPlanImport,
+    StudyPlanImportOut,
+    StudyPlanOut,
     SubjectCreate,
     SubjectOut,
     SubjectUpdate,
@@ -719,6 +722,47 @@ async def list_my_teachers(
         )
         for teacher_id, full_name, email, subjects in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Study plan
+# ---------------------------------------------------------------------------
+
+
+@router.get("/study-plans", response_model=list[StudyPlanOut])
+async def list_study_plans(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[StudyPlanOut]:
+    """The study plan, with what the school already has of it.
+
+    The admin picks the grades of the plan and imports them: the
+    courses are created with their subjects already offered.
+    """
+    school_id = _school_id(context)
+    plans = await operations.list_study_plans(session, school_id=school_id)
+    return [StudyPlanOut(**plan) for plan in plans]
+
+
+@router.post("/study-plans/import", response_model=StudyPlanImportOut)
+async def import_study_plans(
+    body: StudyPlanImport,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> StudyPlanImportOut:
+    """Create the courses of the picked plans.
+
+    The import never duplicates: a course that already exists is
+    skipped and the subjects of the school are reused.
+    """
+    school_id = _require_admin(context)
+    result = await operations.import_study_plans(
+        session,
+        school_id=school_id,
+        course_names=body.courses,
+    )
+    await session.commit()
+    return StudyPlanImportOut(**result)
 
 
 __all__ = ["router"]

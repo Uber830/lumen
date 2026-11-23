@@ -738,3 +738,89 @@ async def test_a_user_without_a_membership_cannot_read_the_structure(client, eng
 
     response = client.get("/v1/academics/courses", headers=_auth(user_id))
     assert response.status_code == 403, response.text
+
+
+# ---------------------------------------------------------------------------
+# Study plan
+# ---------------------------------------------------------------------------
+
+
+async def test_the_study_plan_is_readable_by_the_admin(client, session_factory):
+    """The admin sees the grades of the plan and what the school has of it."""
+    school = await seed_school_with_members(session_factory)
+
+    response = client.get("/v1/academics/study-plans", headers=_auth(school.admin_id))
+    assert response.status_code == 200, response.text
+
+    plans = response.json()
+    assert len(plans) >= 5
+    first = plans[0]
+    assert first["course_name"]
+    assert first["subject_count"] == len(first["subjects"])
+    assert first["exists"] is False
+    assert first["enrolled_students"] == 0
+
+
+async def test_importing_the_plan_creates_the_courses(client, session_factory):
+    """The import creates the course with its subjects already offered."""
+    school = await seed_school_with_members(session_factory)
+
+    response = client.post(
+        "/v1/academics/study-plans/import",
+        headers=_auth(school.admin_id),
+        json={"courses": ["6° A"]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["created_courses"] == ["6° A"]
+
+    courses = client.get("/v1/academics/courses", headers=_auth(school.admin_id)).json()
+    course = next(item for item in courses if item["name"] == "6° A")
+    assert course["subject_count"] == 3
+    assert course["assigned_teachers"] == 0
+
+
+async def test_importing_the_plan_twice_does_not_duplicate(client, session_factory):
+    """The import is idempotent: the second time everything is skipped."""
+    school = await seed_school_with_members(session_factory)
+
+    client.post(
+        "/v1/academics/study-plans/import",
+        headers=_auth(school.admin_id),
+        json={"courses": ["7° A"]},
+    )
+    response = client.post(
+        "/v1/academics/study-plans/import",
+        headers=_auth(school.admin_id),
+        json={"courses": ["7° A"]},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created_courses"] == []
+    assert body["skipped_courses"] == ["7° A"]
+
+    courses = client.get("/v1/academics/courses", headers=_auth(school.admin_id)).json()
+    assert len([item for item in courses if item["name"] == "7° A"]) == 1
+
+
+async def test_importing_a_course_that_is_not_in_the_plan_fails(client, session_factory):
+    """Only the grades of the plan can be imported."""
+    school = await seed_school_with_members(session_factory)
+
+    response = client.post(
+        "/v1/academics/study-plans/import",
+        headers=_auth(school.admin_id),
+        json={"courses": ["99° Z"]},
+    )
+    assert response.status_code == 422, response.text
+
+
+async def test_a_teacher_cannot_import_the_plan(client, session_factory):
+    """Only the admin of the school imports the plan."""
+    school = await seed_school_with_members(session_factory)
+
+    response = client.post(
+        "/v1/academics/study-plans/import",
+        headers=_auth(school.teacher_id),
+        json={"courses": ["6° A"]},
+    )
+    assert response.status_code == 403, response.text
