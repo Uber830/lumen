@@ -14,7 +14,7 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useCreateAcademicPeriod, useDeleteAcademicPeriod } from "@/features/academics/hooks";
+import { useCreateAcademicPeriod } from "@/features/academics/hooks";
 import {
   useClosePeriod,
   useSchoolPeriods,
@@ -78,7 +78,6 @@ function PeriodosPage() {
   const close = useClosePeriod();
   const setCurrent = useSetCurrentPeriod();
   const create = useCreateAcademicPeriod(schoolId ?? "");
-  const remove = useDeleteAcademicPeriod(schoolId ?? "");
 
   const [name, setName] = useState("");
   const [modality, setModality] = useState<"bimestre" | "trimestre" | "semestre" | "anual">(
@@ -88,9 +87,8 @@ function PeriodosPage() {
   const [end, setEnd] = useState("");
   const [dateError, setDateError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  // The period the admin is about to close, and the one to delete.
+  // The period the admin is about to close.
   const [toClose, setToClose] = useState<SchoolPeriod | null>(null);
-  const [toDelete, setToDelete] = useState<SchoolPeriod | null>(null);
 
   // The frontend does not decide what the rank may do: it receives the
   // list from the API. A closed action is disabled **with the reason**,
@@ -406,15 +404,6 @@ function PeriodosPage() {
                         >
                           Marcar vigente
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={X}
-                          onClick={() => setToDelete(period)}
-                          disabled={remove.isPending}
-                        >
-                          Quitar
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -423,9 +412,9 @@ function PeriodosPage() {
             </PanelTable>
           </TableShell>
         )}
-        {(close.error || setCurrent.error || remove.error) && (
+        {(close.error || setCurrent.error) && (
           <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
-            {(close.error ?? setCurrent.error ?? remove.error)?.message}
+            {(close.error ?? setCurrent.error)?.message}
           </p>
         )}
       </SectionCard>
@@ -456,23 +445,6 @@ function PeriodosPage() {
         onConfirm={() => {
           if (!toClose) return;
           close.mutate(toClose.id, { onSuccess: () => setToClose(null) });
-        }}
-      />
-
-      <ConfirmDialog
-        open={toDelete !== null}
-        title={toDelete ? `Eliminar ${toDelete.name}` : "Eliminar periodo"}
-        description={
-          toDelete
-            ? "Se borra el periodo con sus notas y tareas. Esta acción no se puede deshacer."
-            : undefined
-        }
-        confirmLabel="Eliminar periodo"
-        pending={remove.isPending}
-        onCancel={() => setToDelete(null)}
-        onConfirm={() => {
-          if (!toDelete) return;
-          remove.mutate(toDelete.id, { onSuccess: () => setToDelete(null) });
         }}
       />
     </>
