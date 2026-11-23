@@ -10,7 +10,7 @@ The rules come from the RLS policies the migrations declared:
 - **members**: a school admin sees all of them; a member sees the
   ones of their own conversations.
 
-Note that the Realtime delivery stays on Supabase's Realtime service.
+Note that the live delivery is a periodic query on the API.
 These operations are the durable record it is built on.
 """
 

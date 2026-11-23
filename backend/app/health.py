@@ -72,8 +72,7 @@ async def ready() -> JSONResponse:
 
     if not database_ok:
         return _degraded(
-            "The database is unreachable. Check DATABASE_URL and that "
-            "the Supabase project is running.",
+            "The database is unreachable. Check DATABASE_URL and that the database is running.",
             database=False,
         )
 

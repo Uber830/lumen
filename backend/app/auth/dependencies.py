@@ -110,6 +110,27 @@ def verify_access_token(token: str, settings: Settings) -> CurrentUser:
     return CurrentUser(user_id=sub, email=email)
 
 
+def optional_current_user(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> CurrentUser | None:
+    """The requester, when there is one.
+
+    The routes that serve a public file use this: a photo of profile
+    is read by a browser that may not carry the session (a message
+    shared in another application, for instance). A missing or invalid
+    token is not an error here: the route decides what to do without
+    a session.
+    """
+    token = _extract_token(request)
+    if token is None:
+        return None
+    try:
+        return verify_access_token(token, settings)
+    except HTTPException:
+        return None
+
+
 def get_current_user(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],

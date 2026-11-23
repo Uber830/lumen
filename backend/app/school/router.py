@@ -406,15 +406,15 @@ async def upload_school_logo(
     content = await file.read()
     content_type = identity.validate_logo(content, file.content_type or "")
 
-    from app.core import supabase_storage
+    from app.core import storage
 
-    logo_url = await supabase_storage.upload_school_logo(
+    logo_path = await storage.upload_school_logo(
         school_id=str(membership.school_id),
         content=content,
         content_type=content_type,
     )
 
-    await identity.set_logo(session, membership.school_id, logo_url)
+    await identity.set_logo(session, membership.school_id, logo_path)
 
     identity_data = await identity.get_identity(session, membership.school_id)
     return SchoolIdentityOut.model_validate(identity_data)

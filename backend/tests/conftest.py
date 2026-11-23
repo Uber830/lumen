@@ -1,8 +1,7 @@
 """pytest fixtures for the Lumen backend.
 
-Phase 0 replaced the Supabase SDK with SQLAlchemy, so the tests no
-longer mock a PostgREST client. They now run against a real Postgres
-through the `db_session` fixture.
+The tests run against a real Postgres through the `db_session`
+fixture: there is no client of a hosted service to mock.
 
 The database used by the test suite is configured by TEST_DATABASE_URL
 (or DATABASE_URL). When it is not set, the tests that need it are
@@ -41,13 +40,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
-os.environ.setdefault("SUPABASE_SECRET_KEY", "test-secret-key")
-os.environ.setdefault("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test")
 os.environ.setdefault("CORS_ALLOWED_ORIGINS", "http://localhost:8080")
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-with-enough-entropy-for-hs256")
-# The project JWT secret, used to mint the Storage/Realtime tokens.
-os.environ.setdefault("SUPABASE_JWT_SECRET", "supabase-project-secret-for-testing-1234")
 
 # The application builds its own engine from DATABASE_URL at startup
 # (the schema check). Point it at the same database the fixtures use,

@@ -2,7 +2,7 @@
 
 These are the contract between the backend and the frontend. The
 frontend migrates to them in Phase 4; until then it keeps using
-Supabase Auth.
+the previous identity provider.
 
 Error responses use the shape the frontend already knows how to read:
 
@@ -118,7 +118,7 @@ class UpdateProfileRequest(BaseModel):
 
     ``email`` lives on the user, not the profile; changing it is
     guarded for uniqueness. ``avatar_url`` is set by the avatar upload
-    flow after the image lands in Supabase Storage.
+    flow after the image lands in the file store.
     """
 
     full_name: str | None = Field(default=None, max_length=120)
@@ -177,10 +177,6 @@ class AuthResponse(BaseModel):
 
     tokens: TokenPair
     session: SessionInfo
-    # A short-lived token for Supabase Storage and Realtime. It is not
-    # an authentication token: the API does not accept it. It is None
-    # when the project JWT secret is not configured.
-    supabase_token: str | None = None
 
 
 class MessageResponse(BaseModel):

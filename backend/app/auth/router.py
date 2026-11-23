@@ -1,7 +1,7 @@
 """Auth router: login, refresh, logout and the password flows.
 
-These endpoints replace Supabase Auth. The frontend migrates to them
-in Phase 4; until then it keeps using Supabase Auth and
+These endpoints own the identity of the application. The frontend
+talks to them and
 `app.auth.verify_access_token` accepts both kinds of token.
 
 The response shape is the one the frontend's `SessionContext` already
@@ -56,16 +56,14 @@ from app.auth.schemas import (
     UpdateProfileRequest,
 )
 from app.config import get_settings
-from app.core import supabase_storage
+from app.core import storage
 from app.core.admin_permissions import permissions_for
 from app.core.context import RequestContext
 from app.core.errors import (
     AccountLockedError,
     AuthenticationError,
-    NotFoundError,
     RateLimitedError,
 )
-from app.core.supabase_tokens import SUPABASE_TOKEN_TTL
 from app.db.enums import SchoolRole
 from app.db.models import SchoolMembership
 from app.db.session import get_db
@@ -165,30 +163,6 @@ def _token_pair(issued: IssuedSession) -> TokenPair:
         expires_at=issued.access_token.expires_at,
         expires_in=get_settings().access_token_ttl_seconds,
     )
-
-
-def _mint_supabase_token(user: object) -> str | None:
-    """Mint the short-lived token the browser needs for Storage and Realtime.
-
-    Returns None when the project JWT secret is not configured: the
-    rest of the API keeps working, only Storage and Realtime do not.
-    """
-    from app.core.supabase_tokens import (
-        SupabaseTokenUnavailable,
-        mint_supabase_token,
-    )
-
-    try:
-        return mint_supabase_token(
-            user_id=user.id,  # type: ignore[attr-defined]
-            email=getattr(user, "email", None),
-        )
-    except SupabaseTokenUnavailable:
-        logger.warning(
-            "SUPABASE_JWT_SECRET is not configured; Storage and Realtime "
-            "will not work for this user."
-        )
-        return None
 
 
 @router.post("/login")
@@ -291,7 +265,6 @@ async def login(
     return AuthResponse(
         tokens=_token_pair(issued),
         session=_session_info(context),
-        supabase_token=_mint_supabase_token(user),
     )
 
 
@@ -366,7 +339,6 @@ async def refresh(
     return AuthResponse(
         tokens=_token_pair(issued),
         session=_session_info(context),
-        supabase_token=_mint_supabase_token(await operations.get_user(session, issued.user_id)),
     )
 
 
@@ -429,13 +401,11 @@ async def upload_avatar_me(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> SessionInfo:
-    """Upload the caller's profile photo and store its URL.
+    """Upload the caller's profile photo and store its path.
 
     The browser posts the image here (multipart) and the backend writes
-    it to Supabase Storage with the service-role key, then records the
-    public URL on the profile. This avoids needing the browser to hold
-    a Storage-signable token, which newer (ES256) Supabase projects do
-    not allow the backend to mint.
+    it to the file store of the server, then records the path of the
+    file on the profile. The browser asks the API for the file itself.
     """
     content = await file.read()
     if not content:
@@ -443,46 +413,16 @@ async def upload_avatar_me(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded file is empty.",
         )
-    avatar_url = await supabase_storage.upload_avatar(
+    avatar_path = await storage.upload_avatar(
         user_id=str(context.user_id),
         content=content,
         content_type=file.content_type or "application/octet-stream",
     )
-    await operations.update_profile(session, context.user_id, {"avatar_url": avatar_url})
+    await operations.update_profile(session, context.user_id, {"avatar_url": avatar_path})
     await session.commit()
     return _session_info(
         await load_session_context(session, context.user_id),
     )
-
-
-@router.get("/supabase-token")
-async def supabase_token(
-    context: Annotated[RequestContext, Depends(get_context)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, str | None]:
-    """Mint a short-lived token for Supabase Storage and Realtime.
-
-    Storage and Realtime stay on Supabase, and their RLS policies
-    call `auth.uid()`. This token carries the caller's id in the
-    `sub` claim, so those policies work unchanged.
-
-    The token is not an authentication token: the API does not accept
-    it. It lasts an hour.
-    """
-    user = await operations.get_user(session, context.user_id)
-    if user is None:
-        raise NotFoundError("User not found.")
-
-    token = _mint_supabase_token(user)
-    if token is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Supabase Storage and Realtime are not configured.",
-        )
-    return {
-        "token": token,
-        "expires_in": str(int(SUPABASE_TOKEN_TTL.total_seconds())),
-    }
 
 
 @router.post("/forgot-password")

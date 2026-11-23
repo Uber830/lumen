@@ -90,9 +90,6 @@ export type SessionInfo = {
 export type AuthResponse = {
   tokens: TokenPair;
   session: SessionInfo;
-  // A short-lived token for Supabase Storage and Realtime. It is not
-  // an authentication token.
-  supabase_token: string | null;
 };
 
 // --- Evaluations -----------------------------------------------------------
@@ -349,38 +346,6 @@ export type Plan = {
   max_teachers: number | null;
   max_storage_gb: number | null;
   includes_icfes: boolean;
-};
-
-export type Subscription = {
-  id: string;
-  school_id: string;
-  plan_id: string;
-  status: string;
-  interval: string;
-  customer_email: string | null;
-  wompi_subscription_id: string | null;
-  wompi_payment_source_id: string | null;
-  started_at: string | null;
-  current_period_start: string | null;
-  current_period_end: string | null;
-  cancelled_at: string | null;
-  raw: unknown;
-  created_at: string;
-  updated_at: string;
-};
-
-export type Entitlement = {
-  school_id: string;
-  plan_code: string;
-  plan_name: string;
-  max_students: number | null;
-  max_teachers: number | null;
-  max_storage_gb: number | null;
-  includes_icfes: boolean;
-  subscription_id: string | null;
-  status: string;
-  current_period_end: string | null;
-  updated_at: string;
 };
 
 // --- Dashboard -------------------------------------------------------------

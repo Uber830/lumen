@@ -1,26 +1,12 @@
-"""Tests for the cookie session and the Supabase token bridge.
+"""Tests for the cookie session.
 
-Two properties:
-
-- the browser authenticates with the cookie alone, and the token
-  never reaches the page's JavaScript;
-- the Supabase token is scoped to Storage and Realtime, and the API
-  refuses it as an authentication token.
+The browser authenticates with the cookie alone, and the token never
+reaches the page's JavaScript.
 """
 
 from __future__ import annotations
 
 import uuid
-
-import jwt
-import pytest
-
-from app.config import Settings
-from app.core.supabase_tokens import (
-    SUPABASE_TOKEN_TTL,
-    SupabaseTokenUnavailable,
-    mint_supabase_token,
-)
 
 # ---------------------------------------------------------------------------
 # The cookies
@@ -112,98 +98,3 @@ async def test_a_cookie_with_a_bad_token_is_refused(client):
         cookies={"lumen_access": "not.a.jwt"},
     )
     assert response.status_code == 401
-
-
-# ---------------------------------------------------------------------------
-# The Supabase token bridge
-# ---------------------------------------------------------------------------
-
-
-def test_the_supabase_token_carries_the_caller_id():
-    """`auth.uid()` reads the `sub` claim, so it has to be the caller's."""
-    user_id = uuid.uuid4()
-    token = mint_supabase_token(
-        user_id=user_id,
-        email="a@example.com",
-        settings=_settings_with_secret(),
-    )
-
-    claims = jwt.decode(
-        token,
-        "supabase-project-secret-for-testing-1234",
-        algorithms=["HS256"],
-        audience="authenticated",
-    )
-    assert claims["sub"] == str(user_id)
-    assert claims["aud"] == "authenticated"
-    assert claims["role"] == "authenticated"
-    assert claims["email"] == "a@example.com"
-
-
-def test_the_supabase_token_is_short_lived():
-    """An hour: a leaked token grants the same access, briefly."""
-    token = mint_supabase_token(
-        user_id=uuid.uuid4(),
-        settings=_settings_with_secret(),
-    )
-    claims = jwt.decode(
-        token,
-        "supabase-project-secret-for-testing-1234",
-        algorithms=["HS256"],
-        audience="authenticated",
-    )
-    assert claims["exp"] - claims["iat"] == int(SUPABASE_TOKEN_TTL.total_seconds())
-
-
-def test_minting_without_the_secret_raises():
-    """Without the project secret, Storage and Realtime do not work."""
-    from app.config import Settings
-
-    settings = Settings(supabase_jwt_secret=None)
-    with pytest.raises(SupabaseTokenUnavailable):
-        mint_supabase_token(user_id=uuid.uuid4(), settings=settings)
-
-
-async def test_the_supabase_token_endpoint(client, engine, make_user):
-    """The endpoint hands out the short-lived token."""
-    email = f"sb-{uuid.uuid4().hex[:8]}@example.com"
-    make_user(email=email, password="a good password", full_name="SB")
-    registered = client.post(
-        "/v1/auth/login",
-        json={"email": email, "password": "a good password"},
-    )
-    assert registered.status_code == 200, registered.text
-
-    # The register response carries one too.
-    assert registered.json()["supabase_token"]
-
-    response = client.get("/v1/auth/supabase-token")
-    assert response.status_code == 200, response.text
-    token = response.json()["token"]
-    assert token
-
-
-async def test_the_supabase_token_is_not_an_authentication_token(client, engine, make_user):
-    """The API refuses it: it is scoped to Storage and Realtime."""
-    email = f"sbauth-{uuid.uuid4().hex[:8]}@example.com"
-    make_user(email=email, password="a good password", full_name="SB Auth")
-    registered = client.post(
-        "/v1/auth/login",
-        json={"email": email, "password": "a good password"},
-    )
-    assert registered.status_code == 200, registered.text
-    supabase_token = registered.json()["supabase_token"]
-    assert supabase_token
-
-    # The API does not accept it: the audience is wrong.
-    response = client.get(
-        "/v1/auth/me",
-        headers={"Authorization": f"Bearer {supabase_token}"},
-        cookies={},
-    )
-    assert response.status_code == 401, response.text
-
-
-def _settings_with_secret() -> Settings:
-    """Settings with a project JWT secret configured."""
-    return Settings(supabase_jwt_secret="supabase-project-secret-for-testing-1234")

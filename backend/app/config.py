@@ -10,10 +10,8 @@ the values themselves; pydantic-settings handles type coercion and
 trimming. Higher-level helpers (db/session.py, core/tokens.py) check
 that the values are usable for their specific purpose.
 
-Phase 0 note: Supabase remains the Postgres host and the Storage /
-Realtime provider, but the backend now talks to Postgres directly
-(asyncpg) instead of through the PostgREST SDK. The Supabase SDK was
-removed from the dependency list in Phase 0.
+The backend talks to Postgres directly (asyncpg) and keeps the files
+on its own disk: there is no third-party service in the middle.
 """
 
 from __future__ import annotations
@@ -30,8 +28,8 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 # imports this module, so the import is local to avoid a cycle.
 DATABASE_NOT_CONFIGURED_DETAIL = (
     "El servicio no está disponible: falta configurar la base de datos. "
-    "Definí DATABASE_URL en backend/.env con la cadena de conexión del "
-    "proyecto de Supabase."
+    "Definí DATABASE_URL en backend/.env con la cadena de conexión de "
+    "la base de datos de Postgres."
 )
 
 
@@ -77,14 +75,13 @@ class Settings(BaseSettings):
     )
 
     # -----------------------------------------------------------------------
-    # Database (Postgres hosted by Supabase)
+    # Database (Postgres)
     # -----------------------------------------------------------------------
-    # Direct connection string. Use the Supabase *pooler* host in
-    # production (aws-0-<ref>.pooler.supabase.com, port 5432, user
-    # postgres.<ref>) because the direct host only accepts a limited
-    # number of concurrent connections and is IPv6-only in some
-    # projects. The pooler is transaction-mode, which is what an
-    # async request/response backend wants.
+    # Direct connection string. In production use a pooler (the one of
+    # the provider, or PgBouncer) because a direct host usually accepts
+    # a limited number of concurrent connections. The pooler is
+    # transaction-mode, which is what an async request/response backend
+    # wants.
     database_url: str = ""
     # Optional override; when set it wins over database_url. Useful for
     # pointing tests at a throwaway database without rewriting the URL.
@@ -109,19 +106,16 @@ class Settings(BaseSettings):
     platform_storage_dir: str = "var/materiales"
 
     # -----------------------------------------------------------------------
-    # Supabase (Storage + Realtime only)
+    # The files of the app
     # -----------------------------------------------------------------------
-    # The project URL and keys are still needed for Storage uploads and
-    # the Realtime websocket. Auth is not: this backend is the only
-    # issuer of tokens, so no Supabase JWT secret is read any more.
-    supabase_url: str = ""
-    supabase_publishable_key: str = ""
-    supabase_secret_key: SecretStr | None = None
-    # The project JWT secret, used to mint the short-lived tokens the
-    # browser needs for Storage and Realtime. It is NOT used to
-    # authenticate: `app/auth/dependencies.py` does not accept a token
-    # signed with it. See app/core/supabase_tokens.py.
-    supabase_jwt_secret: SecretStr | None = None
+    # Where the files live: the disk of the server. A relative path is
+    # resolved against the backend folder, so the default keeps the
+    # files inside the project and out of the way of the code.
+    uploads_dir: str = "var/archivos"
+    # The public address of the API. It is used to build the URL of the
+    # files the browser has to reach. Leave it empty when the API and
+    # the browser talk to the same host: the paths are relative then.
+    public_base_url: str = ""
 
     # -----------------------------------------------------------------------
     # Auth (Phase 1)
@@ -166,16 +160,6 @@ class Settings(BaseSettings):
     login_lock_minutes: int = Field(default=15, ge=1, le=1440)
 
     # -----------------------------------------------------------------------
-    # Wompi
-    # -----------------------------------------------------------------------
-    wompi_environment: Literal["sandbox", "production"] = "sandbox"
-    wompi_api_base: str | None = None
-    wompi_public_key: str | None = None
-    wompi_private_key: SecretStr | None = None
-    wompi_integrity_key: SecretStr | None = None
-    wompi_webhook_secret: SecretStr | None = None
-
-    # -----------------------------------------------------------------------
     # Derived helpers
     # -----------------------------------------------------------------------
     @field_validator("cors_allowed_origins", mode="before")
@@ -195,11 +179,9 @@ class Settings(BaseSettings):
         database is unavailable, not broken, and the message says what
         to configure.
 
-        A bare `postgresql://` URL gets the async driver. The
-        connection string people copy from the Supabase dashboard is
-        `postgresql://`, and SQLAlchemy would default to psycopg2,
-        which is not installed. The application is async, so asyncpg is
-        the right driver.
+        A bare `postgresql://` URL gets the async driver. SQLAlchemy
+        would default to psycopg2, which is not installed. The
+        application is async, so asyncpg is the right driver.
         """
         url = self.database_url_override or self.database_url
         if not url:

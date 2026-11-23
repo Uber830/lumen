@@ -34,6 +34,9 @@ import type {
 
 export type { ChatConversation, ChatMessage, ContentItem, Task, TaskSubmission };
 
+/** How often the messages of a conversation are refreshed, in milliseconds. */
+export const CHAT_POLL_INTERVAL = 5_000;
+
 export const queryKeys = {
   contentItems: (schoolId: string) => ["content_items", schoolId] as const,
   contentItemsByCourseSubject: (courseSubjectId: string) =>
@@ -218,6 +221,13 @@ export function useChatConversations(
   });
 }
 
+/**
+ * The messages of a conversation.
+ *
+ * The panel refreshes them every few seconds: there is no push channel,
+ * and a message that arrives is read the same way whether it was
+ * written a second ago or a minute ago.
+ */
 export function useChatMessages(
   conversationId: string | null,
 ): UseQueryResult<ChatMessage[], Error> {
@@ -225,6 +235,8 @@ export function useChatMessages(
     queryKey: conversationId ? queryKeys.messages(conversationId) : ["chat_messages", "none"],
     enabled: !!conversationId,
     queryFn: () => api.get<ChatMessage[]>(`/v1/chat/conversations/${conversationId}/messages`),
+    refetchInterval: CHAT_POLL_INTERVAL,
+    refetchIntervalInBackground: false,
   });
 }
 

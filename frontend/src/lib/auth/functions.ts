@@ -108,7 +108,7 @@ export const getCurrentSession = createServerFn({ method: "GET" }).handler(
 /**
  * Update the avatar URL of the signed-in user.
  *
- * The file itself is uploaded to Supabase Storage from the browser
+ * The file itself is uploaded to the API from the browser
  * (see `lib/storage/files.ts`); this only records the resulting URL.
  */
 export const updateAvatar = createServerFn({ method: "POST" })

@@ -56,25 +56,6 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * The short-lived token the browser needs for Supabase Storage and
- * Realtime.
- *
- * Storage and Realtime stay on Supabase, and their RLS policies call
- * `auth.uid()`. The backend mints a token whose `sub` is the
- * caller's id, so those policies work unchanged. It is not an
- * authentication token: the API does not accept it.
- */
-export async function fetchSupabaseToken(): Promise<string | null> {
-  try {
-    const response = await api.get<{ token: string | null }>("/v1/auth/supabase-token");
-    return response.token;
-  } catch {
-    // Storage and Realtime are unavailable; the rest works.
-    return null;
-  }
-}
-
-/**
  * Activate an invited account, or reset a password.
  *
  * An admin creates a user with no password and hands them an

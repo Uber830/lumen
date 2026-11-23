@@ -1,14 +1,14 @@
 """Async engine and session factory.
 
-The database is Postgres hosted by Supabase. The backend connects
+The database is Postgres. The backend connects
 directly with asyncpg through SQLAlchemy's async engine — the
 PostgREST SDK is gone as of Phase 0.
 
-Two important details for Supabase-hosted Postgres:
+Two important details for a hosted Postgres:
 
-1. Prefer the *pooler* host (aws-0-<ref>.pooler.supabase.com) over
-   the direct host. The direct host only accepts a handful of
-   concurrent connections and, in some projects, is IPv6-only. The
+1. Prefer the *pooler* host over the direct host. The direct host
+   usually accepts a handful of concurrent connections and is, in some
+   projects, IPv6-only. The
    pooler runs in transaction mode, which suits a request/response
    backend: each request takes a connection, uses it for one
    transaction, and returns it.
@@ -46,7 +46,7 @@ def _build_engine(settings: Settings) -> AsyncEngine:
         pool_timeout=settings.database_pool_timeout,
         pool_pre_ping=True,
         connect_args={
-            # Required for the Supabase transaction-mode pooler.
+            # Required for the transaction-mode pooler.
             "statement_cache_size": 0,
             "server_settings": {
                 "application_name": "lumen-api",
