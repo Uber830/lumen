@@ -18,6 +18,7 @@ import {
 } from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
+import { cycleKeys } from "@/lib/school/cycles";
 import type {
   AcademicPeriod,
   Course,
@@ -72,6 +73,9 @@ export function useCreateAcademicPeriod(
     mutationFn: (input) => api.post<AcademicPeriod>("/v1/academics/periods", input),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+      // The list of the school reads another key: without this, the
+      // period that was just created does not show up until a reload.
+      qc.invalidateQueries({ queryKey: cycleKeys.periods() });
     },
   });
 }
@@ -84,6 +88,7 @@ export function useUpdateAcademicPeriod(
     mutationFn: ({ id, patch }) => api.patch<AcademicPeriod>(`/v1/academics/periods/${id}`, patch),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+      qc.invalidateQueries({ queryKey: cycleKeys.periods() });
     },
   });
 }
@@ -94,6 +99,7 @@ export function useDeleteAcademicPeriod(schoolId: string): UseMutationResult<voi
     mutationFn: (id) => api.delete<void>(`/v1/academics/periods/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.periods(schoolId) });
+      qc.invalidateQueries({ queryKey: cycleKeys.periods() });
     },
   });
 }
