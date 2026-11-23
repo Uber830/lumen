@@ -118,6 +118,8 @@ export type SchoolMember = {
   course_ids?: string[];
   // The course subjects of a teacher, by id.
   course_subject_ids?: string[];
+  // The average of a student: `null` when it has no grades.
+  average?: number | null;
 };
 
 // --- Hook inputs -----------------------------------------------------------

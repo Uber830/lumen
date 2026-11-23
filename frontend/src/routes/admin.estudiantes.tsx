@@ -118,6 +118,7 @@ function EstudiantesPage() {
       access_reason: row.access_reason,
       courses: row.courses,
       course_ids: row.course_ids,
+      average: row.average,
     };
   }
 

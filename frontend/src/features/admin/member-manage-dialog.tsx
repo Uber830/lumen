@@ -141,6 +141,15 @@ export function MemberManageDialog({
             {new Date(member.joined_at).toLocaleDateString("es-CO")}
           </dd>
 
+          {member.average !== undefined && (
+            <>
+              <dt className="text-[12.4px] text-muted-foreground">Promedio</dt>
+              <dd className="font-mono text-[12.4px]">
+                {member.average === null ? "—" : member.average.toFixed(2)}
+              </dd>
+            </>
+          )}
+
           <dt className="text-[12.4px] text-muted-foreground">Acceso</dt>
           <dd>
             <StatusBadge tone={hasAccess ? "success" : "warning"}>
