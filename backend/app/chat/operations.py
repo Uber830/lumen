@@ -10,8 +10,9 @@ The rules come from the RLS policies the migrations declared:
 - **members**: a school admin sees all of them; a member sees the
   ones of their own conversations.
 
-Note that the live delivery is a periodic query on the API.
-These operations are the durable record it is built on.
+Note that the live delivery is the event stream: the browser is told
+that a message arrived and asks the API for it. These operations are
+the durable record it is built on.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import RequestContext
 from app.core.errors import ConflictError, NotFoundError
+from app.core.events import Event, queue_events
 from app.db.enums import ChatConversationKind, SchoolRole
 from app.db.models import (
     ChatConversation,
@@ -292,7 +294,33 @@ async def send_message(
         message=message,
         conversation_title=conversation.title if conversation is not None else None,
     )
+
+    # And their open panel is told to ask for the new message.
+    await _announce_message(session, message=message)
     return message
+
+
+async def _announce_message(session: AsyncSession, *, message: ChatMessage) -> None:
+    """Tell the members of the conversation that a message arrived.
+
+    The event leaves when the transaction commits: the client asks the
+    API for the messages, and it always finds the one that was written.
+    """
+    result = await session.execute(
+        select(ChatMember.user_id).where(ChatMember.conversation_id == message.conversation_id)
+    )
+    recipients = [row[0] for row in result.all()]
+    if not recipients:
+        return
+
+    queue_events(
+        session,
+        event=Event(
+            "chat.message",
+            {"conversation_id": str(message.conversation_id), "message_id": str(message.id)},
+        ),
+        user_ids=recipients,
+    )
 
 
 async def mark_read(

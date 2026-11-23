@@ -25,14 +25,29 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from functools import lru_cache
 
+from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+
+
+@sa_event.listens_for(Session, "after_commit")
+def _publish_pending_events(session: Session) -> None:
+    """Publish the events the session was holding, once it committed.
+
+    An event says that something happened: a notification was written, a
+    message was sent. It only leaves when the data behind it is on disk,
+    so the client never refetches a row that is not there yet.
+    """
+    from app.core.events import publish_pending
+
+    publish_pending(session)
 
 
 def _build_engine(settings: Settings) -> AsyncEngine:

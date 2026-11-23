@@ -22,6 +22,7 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import course_subject_course_id
+from app.core.events import Event, queue_events
 from app.db.enums import EnrollmentStatus, NotificationKind, SchoolRole
 from app.db.models import (
     ChatMember,
@@ -304,6 +305,16 @@ async def _insert_notifications(
     ]
 
     await session.execute(insert(Notification), rows)
+
+    # The browser is told there is something new. The event says what
+    # happened, not what it is: the client asks the API for the rows.
+    # It leaves when the transaction commits.
+    queue_events(
+        session,
+        event=Event("notification", {"kind": kind.value, "count": len(rows)}),
+        user_ids=list(wanted),
+    )
+
     return len(rows)
 
 

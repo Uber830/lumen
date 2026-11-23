@@ -27,6 +27,7 @@ from app.core.errors import AppError, ServiceUnavailableError
 from app.db.schema_check import SchemaOutOfDateError, verify_schema
 from app.db.session import dispose_engine, get_sessionmaker
 from app.evaluations.router import router as evaluations_router
+from app.events.router import router as events_router
 from app.files.router import router as files_router
 from app.grades.router import router as grades_router
 from app.health import router as health_router
@@ -166,6 +167,7 @@ def create_app() -> FastAPI:
     app.include_router(icfes_authoring_router)
     app.include_router(chat_router)
     app.include_router(notifications_router)
+    app.include_router(events_router)
     app.include_router(plans_router)
     app.include_router(school_router)
     app.include_router(schools_router)
