@@ -16,6 +16,7 @@ import {
 import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
 import { MemberAvatar } from "@/components/member-avatar";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
+import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
 import {
   useInviteAdmin,
   useRemoveAdmin,
@@ -59,6 +60,8 @@ function AdministradoresPage() {
   const [activations, setActivations] = useState<ActivationLink[]>([]);
   // The administrator whose detail is open.
   const [detail, setDetail] = useState<SchoolAdmin | null>(null);
+  // The rows the administrator picked: the bar acts on all of them.
+  const [picked, setPicked] = useState<string[]>([]);
   const adminToRemove = useDeleteConfirmation();
 
   // The frontend does not decide what a rank may do: the API returns
@@ -84,6 +87,18 @@ function AdministradoresPage() {
     setEmail("");
     setFullName("");
     setOpen(false);
+  }
+
+  /** Pass the picked administrators to the secondary rank. */
+  async function onBulkRank() {
+    for (const membershipId of picked) {
+      try {
+        await updateRank.mutateAsync({ membership_id: membershipId, admin_role: "secundario" });
+      } catch {
+        // The error of the last one is shown below the bar.
+      }
+    }
+    setPicked([]);
   }
 
   return (
@@ -194,6 +209,23 @@ function AdministradoresPage() {
       )}
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        <BulkBar count={picked.length} onClear={() => setPicked([])}>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={ShieldCheck}
+            disabled={updateRank.isPending}
+            onClick={() => void onBulkRank()}
+          >
+            Cambiar a secundario
+          </Button>
+          {updateRank.error && (
+            <span role="alert" className="text-[12.5px] text-destructive">
+              {updateRank.error.message}
+            </span>
+          )}
+        </BulkBar>
+
         {admins.isError ? (
           <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {admins.error.message}

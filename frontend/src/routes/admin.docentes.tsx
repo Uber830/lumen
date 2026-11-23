@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { Plus, Search, Upload, UserRoundX } from "lucide-react";
+import { KeyRound, Lock, Plus, Search, Upload, UserRoundX } from "lucide-react";
 import { useRef, useState } from "react";
 
 import {
@@ -16,6 +16,7 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
+import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
 import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
@@ -27,6 +28,7 @@ import {
   parseCsvInvitations,
   useBulkInviteUsers,
   useInviteUser,
+  useUpdateMembership,
   type InviteUserResult,
 } from "@/lib/users/invitations";
 import { useSchoolCourses, useSchoolTeachers, type SchoolMemberRow } from "@/lib/school/community";
@@ -67,6 +69,7 @@ function DocentesPage() {
 
   const invite = useInviteUser();
   const bulkInvite = useBulkInviteUsers();
+  const updateMembership = useUpdateMembership();
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -86,6 +89,8 @@ function DocentesPage() {
   // The teacher whose management modal is open, and the one being edited.
   const [selectedTeacher, setSelectedTeacher] = useState<SchoolMemberRow | null>(null);
   const [editingTeacher, setEditingTeacher] = useState<SchoolMemberRow | null>(null);
+  // The rows the administrator picked: the bar acts on all of them.
+  const [picked, setPicked] = useState<string[]>([]);
 
   const total = teachers.data?.total ?? 0;
 
@@ -153,6 +158,18 @@ function DocentesPage() {
     setFullName("");
     setNewCourseSubjectId("");
     setOpen(false);
+  }
+
+  /** Turn the access of the picked teachers on or off. */
+  async function onBulkAccess(revoked: boolean) {
+    for (const membershipId of picked) {
+      try {
+        await updateMembership.mutateAsync({ membershipId, revoked });
+      } catch {
+        // The error of the last one is shown below the bar.
+      }
+    }
+    setPicked([]);
   }
 
   async function onBulkFile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -393,6 +410,32 @@ function DocentesPage() {
           </div>
         </Toolbar>
 
+        <BulkBar count={picked.length} onClear={() => setPicked([])}>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={KeyRound}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(false)}
+          >
+            Activar acceso
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Lock}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(true)}
+          >
+            Desactivar acceso
+          </Button>
+          {updateMembership.error && (
+            <span role="alert" className="text-[12.5px] text-destructive">
+              {updateMembership.error.message}
+            </span>
+          )}
+        </BulkBar>
+
         {teachers.isError ? (
           <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {teachers.error.message}
@@ -428,6 +471,22 @@ function DocentesPage() {
                 </caption>
                 <thead>
                   <tr>
+                    <th scope="col" className={`${tableHeadClass} w-[38px]`}>
+                      <SelectBox
+                        checked={
+                          (teachers.data?.items.length ?? 0) > 0 &&
+                          picked.length === teachers.data?.items.length
+                        }
+                        onChange={(checked) =>
+                          setPicked(
+                            checked
+                              ? (teachers.data?.items ?? []).map((row) => row.membership_id)
+                              : [],
+                          )
+                        }
+                        label="Seleccionar todos los docentes"
+                      />
+                    </th>
                     <th scope="col" className={tableHeadClass}>
                       Docente
                     </th>
@@ -451,6 +510,19 @@ function DocentesPage() {
                 <tbody>
                   {(teachers.data?.items ?? []).map((teacher) => (
                     <tr key={teacher.membership_id} className="transition-colors hover:bg-muted">
+                      <td className={tableCellClass}>
+                        <SelectBox
+                          checked={picked.includes(teacher.membership_id)}
+                          onChange={(checked) =>
+                            setPicked((current) =>
+                              checked
+                                ? [...current, teacher.membership_id]
+                                : current.filter((id) => id !== teacher.membership_id),
+                            )
+                          }
+                          label={`Seleccionar a ${teacher.full_name ?? "el docente"}`}
+                        />
+                      </td>
                       <td className={tableCellClass}>
                         <p className="font-medium text-foreground">{teacher.full_name ?? "—"}</p>
                         <p className="text-[12px] text-muted-foreground">
