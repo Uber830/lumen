@@ -1,7 +1,7 @@
 """Enum types mirroring the Postgres enums declared in the migrations.
 
 Each value here has a one-to-one counterpart in the `create type`
-statements under supabase/migrations/. The SQLAlchemy Enum uses the
+statements under db/migrations/. The SQLAlchemy Enum uses the
 *value* names, which are the ones stored in Postgres, and renders them
 as native Postgres enum types on create.
 

@@ -1,8 +1,8 @@
 // =============================================================================
-// The billing hooks: the subscription, the entitlement and the checkout.
+// The billing hooks: the entitlement of the school.
 // -----------------------------------------------------------------------------
-// These used to read PostgREST and call the `school_has_icfes` RPC.
-// They talk to the API now.
+// The entitlement says what the school has enabled (the ICFES, for
+// now). The API owns it; the browser only reads it.
 // =============================================================================
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
@@ -23,28 +23,6 @@ export function useEntitlement(schoolId: string | null): UseQueryResult<Entitlem
     queryFn: async () => {
       const response = await api.get<SubscriptionResponse>("/v1/subscriptions");
       return response.entitlements;
-    },
-  });
-}
-
-/**
- * Whether the school has the ICFES entitlement.
- *
- * The entitlement row carries the flag, so there is no separate call:
- * the entitlement query already answers it.
- */
-export function useSchoolHasIcves(schoolId: string | null): UseQueryResult<boolean, Error> {
-  return useQuery({
-    queryKey: schoolId ? ["school_has_icfes", schoolId] : ["school_has_icfes", "none"],
-    enabled: !!schoolId,
-    queryFn: async () => {
-      const response = await api.get<SubscriptionResponse>("/v1/subscriptions");
-      const entitlement = response.entitlements;
-      return Boolean(
-        entitlement &&
-        entitlement.includes_icfes &&
-        (entitlement.status === "active" || entitlement.status === "trial"),
-      );
     },
   });
 }

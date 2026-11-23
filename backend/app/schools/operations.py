@@ -1,7 +1,7 @@
 """School bootstrap: the operation that creates a school.
 
 This is the Python port of the `bootstrap_school` SQL function that
-lived in `supabase/migrations/20260813050000_bootstrap_school_rpc.sql`.
+lived in `db/migrations/20260813050000_bootstrap_school_rpc.sql`.
 The RPC existed because the user who signed up could not insert into
 `public.schools` directly: the RLS policy required `is_platform_admin`.
 With the logic in Python there is no such obstacle, so the function
@@ -158,7 +158,7 @@ async def bootstrap_school(
         )
         session.add(membership)
 
-        # Trial subscription. The Wompi webhook rewrites this when a
+        # Trial subscription. The platform team rewrites this when a
         # paid plan is activated.
         subscription = Subscription(
             id=uuid.uuid4(),
