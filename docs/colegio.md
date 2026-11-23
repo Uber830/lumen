@@ -37,15 +37,41 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula, filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos |
-| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, con el **material visible** calculado |
+| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, con el **material visible** calculado, e importación del plan de estudios |
 | Períodos | `/admin/periodos` | Ciclo lectivo, modalidad, cierre de periodo y periodo vigente |
 | ICFES | `/admin/icfes-colegio` | Simulacros que la plataforma habilitó, activados por curso, con sus resultados |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
 | Administradores | `/admin/administradores` | El equipo del colegio, con rango Principal o Secundario |
-| Soporte | `/admin/soporte` | Solicitudes al equipo de Lumen y el hilo de respuesta |
+| Soporte | `/admin/soporte` | Solicitudes al equipo de Lumen, con adjuntos, y el hilo de respuesta |
 
 «Mi perfil» vive en el **menú de usuario** (arriba a la derecha), no en el menú
 lateral.
+
+### La selección múltiple
+
+Las listas de **docentes**, **estudiantes** y **administradores** aceptan la
+selección de varias filas. La barra que aparece arriba dice cuántos están
+seleccionados y ofrece lo que se puede hacer con ellos:
+
+| Lista | Acciones de la barra |
+| --- | --- |
+| Docentes y estudiantes | Activar acceso · Desactivar acceso |
+| Administradores | Cambiar a secundario |
+
+Quitar el acceso es revocar la membresía: la persona deja de llegar al
+material del colegio y su historial se conserva. El backend sigue negándose a
+degradar o quitar al último administrador principal (`409`, `last_principal`).
+
+### El plan de estudios
+
+**Asignaciones → Importar desde plan de estudios** crea de una vez los cursos
+de un grado con sus materias ofrecidas. La importación es **idempotente**: un
+curso que ya existe se omite y las materias del colegio se reutilizan en vez
+de duplicarse.
+
+Los planes que la plataforma ofrece (sexto a décimo) viven en
+`backend/app/academics/study_plan.py`; el endpoint dice cuáles ya existen y
+cuántos estudiantes hay en cada uno.
 
 ---
 
@@ -81,11 +107,14 @@ revela la existencia de material ajeno.
 | `GET /v1/school/material?q=&area=&page=` | Material habilitado (6 por página) |
 | `GET /v1/school/material/{id}` | Detalle de un material habilitado |
 | `GET /v1/school/teachers|students|courses|subjects|assignments|periods` | La comunidad y el ciclo |
+| `PATCH /v1/school/members/{id}` | Editar a un docente o a un estudiante: nombre, correo y cursos o materias |
+| `GET /v1/academics/study-plans` · `POST /study-plans/import` | El plan de estudios del colegio y su importación |
 | `GET /v1/school/settings` · `PATCH` | Identidad del colegio (el color se valida en el backend) |
 | `POST /v1/school/logo` | Escudo: PNG o SVG, máximo 2 MB, tipo real |
 | `GET /v1/school/admins` · `POST /admins/invite` · `PATCH|DELETE /admins/{id}` | El equipo del colegio |
 | `GET /v1/school/icfes` · `POST /icfes/{id}/activations` · `GET /icfes/{id}/results` | Simulacros del colegio |
 | `GET/POST /v1/school/support/cases` · `GET /cases/{id}` · `POST /cases/{id}/messages` | Canal con el soporte |
+| `POST /v1/school/support/attachments` | El archivo que se adjunta a una solicitud (10 MB) |
 
 La API responde en inglés; el frontend traduce los mensajes de error.
 
@@ -119,6 +148,8 @@ una corrida real.
 - El **equipo de Lumen** responde y resuelve.
 - El colegio **no marca el caso como resuelto**: no hay endpoint ni botón.
 - El estudiante no tiene ruta a este canal.
+- Un mensaje puede llevar **adjuntos** (PDF, imagen o documento, hasta 10 MB):
+  el archivo va al almacén del colegio y el hilo guarda su ruta.
 
 ---
 
