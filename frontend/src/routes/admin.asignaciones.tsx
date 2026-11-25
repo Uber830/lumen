@@ -112,6 +112,35 @@ function AsignacionesPage() {
   const noTeachers = teacherOptions.length === 0;
   const noCourseSubjects = courseSubjectOptions.length === 0;
 
+  // One row per teacher, not one per assignment: the person is the
+  // one that repeats, and what matters is what each one teaches.
+  const byTeacher = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        teacherId: string;
+        name: string;
+        email: string | null;
+        avatarUrl: string | null;
+        assignments: SchoolAssignment[];
+      }
+    >();
+    for (const assignment of assignments.data ?? []) {
+      const group = groups.get(assignment.teacher_id) ?? {
+        teacherId: assignment.teacher_id,
+        name: assignment.teacher_name ?? "Docente",
+        email: assignment.teacher_email,
+        avatarUrl: assignment.teacher_avatar_url,
+        assignments: [],
+      };
+      group.assignments.push(assignment);
+      groups.set(assignment.teacher_id, group);
+    }
+    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [assignments.data]);
+
+  const totalAssignments = (assignments.data ?? []).length;
+
   function openCreate() {
     setEditing(null);
     setTeacherId("");
@@ -309,7 +338,9 @@ function AsignacionesPage() {
 
           <div className="ml-auto">
             <Chip tone="muted">
-              {assignments.data ? `${assignments.data.length} asignaciones` : "—"}
+              {assignments.data
+                ? `${byTeacher.length} docente(s) · ${totalAssignments} asignación(es)`
+                : "—"}
             </Chip>
           </div>
         </Toolbar>
@@ -344,7 +375,7 @@ function AsignacionesPage() {
           <TableShell>
             <PanelTable className="w-full border-collapse">
               <caption className="sr-only">
-                Asignaciones del colegio: docente, curso y materia
+                Docentes del colegio y las materias que tiene asignadas
               </caption>
               <thead>
                 <tr>
@@ -352,10 +383,10 @@ function AsignacionesPage() {
                     Docente
                   </th>
                   <th scope="col" className={tableHeadClass}>
-                    Curso
+                    Materias asignadas
                   </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Materia
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Material
                   </th>
                   <th scope="col" className={`${tableHeadClass} text-right`}>
                     Acción
@@ -363,64 +394,85 @@ function AsignacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {(assignments.data ?? []).map((assignment) => (
-                  <tr key={assignment.id} className="transition-colors hover:bg-muted">
+                {byTeacher.map((group) => (
+                  <tr key={group.teacherId} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        <MemberAvatar
-                          name={assignment.teacher_name ?? "Docente"}
-                          avatarUrl={assignment.teacher_avatar_url}
-                          size="sm"
-                        />
+                        <MemberAvatar name={group.name} avatarUrl={group.avatarUrl} size="sm" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            {assignment.teacher_name ?? "Sin nombre"}
-                          </p>
+                          <p className="truncate font-medium text-foreground">{group.name}</p>
                           <p className="truncate text-[12px] text-muted-foreground">
-                            {assignment.teacher_email ?? "Sin correo"}
+                            {group.email ?? "Sin correo"}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className={tableCellClass}>{assignment.course_name}</td>
                     <td className={tableCellClass}>
-                      <p>{assignment.subject_name}</p>
-                      {assignment.subject_area && (
-                        <p className="text-[12px] text-muted-foreground">
-                          {assignment.subject_area}
-                        </p>
+                      {/* What the teacher teaches: one chip per
+                          assignment, so the person is not repeated. */}
+                      <ul className="flex flex-wrap gap-1.5">
+                        {group.assignments.map((assignment) => (
+                          <li
+                            key={assignment.id}
+                            className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2 py-1 text-[12.2px]"
+                          >
+                            <span className="font-medium text-foreground">
+                              {assignment.course_name}
+                            </span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-muted-foreground">{assignment.subject_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(assignment)}
+                              aria-label={`Editar la asignación de ${assignment.subject_name} en ${assignment.course_name}`}
+                              title="Editar la asignación"
+                              className="grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <Pencil className="size-3" strokeWidth={1.9} aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                assignmentToDelete.ask({
+                                  id: assignment.id,
+                                  title: `la asignación de ${
+                                    assignment.teacher_name ?? "el docente"
+                                  } a ${assignment.subject_name}`,
+                                  description:
+                                    "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
+                                  confirmLabel: "Quitar asignación",
+                                })
+                              }
+                              aria-label={`Quitar la asignación de ${assignment.subject_name} en ${assignment.course_name}`}
+                              title="Quitar la asignación"
+                              className="grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                            >
+                              <X className="size-3" strokeWidth={1.9} aria-hidden />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td
+                      className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
+                    >
+                      {group.assignments.reduce(
+                        (total, assignment) => total + assignment.visible_materials_count,
+                        0,
                       )}
                     </td>
                     <td className={`${tableCellClass} text-right`}>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Pencil}
-                          onClick={() => openEdit(assignment)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={X}
-                          onClick={() =>
-                            assignmentToDelete.ask({
-                              id: assignment.id,
-                              title: `la asignación de ${
-                                assignment.teacher_name ?? "el docente"
-                              } a ${assignment.subject_name}`,
-                              description:
-                                "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
-                              confirmLabel: "Quitar asignación",
-                            })
-                          }
-                          disabled={deleteAssignment.isPending}
-                        >
-                          Quitar
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Plus}
+                        onClick={() => {
+                          openCreate();
+                          setTeacherId(group.teacherId);
+                        }}
+                      >
+                        Asignar otra
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -461,8 +513,9 @@ function AsignacionesPage() {
           Sistema operativo
         </Chip>
         <span>
-          Cada asignación habilita el acceso del docente al material de esa materia: es lo que abre
-          el contenido que el equipo de plataforma habilitó para el colegio.
+          Cada docente aparece una sola vez con todas sus materias: cada asignación habilita el
+          acceso del docente al material de esa materia, que es lo que abre el contenido que el
+          equipo de plataforma habilitó para el colegio.
         </span>
       </p>
     </>
