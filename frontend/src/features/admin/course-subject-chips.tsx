@@ -4,8 +4,8 @@
 // A teacher can teach many courses and subjects. Written one after the
 // other, the list grows until it breaks the row it lives in.
 //
-// So only the first two are shown as chips, and the rest are counted: the
-// "+3" opens a modal with the whole list. It is the same way the platform
+// So only the first one is shown as a chip, and the rest are counted: the
+// "+2" opens a modal with the whole list. It is the same way the platform
 // module shows the schools that have access to a material.
 // =============================================================================
 
@@ -43,7 +43,7 @@ export function CourseSubjectChips({
     return <span className="text-muted-foreground">{emptyLabel}</span>;
   }
 
-  const shown = items.slice(0, 2);
+  const shown = items.slice(0, 1);
   const extra = items.length - shown.length;
 
   return (

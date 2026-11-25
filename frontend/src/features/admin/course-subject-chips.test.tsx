@@ -39,23 +39,32 @@ describe("the courses and subjects of a teacher", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the first two and counts the rest", async () => {
+  it("shows the first one and counts the rest", async () => {
     const { container, cleanup } = await render({ items: items(5) });
 
     expect(container.textContent).toContain("6to A · Materia 1");
-    expect(container.textContent).toContain("6to A · Materia 2");
-    // The third one is only in the counter.
-    expect(container.textContent).not.toContain("6to A · Materia 3");
-    expect(container.textContent).toContain("+3");
+    // The second one is only in the counter.
+    expect(container.textContent).not.toContain("6to A · Materia 2");
+    expect(container.textContent).toContain("+4");
 
     await cleanup();
   });
 
   it("does not count what fits", async () => {
+    const { container, cleanup } = await render({ items: items(1) });
+
+    expect(container.textContent).toContain("6to A · Materia 1");
+    expect(container.textContent).not.toContain("+");
+
+    await cleanup();
+  });
+
+  it("counts from the second one", async () => {
     const { container, cleanup } = await render({ items: items(2) });
 
-    expect(container.textContent).toContain("6to A · Materia 2");
-    expect(container.textContent).not.toContain("+");
+    expect(container.textContent).toContain("6to A · Materia 1");
+    expect(container.textContent).not.toContain("6to A · Materia 2");
+    expect(container.textContent).toContain("+1");
 
     await cleanup();
   });
@@ -75,7 +84,7 @@ describe("the courses and subjects of a teacher", () => {
     });
 
     const counter = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("+3"),
+      button.textContent?.includes("+4"),
     );
     expect(counter).toBeDefined();
 
