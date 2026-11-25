@@ -1,13 +1,21 @@
 import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 
+import { panelContainer } from "@/components/panel/scope";
 import { cn } from "@/lib/utils";
 
 const Drawer = ({
   shouldScaleBackground = true,
+  container,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  // The drawer is drawn inside the panel: there it has the type, the
+  // colours and the square corners of the app.
+  <DrawerPrimitive.Root
+    shouldScaleBackground={shouldScaleBackground}
+    container={container ?? panelContainer()}
+    {...props}
+  />
 );
 Drawer.displayName = "Drawer";
 
@@ -23,7 +31,7 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/80", className)}
+    className={cn("fixed inset-0 z-50 bg-foreground/40 backdrop-blur-[2px]", className)}
     {...props}
   />
 ));
@@ -38,12 +46,18 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
+        // On a phone it is a sheet at the bottom; on a screen it is the
+        // panel of the right side, the way the reference prototype draws
+        // it.
         "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        "sm:inset-y-0 sm:left-auto sm:right-0 sm:mt-0 sm:h-full sm:rounded-none sm:border-l sm:border-t-0",
         className,
       )}
       {...props}
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      {/* The grabber is for the phone: on a screen the panel is on the
+          right and does not need it. */}
+      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted sm:hidden" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>

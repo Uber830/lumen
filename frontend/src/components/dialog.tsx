@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as React from "react";
 import { X } from "lucide-react";
 
+import { panelContainer } from "@/components/panel/scope";
 import { cn } from "@/lib/utils";
 
 /*
@@ -14,7 +15,14 @@ import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
+const DialogPortal = ({
+  container,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Portal>) => (
+  // The modal is drawn inside the panel: there it has the type, the
+  // colours and the square corners of the app.
+  <DialogPrimitive.Portal container={container ?? panelContainer()} {...props} />
+);
 const DialogClose = DialogPrimitive.Close;
 
 const DialogOverlay = React.forwardRef<

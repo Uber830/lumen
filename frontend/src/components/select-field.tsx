@@ -15,6 +15,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { panelContainer } from "@/components/panel/scope";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = {
@@ -291,7 +292,9 @@ export function Select({
               })
             )}
           </div>,
-          document.body,
+          // The list is drawn inside the panel: there it has the type and
+          // the colours of the app.
+          panelContainer() ?? document.body,
         )}
     </>
   );
