@@ -16,6 +16,14 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Select } from "@/components/select-field";
 import {
@@ -158,29 +166,27 @@ function AsignacionesPage() {
         }
       />
 
-      {formOpen && (
-        <SectionCard
-          className="mb-4"
-          title={editing ? "Editar asignación" : "Nueva asignación"}
-          description={
-            editing
-              ? "El docente deja de ver el material de la materia anterior y empieza a ver el de la nueva."
-              : "La asignación habilita el acceso del docente al material de esa materia."
-          }
-          actions={
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={X}
-              onClick={() => {
-                setFormOpen(false);
-                setEditing(null);
-              }}
-            >
-              Cerrar
-            </Button>
-          }
-        >
+      {/* The form lives in a modal: the list of the assignments does not
+          move when the admin opens it. */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditing(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">
+              {editing ? "Editar asignación" : "Nueva asignación"}
+            </DialogTitle>
+            <DialogDescription>
+              {editing
+                ? "El docente deja de ver el material de la materia anterior y empieza a ver el de la nueva."
+                : "La asignación habilita el acceso del docente al material de esa materia."}
+            </DialogDescription>
+          </DialogHeader>
+
           <form className="space-y-3" onSubmit={onSubmit}>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="block">
@@ -235,7 +241,23 @@ function AsignacionesPage() {
               </p>
             )}
 
-            <div className="flex items-center gap-2">
+            {(createAssignment.error || updateAssignment.error) && (
+              <p role="alert" className="text-[13px] text-destructive">
+                {(createAssignment.error ?? updateAssignment.error)?.message}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setFormOpen(false);
+                  setEditing(null);
+                }}
+              >
+                Cancelar
+              </Button>
               <Button
                 type="submit"
                 icon={Link2}
@@ -247,15 +269,10 @@ function AsignacionesPage() {
                     ? "Guardar cambios"
                     : "Asignar docente a la materia"}
               </Button>
-              {(createAssignment.error || updateAssignment.error) && (
-                <p role="alert" className="text-[13px] text-destructive">
-                  {(createAssignment.error ?? updateAssignment.error)?.message}
-                </p>
-              )}
-            </div>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {justAssigned && (
         <p role="status" className="mb-3 text-[13px] text-success">
@@ -333,7 +350,7 @@ function AsignacionesPage() {
           <TableShell>
             <PanelTable className="w-full border-collapse">
               <caption className="sr-only">
-                Asignaciones del colegio, con el material visible de cada una
+                Asignaciones del colegio: docente, curso y materia
               </caption>
               <thead>
                 <tr>
@@ -345,9 +362,6 @@ function AsignacionesPage() {
                   </th>
                   <th scope="col" className={tableHeadClass}>
                     Materia
-                  </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Material visible
                   </th>
                   <th scope="col" className={`${tableHeadClass} text-right`}>
                     Acción
@@ -382,13 +396,6 @@ function AsignacionesPage() {
                           {assignment.subject_area}
                         </p>
                       )}
-                    </td>
-                    <td className={tableCellClass}>
-                      <Chip tone={assignment.visible_materials_count > 0 ? "ok" : "muted"} dot>
-                        {assignment.visible_materials_count > 0
-                          ? `${assignment.visible_materials_count} publicados`
-                          : "Sin material"}
-                      </Chip>
                     </td>
                     <td className={`${tableCellClass} text-right`}>
                       <div className="flex items-center justify-end gap-1">
@@ -467,8 +474,8 @@ function AsignacionesPage() {
           Sistema operativo
         </Chip>
         <span>
-          El material visible se cuenta en el servidor: es el material publicado del área de la
-          materia, habilitado para el colegio, que aplica a los cursos del docente.
+          Cada asignación habilita el acceso del docente al material de esa materia: es lo que abre
+          el contenido que el equipo de plataforma habilitó para el colegio.
         </span>
       </p>
     </>

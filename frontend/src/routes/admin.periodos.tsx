@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { CalendarRange, Lock, Plus, X } from "lucide-react";
+import { CalendarRange, Lock, Plus } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -14,6 +14,14 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import { useCreateAcademicPeriod } from "@/features/academics/hooks";
 import {
   useClosePeriod,
@@ -40,12 +48,14 @@ export const Route = createFileRoute("/admin/periodos")({
   component: PeriodosPage,
 });
 
-const MODALITIES = [
-  { id: "bimestre", label: "Bimestres" },
-  { id: "trimestre", label: "Trimestres" },
-  { id: "semestre", label: "Semestres" },
-  { id: "anual", label: "Anual" },
-] as const;
+/**
+ * The modality the school works with.
+ *
+ * The admin does not pick it: the name of the period says it ("2do
+ * Trimestre 2026"). The API still asks for it, so the school goes with
+ * the cycle it uses.
+ */
+const DEFAULT_MODALITY = "trimestre";
 
 /**
  * The API answers in English; the page speaks Spanish.
@@ -80,9 +90,6 @@ function PeriodosPage() {
   const create = useCreateAcademicPeriod(schoolId ?? "");
 
   const [name, setName] = useState("");
-  const [modality, setModality] = useState<"bimestre" | "trimestre" | "semestre" | "anual">(
-    "trimestre",
-  );
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [dateError, setDateError] = useState<string | null>(null);
@@ -123,7 +130,7 @@ function PeriodosPage() {
     try {
       await create.mutateAsync({
         name: name.trim(),
-        modality,
+        modality: DEFAULT_MODALITY,
         start_date: start,
         end_date: end,
         is_current: false,
@@ -163,7 +170,7 @@ function PeriodosPage() {
             >
               Cerrar periodo
             </Button>
-            <Button icon={Plus} onClick={() => setFormOpen((open) => !open)}>
+            <Button icon={Plus} onClick={() => setFormOpen(true)}>
               Nuevo periodo
             </Button>
           </>
@@ -199,9 +206,24 @@ function PeriodosPage() {
         </p>
       )}
 
-      {formOpen && (
-        <SectionCard className="mb-4" title="Nuevo periodo" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onCreate}>
+      {/* The form lives in a modal: the list of the periods does not move
+          when the admin opens it. */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setDateError(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">Nuevo periodo</DialogTitle>
+            <DialogDescription>
+              El ciclo lectivo del colegio. El material se archiva al cerrarlo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-3" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre
@@ -212,26 +234,8 @@ function PeriodosPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 placeholder="4to Trimestre 2026"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Modalidad
-              </span>
-              <select
-                value={modality}
-                onChange={(e) =>
-                  setModality(e.target.value as "bimestre" | "trimestre" | "semestre" | "anual")
-                }
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {MODALITIES.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
@@ -243,7 +247,7 @@ function PeriodosPage() {
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
                   required
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
                 />
               </label>
               <label className="block">
@@ -255,7 +259,7 @@ function PeriodosPage() {
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
                   required
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
                 />
               </label>
             </div>
@@ -269,13 +273,10 @@ function PeriodosPage() {
                 {periodErrorMessage(create.error)}
               </p>
             )}
-            <div className="flex items-center gap-2">
-              <Button type="submit" icon={CalendarRange} disabled={create.isPending}>
-                {create.isPending ? "Creando..." : "Crear periodo"}
-              </Button>
+            <DialogFooter>
               <Button
                 variant="ghost"
-                icon={X}
+                type="button"
                 onClick={() => {
                   setFormOpen(false);
                   setDateError(null);
@@ -283,10 +284,13 @@ function PeriodosPage() {
               >
                 Cancelar
               </Button>
-            </div>
+              <Button type="submit" icon={CalendarRange} disabled={create.isPending}>
+                {create.isPending ? "Creando..." : "Crear periodo"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         {periods.isError ? (

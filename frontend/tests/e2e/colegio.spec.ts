@@ -3,12 +3,12 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * The chain of the panel of the school:
  *
- *   crear docente → asignarlo a un curso → el material visible de esa
- *   asignación cambia.
+ *   crear docente → asignarlo a un curso → el docente queda con acceso
+ *   al material de esa materia.
  *
  * The assignment is what enables the access to the content: without one
  * the teacher has no course, and without a course there is nothing to
- * see. The column "Material visible" says it in numbers.
+ * see.
  */
 
 const ADMIN = {
@@ -57,7 +57,7 @@ test.describe("el panel del colegio", () => {
     await expect(page.getByRole("button", { name: /Subir|Publicar/i })).toHaveCount(0);
   });
 
-  test("la asignación de un docente cambia el material visible", async ({ page }) => {
+  test("la asignación de un docente lo habilita a ver el material", async ({ page }) => {
     await login(page);
 
     // 1. A teacher is created.
@@ -101,12 +101,11 @@ test.describe("el panel del colegio", () => {
 
     await page.getByRole("button", { name: /Asignar docente a la materia/i }).click();
 
-    // 3. The assignment says how much material the teacher sees through it.
+    // 3. The assignment is in the list: the teacher, the course and the
+    // subject.
     const fila = page.getByRole("row").filter({ hasText: nombre });
     await expect(fila).toBeVisible(READY);
-    // La columna dice cuántos materiales publicados ve el docente a
-    // través de esa asignación.
-    await expect(fila).toContainText(/\d+ publicados|Sin material/i);
+    await expect(fila).toContainText(/7° A/);
   });
 
   test("el simulacro sin activar ofrece la acción de activarlo", async ({ page }) => {
