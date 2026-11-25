@@ -582,6 +582,10 @@ async def update_member(
     form: the list is replaced by the one that comes in, so what the form
     shows is what the member has.
 
+    A student is in **one** course: more than one is refused, because a
+    student in two courses has no average and no tasks. A teacher can
+    teach many course subjects.
+
     The membership has to belong to the school: an admin of another school
     does not get to edit this one.
     """
@@ -622,6 +626,11 @@ async def update_member(
             user.email = new_email
 
     if membership.role == SchoolRole.STUDENT and course_ids is not None:
+        # A student is in **one** course: the school has one grade per
+        # student, and a student in two courses has no average, no tasks
+        # and no idea of what he is studying.
+        if len(course_ids) > 1:
+            raise ValidationError("A student belongs to one course.")
         await _sync_enrollments(session, school_id, user.id, course_ids)
 
     if membership.role == SchoolRole.TEACHER and course_subject_ids is not None:

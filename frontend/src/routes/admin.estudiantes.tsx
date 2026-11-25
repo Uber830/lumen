@@ -490,7 +490,7 @@ function EstudiantesPage() {
                       Estudiante
                     </th>
                     <th scope="col" className={tableHeadClass}>
-                      Cursos
+                      Curso
                     </th>
                     <th scope="col" className={tableHeadClass}>
                       Ingreso

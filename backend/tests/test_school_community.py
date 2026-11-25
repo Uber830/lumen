@@ -424,6 +424,36 @@ async def test_editing_a_student_changes_the_courses(client, engine, seeded_scho
     assert student["courses"] == ["7° A"]
 
 
+async def test_a_student_cannot_be_in_two_courses(client, engine, seeded_school, community):
+    """A student belongs to one course: two are refused.
+
+    A student in two courses has no average and no tasks: the school
+    has one grade per student.
+    """
+    membership_id = await _membership_of(engine, community["student_id"])
+
+    other_course_id = uuid.uuid4()
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        session.add(
+            Course(
+                id=other_course_id,
+                school_id=seeded_school,
+                name="8° A",
+                grade_label="8°",
+            )
+        )
+        await session.commit()
+
+    response = client.patch(
+        f"/v1/school/members/{membership_id}",
+        headers=await _auth(),
+        json={
+            "course_ids": [str(community["course_id"]), str(other_course_id)],
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
 async def test_editing_a_member_that_is_not_of_the_school_is_a_404(client, engine, community):
     """The membership has to belong to the school of the caller."""
     response = client.patch(

@@ -50,10 +50,15 @@ export function MemberEditDialog({
 
   const [fullName, setFullName] = useState(member.full_name ?? "");
   const [email, setEmail] = useState(member.email ?? "");
-  // The course (of a student) or the course subject (of a teacher) that
-  // the member has now.
+  // The course and the subject that the teacher has now. A teacher can
+  // teach many: the list is a set of checkboxes.
   const [selected, setSelected] = useState<string[]>(
-    role === "student" ? (member.course_ids ?? []) : (member.course_subject_ids ?? []),
+    role === "teacher" ? (member.course_subject_ids ?? []) : [],
+  );
+  // A student belongs to **one** course: the school has one grade per
+  // student, and a student in two courses has no average and no tasks.
+  const [courseId, setCourseId] = useState<string>(
+    role === "student" ? (member.course_ids?.[0] ?? "") : "",
   );
   // The error of the request is shown by the hook itself.
 
@@ -77,7 +82,9 @@ export function MemberEditDialog({
         membershipId: member.membership_id,
         full_name: fullName.trim(),
         email: email.trim(),
-        ...(role === "student" ? { course_ids: selected } : { course_subject_ids: selected }),
+        ...(role === "student"
+          ? { course_ids: courseId ? [courseId] : [] }
+          : { course_subject_ids: selected }),
       });
       onSaved();
       onClose();
@@ -150,7 +157,7 @@ export function MemberEditDialog({
 
           <fieldset>
             <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {isTeacher ? "Curso y materia" : "Cursos"}
+              {isTeacher ? "Curso y materia" : "Curso"}
             </legend>
             {isTeacher ? (
               courseSubjects.isLoading ? (
@@ -191,7 +198,7 @@ export function MemberEditDialog({
                 </div>
               )
             ) : (
-              <StudentCourses selected={selected} onToggle={toggle} />
+              <StudentCourses courseId={courseId} onPick={setCourseId} />
             )}
           </fieldset>
 
@@ -215,19 +222,19 @@ export function MemberEditDialog({
   );
 }
 
-/** The courses of the school, as a list to pick from. */
-function StudentCourses({
-  selected,
-  onToggle,
-}: {
-  selected: string[];
-  onToggle: (id: string) => void;
-}) {
+/**
+ * The course of a student.
+ *
+ * A student is in **one** course: the one that says what he studies, what
+ * he is graded on and what tasks he has. The list is a radio group, not a
+ * set of checkboxes, so two courses can never be picked at once.
+ */
+function StudentCourses({ courseId, onPick }: { courseId: string; onPick: (id: string) => void }) {
   const courses = useSchoolCourses();
   return (
     <div className="mt-2 max-h-[220px] space-y-1.5 overflow-y-auto">
       {(courses.data ?? []).map((course) => {
-        const checked = selected.includes(course.id);
+        const checked = courseId === course.id;
         return (
           <label
             key={course.id}
@@ -238,9 +245,10 @@ function StudentCourses({
             }`}
           >
             <input
-              type="checkbox"
+              type="radio"
+              name="curso-del-estudiante"
               checked={checked}
-              onChange={() => onToggle(course.id)}
+              onChange={() => onPick(course.id)}
               className="size-[15px] accent-primary"
             />
             {course.name}
@@ -250,6 +258,11 @@ function StudentCourses({
       {(courses.data ?? []).length === 0 && (
         <p className="text-[13px] text-muted-foreground">
           El colegio todavía no tiene cursos. Crea uno en «Cursos y materias».
+        </p>
+      )}
+      {(courses.data ?? []).length > 0 && (
+        <p className="pt-1 text-[12px] text-muted-foreground">
+          El estudiante pertenece a un solo curso. Cambiarlo lo matricula en el nuevo.
         </p>
       )}
     </div>

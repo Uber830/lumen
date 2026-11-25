@@ -370,12 +370,19 @@ async def _create_one_invitation(
     await session.flush()
 
     # A student is created in a course: the admin picks it in the form,
-    # and a student without a course has no material to see.
+    # and a student without a course has no material to see. A student is
+    # in **one** course: two courses would leave him without an average
+    # and without tasks.
     if body.course_ids:
         if body.role.value != SchoolRoleEnum.STUDENT.value:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Only a student can be enrolled in a course.",
+            )
+        if len(body.course_ids) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A student belongs to one course.",
             )
         for course_id in body.course_ids:
             await create_student_enrollment(
