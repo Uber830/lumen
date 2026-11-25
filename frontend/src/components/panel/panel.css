@@ -71,6 +71,9 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--accent-soft);
   --sidebar-accent-foreground: var(--ink);
+  /* The module that is open wears the colour of the school, so the rail
+     keeps the identity of the school whichever module is open. */
+  --sidebar-active-foreground: var(--school-primary, var(--accent-solid));
   --sidebar-border: var(--line);
   --sidebar-ring: var(--school-primary, var(--accent-solid));
 
@@ -106,6 +109,13 @@
   --popover: var(--paper-2);
   --sidebar: var(--paper);
   --shadow-lift: 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  /* On a dark surface the colour of the school is lightened: the same
+     green, the one that can be read. */
+  --sidebar-active-foreground: color-mix(
+    in oklab,
+    var(--school-primary, var(--accent-solid)) 55%,
+    white
+  );
 }
 
 /*

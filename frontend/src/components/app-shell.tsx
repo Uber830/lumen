@@ -165,14 +165,14 @@ function NavGroups({
                         "flex w-full items-center gap-[11px] rounded-idx border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
                         ICON_ONLY_ITEM,
                         active
-                          ? "border-sidebar-border bg-sidebar-accent font-medium text-white"
+                          ? "border-sidebar-border bg-sidebar-accent font-medium text-sidebar-active-foreground"
                           : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <item.icon
                         className={cn(
                           "size-[17px] shrink-0 opacity-85",
-                          active && "text-primary opacity-100",
+                          active && "text-sidebar-active-foreground opacity-100",
                         )}
                         strokeWidth={1.9}
                         aria-hidden
