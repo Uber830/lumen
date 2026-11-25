@@ -33,12 +33,12 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Vista | Ruta | Qué hace |
 | --- | --- | --- |
 | Dashboard | `/admin` | KPIs del colegio, material por área, estado del colegio, actividad reciente y acciones rápidas |
-| Contenido | `/admin/contenido` | Material habilitado, **solo lectura**; 6 filas por página y filtro en el servidor |
+| Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
-| Estudiantes | `/admin/estudiantes` | Alta, matrícula, filtro por curso, promedio y estado |
+| Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos |
-| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, con el **material visible** calculado, e importación del plan de estudios |
-| Períodos | `/admin/periodos` | Ciclo lectivo, modalidad, cierre de periodo y periodo vigente |
+| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, e importación del plan de estudios |
+| Períodos | `/admin/periodos` | Ciclo lectivo, cierre de periodo y periodo vigente |
 | ICFES | `/admin/icfes-colegio` | Simulacros que la plataforma habilitó, activados por curso, con sus resultados |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
 | Administradores | `/admin/administradores` | El equipo del colegio, con rango Principal o Secundario |
