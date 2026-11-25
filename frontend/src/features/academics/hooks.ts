@@ -51,6 +51,24 @@ export const queryKeys = {
   members: (schoolId: string) => ["school_members", schoolId] as const,
 };
 
+/**
+ * The lists that show the academic structure.
+ *
+ * The panel reads the courses, the subjects and the assignments from
+ * the endpoints of the school (`/v1/school/courses`), and the forms
+ * read them from the academic ones. When the structure changes, both
+ * have to be asked again: with only one of them, the list keeps
+ * showing what was there before and the panel asks for a reload.
+ */
+function invalidateStructure(qc: ReturnType<typeof useQueryClient>, schoolId: string): void {
+  qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+  qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+  qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+  qc.invalidateQueries({ queryKey: ["school", "courses"] });
+  qc.invalidateQueries({ queryKey: ["school", "subjects"] });
+  qc.invalidateQueries({ queryKey: ["school", "assignments"] });
+}
+
 // ---------------------------------------------------------------------------
 // Academic periods
 // ---------------------------------------------------------------------------
@@ -123,7 +141,7 @@ export function useCreateCourse(
   return useMutation({
     mutationFn: (input) => api.post<Course>("/v1/academics/courses", input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -135,7 +153,7 @@ export function useUpdateCourse(
   return useMutation({
     mutationFn: ({ id, patch }) => api.patch<Course>(`/v1/academics/courses/${id}`, patch),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -145,8 +163,7 @@ export function useDeleteCourse(schoolId: string): UseMutationResult<void, Error
   return useMutation({
     mutationFn: (id) => api.delete<void>(`/v1/academics/courses/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
-      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -170,7 +187,7 @@ export function useCreateSubject(
   return useMutation({
     mutationFn: (input) => api.post<Subject>("/v1/academics/subjects", input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -182,7 +199,7 @@ export function useUpdateSubject(
   return useMutation({
     mutationFn: ({ id, patch }) => api.patch<Subject>(`/v1/academics/subjects/${id}`, patch),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -192,8 +209,7 @@ export function useDeleteSubject(schoolId: string): UseMutationResult<void, Erro
   return useMutation({
     mutationFn: (id) => api.delete<void>(`/v1/academics/subjects/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.subjects(schoolId) });
-      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -219,8 +235,7 @@ export function useCreateCourseSubject(
   return useMutation({
     mutationFn: (input) => api.post<CourseSubject>("/v1/academics/course-subjects", input),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
-      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }
@@ -230,8 +245,7 @@ export function useDeleteCourseSubject(schoolId: string): UseMutationResult<void
   return useMutation({
     mutationFn: (id) => api.delete<void>(`/v1/academics/course-subjects/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.courseSubjects(schoolId) });
-      qc.invalidateQueries({ queryKey: queryKeys.courses(schoolId) });
+      invalidateStructure(qc, schoolId);
     },
   });
 }

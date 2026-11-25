@@ -240,6 +240,11 @@ export function Select({
             tabIndex={-1}
             aria-activedescendant={`${listboxId}-option-${activeIndex}`}
             onKeyDown={onListKeyDown}
+            // The modal of the panel blocks the scroll of the page with
+            // a listener on the document: without this, the wheel never
+            // reaches the list and the options below cannot be reached
+            // with the mouse.
+            onWheel={(event) => event.stopPropagation()}
             style={{
               position: "fixed",
               left: placement.left,
