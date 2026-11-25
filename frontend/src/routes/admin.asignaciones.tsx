@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ClipboardList, GraduationCap, Link2, Pencil, Plus, X } from "lucide-react";
+import { ClipboardList, GraduationCap, Link2, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   Chip,
   EmptyState,
   PageHeader,
+  Pagination,
   SectionCard,
   TableShell,
   Toolbar,
@@ -26,12 +27,17 @@ import {
 import { MemberAvatar } from "@/components/member-avatar";
 import { Select } from "@/components/select-field";
 import {
+  AssignmentSubjectChips,
+  type AssignmentChipItem,
+} from "@/features/admin/assignment-subject-chips";
+import {
   useCourseSubjects,
   useCreateTeacherAssignment,
   useDeleteTeacherAssignment,
   useSchoolMembers,
   useUpdateTeacherAssignment,
 } from "@/features/academics/hooks";
+import { paginate } from "@/lib/pagination";
 import { useSchoolAssignments, type SchoolAssignment } from "@/lib/school/cycles";
 import { useSchoolCourses } from "@/lib/school/community";
 
@@ -54,12 +60,17 @@ export const Route = createFileRoute("/admin/asignaciones")({
   component: AsignacionesPage,
 });
 
+/** How many teachers are on a page. */
+const PAGE_SIZE = 10;
+
 function AsignacionesPage() {
   const { session } = useRouteContext({ from: "/admin/asignaciones" });
   const schoolId = session.primarySchoolId;
 
   const [teacherFilter, setTeacherFilter] = useState("all");
   const [courseFilter, setCourseFilter] = useState("all");
+  // The page of the list of teachers.
+  const [page, setPage] = useState(1);
   const assignments = useSchoolAssignments(
     teacherFilter === "all" ? undefined : teacherFilter,
     courseFilter === "all" ? undefined : courseFilter,
@@ -141,6 +152,11 @@ function AsignacionesPage() {
 
   const totalAssignments = (assignments.data ?? []).length;
 
+  // The rows are the teachers: the list is cut in pages, so the view
+  // keeps its place when the school grows.
+  const teacherPage = paginate(byTeacher, page, PAGE_SIZE);
+  const visibleGroups = teacherPage.items;
+
   function openCreate() {
     setEditing(null);
     setTeacherId("");
@@ -155,6 +171,20 @@ function AsignacionesPage() {
     setCourseSubjectId(assignment.course_subject_id);
     setJustAssigned(null);
     setFormOpen(true);
+  }
+
+  /** Removing an assignment asks for confirmation: the teacher stops
+      seeing the content of that subject. */
+  function askRemoveAssignment(assignment: SchoolAssignment) {
+    assignmentToDelete.ask({
+      id: assignment.id,
+      title: `la asignación de ${
+        assignment.teacher_name ?? "el docente"
+      } a ${assignment.subject_name}`,
+      description:
+        "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
+      confirmLabel: "Quitar asignación",
+    });
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -394,7 +424,7 @@ function AsignacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {byTeacher.map((group) => (
+                {visibleGroups.map((group) => (
                   <tr key={group.teacherId} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="flex min-w-0 items-center gap-2.5">
@@ -408,50 +438,25 @@ function AsignacionesPage() {
                       </div>
                     </td>
                     <td className={tableCellClass}>
-                      {/* What the teacher teaches: one chip per
-                          assignment, so the person is not repeated. */}
-                      <ul className="flex flex-wrap gap-1.5">
-                        {group.assignments.map((assignment) => (
-                          <li
-                            key={assignment.id}
-                            className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2 py-1 text-[12.2px]"
-                          >
-                            <span className="font-medium text-foreground">
-                              {assignment.course_name}
-                            </span>
-                            <span className="text-muted-foreground">·</span>
-                            <span className="text-muted-foreground">{assignment.subject_name}</span>
-                            <button
-                              type="button"
-                              onClick={() => openEdit(assignment)}
-                              aria-label={`Editar la asignación de ${assignment.subject_name} en ${assignment.course_name}`}
-                              title="Editar la asignación"
-                              className="grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                              <Pencil className="size-3" strokeWidth={1.9} aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                assignmentToDelete.ask({
-                                  id: assignment.id,
-                                  title: `la asignación de ${
-                                    assignment.teacher_name ?? "el docente"
-                                  } a ${assignment.subject_name}`,
-                                  description:
-                                    "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
-                                  confirmLabel: "Quitar asignación",
-                                })
-                              }
-                              aria-label={`Quitar la asignación de ${assignment.subject_name} en ${assignment.course_name}`}
-                              title="Quitar la asignación"
-                              className="grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                            >
-                              <X className="size-3" strokeWidth={1.9} aria-hidden />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                      {/* What the teacher teaches: one chip and the
+                          count of the rest, so the person is not
+                          repeated and the row does not grow. */}
+                      <AssignmentSubjectChips
+                        items={group.assignments.map((assignment) => ({
+                          id: assignment.id,
+                          courseName: assignment.course_name,
+                          subjectName: assignment.subject_name,
+                        }))}
+                        who={group.name}
+                        onEdit={(item) => {
+                          const assignment = group.assignments.find((one) => one.id === item.id);
+                          if (assignment) openEdit(assignment);
+                        }}
+                        onRemove={(item) => {
+                          const assignment = group.assignments.find((one) => one.id === item.id);
+                          if (assignment) askRemoveAssignment(assignment);
+                        }}
+                      />
                     </td>
                     <td
                       className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
@@ -484,6 +489,15 @@ function AsignacionesPage() {
           <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
             {deleteAssignment.error.message}
           </p>
+        )}
+        {(assignments.data?.length ?? 0) > 0 && (
+          <Pagination
+            page={teacherPage.page}
+            pageCount={teacherPage.pageCount}
+            total={teacherPage.total}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         )}
       </SectionCard>
 
