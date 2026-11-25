@@ -89,6 +89,9 @@ class ReplyRequest(BaseModel):
     """The answer of the platform team."""
 
     body: str = Field(min_length=1, max_length=4000)
+    # The files the answer carries: the support team answers with a
+    # document as well as with words.
+    attachment_ids: list[str] = Field(default_factory=list)
 
     @field_validator("body")
     @classmethod
@@ -97,6 +100,15 @@ class ReplyRequest(BaseModel):
         if not value:
             raise ValueError("must not be blank")
         return value
+
+
+class PlatformAttachmentOut(BaseModel):
+    """The file the support team attached to its answer."""
+
+    id: str
+    name: str
+    size: int
+    url: str
 
 
 def case_options() -> CaseOptions:
@@ -116,6 +128,7 @@ __all__ = [
     "CaseOptions",
     "CasePage",
     "CaseSummary",
+    "PlatformAttachmentOut",
     "ReplyRequest",
     "case_options",
 ]

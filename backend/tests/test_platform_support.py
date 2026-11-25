@@ -303,3 +303,40 @@ async def test_the_endpoints_are_closed_to_everybody_else(client, make_user) -> 
     response = client.get("/v1/platform/cases")
 
     assert response.status_code == 401
+
+
+async def test_the_support_team_attaches_a_file_to_its_answer(
+    client, platform_admin, engine, a_case, case_school, tmp_path, monkeypatch
+) -> None:
+    """The answer of the platform may carry files, like the school's."""
+    from app.config import get_settings
+    from app.core import storage
+
+    monkeypatch.setenv("UPLOADS_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    try:
+        response = client.post(
+            f"/v1/platform/cases/{a_case}/attachments",
+            headers=platform_admin,
+            files={"file": ("guia.txt", b"la guia del soporte", "text/plain")},
+        )
+
+        assert response.status_code == 201, response.text
+        attached = response.json()
+        assert attached["name"] == "guia.txt"
+        assert attached["id"].startswith(f"support-attachments/{case_school}/")
+
+        answer = client.post(
+            f"/v1/platform/cases/{a_case}/messages",
+            headers=platform_admin,
+            json={"body": "Te dejamos la guía.", "attachment_ids": [attached["id"]]},
+        )
+
+        assert answer.status_code == 200, answer.text
+        messages = answer.json()["messages"]
+        assert messages[-1]["attachment_ids"] == [attached["id"]]
+
+        # The file is in the store of the school: the school reads it too.
+        assert storage.read_file(attached["id"]) == b"la guia del soporte"
+    finally:
+        get_settings.cache_clear()

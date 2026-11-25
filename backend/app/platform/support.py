@@ -218,17 +218,22 @@ async def answer_case(
     case: SupportCase,
     author_id: uuid.UUID | None,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> SupportMessage:
     """Write the answer of the platform team in a case.
 
     A closed case reopens: the school wrote again, so it is waiting
     for an answer.
+
+    The answer may carry files: the support team answers with a
+    document (a guide, a capture of the fix) as well as with words.
     """
     message = SupportMessage(
         case_id=case.id,
         author_id=author_id,
         author_role="plataforma",
         body=body.strip(),
+        attachment_ids=list(attachment_ids or []),
     )
     session.add(message)
 
