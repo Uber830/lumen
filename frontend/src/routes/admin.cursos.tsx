@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, Link2, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { BookOpen, ChevronRight, Plus } from "lucide-react";
+import { useState } from "react";
 
 import {
   Button,
   PanelTable,
   Chip,
-  CollapsibleCard,
   EmptyState,
   PageHeader,
   SectionCard,
@@ -14,15 +13,7 @@ import {
   tableCellClass,
   tableHeadClass,
 } from "@/components/ui-kit";
-import { Select } from "@/components/select-field";
-import {
-  useCourseSubjects,
-  useCreateCourse,
-  useCreateCourseSubject,
-  useCreateSubject,
-  useCourses,
-  useSubjects,
-} from "@/features/academics/hooks";
+import { AcademicStructureWizard } from "@/features/admin/academic-wizard";
 import { useSchoolCourses, useSchoolSubjects } from "@/lib/school/community";
 import { cn } from "@/lib/utils";
 
@@ -54,96 +45,12 @@ function CursosPage() {
   const courses = useSchoolCourses();
   const subjects = useSchoolSubjects();
 
-  // The write side keeps using the academic hooks: creating a course, a
-  // subject or an offering is the same operation it always was.
-  const academicCourses = useCourses(schoolId);
-  const academicSubjects = useSubjects(schoolId);
-  const courseSubjects = useCourseSubjects(schoolId);
-  const createCourse = useCreateCourse(schoolId ?? "");
-  const createSubject = useCreateSubject(schoolId ?? "");
-  const createCourseSubject = useCreateCourseSubject(schoolId ?? "");
-
-  const [name, setName] = useState("");
-  const [gradeLabel, setGradeLabel] = useState("");
-  const [subjectName, setSubjectName] = useState("");
-  const [subjectArea, setSubjectArea] = useState("");
-  const [courseId, setCourseId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-
-  // The three creation boxes fold away. They start closed, and the form
-  // keeps what was typed in it when they are opened again.
-  const [openBoxes, setOpenBoxes] = useState({ course: false, subject: false, offer: false });
-  function toggleBox(box: keyof typeof openBoxes) {
-    setOpenBoxes((current) => ({ ...current, [box]: !current[box] }));
-  }
-
-  const courseOptions = useMemo(
-    () =>
-      (academicCourses.data ?? []).map((course) => ({
-        value: course.id,
-        label: course.name,
-        hint: course.grade_label,
-      })),
-    [academicCourses.data],
-  );
-
-  const subjectOptions = useMemo(
-    () =>
-      (academicSubjects.data ?? []).map((subject) => ({
-        value: subject.id,
-        label: subject.name,
-        hint: subject.area ?? undefined,
-      })),
-    [academicSubjects.data],
-  );
-
-  // The pairs already offered, so the form does not offer what exists.
-  const offeredPairs = useMemo(
-    () => new Set((courseSubjects.data ?? []).map((cs) => `${cs.course_id}:${cs.subject_id}`)),
-    [courseSubjects.data],
-  );
-
-  // A subject already offered in the selected course cannot be offered again.
-  const availableSubjects = useMemo(
-    () =>
-      subjectOptions.map((option) => ({
-        ...option,
-        disabled: courseId ? offeredPairs.has(`${courseId}:${option.value}`) : false,
-      })),
-    [subjectOptions, courseId, offeredPairs],
-  );
+  // The creation of the structure happens in one big form: course,
+  // subject and offering, one step after the other.
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   if (!schoolId) {
     return <NoSchoolFallback onSignOut={() => navigate({ to: "/login" })} />;
-  }
-
-  async function onCreateCourse(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!name.trim() || !gradeLabel.trim()) return;
-    await createCourse.mutateAsync({
-      name: name.trim(),
-      grade_label: gradeLabel.trim(),
-    });
-    setName("");
-    setGradeLabel("");
-  }
-
-  async function onCreateSubject(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!subjectName.trim()) return;
-    await createSubject.mutateAsync({
-      name: subjectName.trim(),
-      area: subjectArea.trim() || null,
-    });
-    setSubjectName("");
-    setSubjectArea("");
-  }
-
-  async function onOfferSubject(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!courseId || !subjectId) return;
-    await createCourseSubject.mutateAsync({ course_id: courseId, subject_id: subjectId });
-    setSubjectId("");
   }
 
   const activeCourses = (courses.data ?? []).filter((course) => course.status === "activo");
@@ -155,7 +62,7 @@ function CursosPage() {
         title="Cursos y materias"
         subtitle="Estructura académica del colegio: cursos, materias y quién las imparte."
         actions={
-          <Button icon={Plus} onClick={() => toggleBox("course")}>
+          <Button icon={Plus} onClick={() => setWizardOpen(true)}>
             Nuevo curso
           </Button>
         }
@@ -188,7 +95,7 @@ function CursosPage() {
               title="Sin cursos"
               description="Crea el primer curso del colegio para empezar a estructurar el año."
               action={
-                <Button icon={Plus} onClick={() => toggleBox("course")}>
+                <Button icon={Plus} onClick={() => setWizardOpen(true)}>
                   Nuevo curso
                 </Button>
               }
@@ -324,162 +231,6 @@ function CursosPage() {
         </SectionCard>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <CollapsibleCard
-          title="Nuevo curso"
-          open={openBoxes.course}
-          onToggle={() => toggleBox("course")}
-        >
-          <form className="space-y-3" onSubmit={onCreateCourse}>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Nombre
-              </span>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                placeholder="4to A"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Etiqueta de grado
-              </span>
-              <input
-                type="text"
-                value={gradeLabel}
-                onChange={(e) => setGradeLabel(e.target.value)}
-                required
-                placeholder="Cuarto"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={createCourse.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Plus className="size-4" />
-              {createCourse.isPending ? "Creando..." : "Crear curso"}
-            </button>
-            {createCourse.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {createCourse.error.message}
-              </p>
-            )}
-          </form>
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          title="Nueva materia"
-          open={openBoxes.subject}
-          onToggle={() => toggleBox("subject")}
-        >
-          <form className="space-y-3" onSubmit={onCreateSubject}>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Nombre de la materia
-              </span>
-              <input
-                type="text"
-                value={subjectName}
-                onChange={(e) => setSubjectName(e.target.value)}
-                required
-                placeholder="Matemáticas"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Área
-              </span>
-              <input
-                type="text"
-                list="areas-sugeridas"
-                value={subjectArea}
-                onChange={(e) => setSubjectArea(e.target.value)}
-                placeholder="Matemáticas"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <datalist id="areas-sugeridas">
-                {SUGGESTED_AREAS.map((area) => (
-                  <option key={area} value={area} />
-                ))}
-              </datalist>
-            </label>
-            <button
-              type="submit"
-              disabled={createSubject.isPending}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Plus className="size-4" />
-              {createSubject.isPending ? "Creando..." : "Crear materia"}
-            </button>
-            {createSubject.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {createSubject.error.message}
-              </p>
-            )}
-          </form>
-        </CollapsibleCard>
-
-        <CollapsibleCard
-          title="Ofrecer materia en un curso"
-          description="Las materias ofrecidas en un curso son las que después se asignan a docentes."
-          open={openBoxes.offer}
-          onToggle={() => toggleBox("offer")}
-        >
-          <form className="space-y-3" onSubmit={onOfferSubject}>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Curso
-              </span>
-              <div className="mt-1.5">
-                <Select
-                  value={courseId}
-                  onChange={setCourseId}
-                  options={courseOptions}
-                  placeholder={courseOptions.length ? "Elige un curso" : "Primero crea un curso"}
-                  emptyLabel="Todavía no hay cursos"
-                />
-              </div>
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Materia
-              </span>
-              <div className="mt-1.5">
-                <Select
-                  value={subjectId}
-                  onChange={setSubjectId}
-                  options={availableSubjects}
-                  placeholder={
-                    availableSubjects.length ? "Elige una materia" : "Primero crea una materia"
-                  }
-                  emptyLabel="Todavía no hay materias"
-                />
-              </div>
-            </label>
-            <button
-              type="submit"
-              disabled={createCourseSubject.isPending || !courseId || !subjectId}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Link2 className="size-4" />
-              {createCourseSubject.isPending ? "Ofreciendo..." : "Ofrecer materia"}
-            </button>
-            {createCourseSubject.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {createCourseSubject.error.message}
-              </p>
-            )}
-          </form>
-        </CollapsibleCard>
-      </div>
-
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
@@ -488,19 +239,17 @@ function CursosPage() {
         </Chip>
         <span>Los conteos de materias y docentes se calculan en el servidor.</span>
       </p>
+
+      {/* The whole structure is built in one form: course, subject and
+          offering, one step after the other. */}
+      <AcademicStructureWizard
+        schoolId={schoolId}
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+      />
     </>
   );
 }
-
-const SUGGESTED_AREAS = [
-  "Matemáticas",
-  "Lengua",
-  "Ciencias",
-  "Sociales",
-  "Inglés",
-  "Arte",
-  "Educación Física",
-];
 
 function NoSchoolFallback({ onSignOut }: { onSignOut: () => void }) {
   return (
