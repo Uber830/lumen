@@ -126,13 +126,29 @@ describe("MemberManageDialog", () => {
     });
 
     expect(container.textContent).toContain("Correo");
-    expect(container.textContent).toContain("Curso · Materia");
-    expect(container.textContent).toContain("7° A");
     expect(container.textContent).toContain("Ingreso");
     expect(container.textContent).toContain("Acceso");
     expect(container.textContent).toContain("Activado");
     expect(container.textContent).toContain("Estado");
     expect(container.textContent).toContain("Acceso al material");
+
+    await cleanup();
+  });
+
+  it("does not show the courses of the person", async () => {
+    // The courses and the subjects of a teacher are changed in the
+    // assign view: in this drawer there is nothing to change.
+    const { container, cleanup } = await render({
+      member: member({
+        access: "activado",
+        courses: ["7° A"],
+        subjects: ["Matemáticas"],
+      }),
+    });
+
+    expect(container.textContent).not.toContain("Curso · Materia");
+    expect(container.textContent).not.toContain("7° A");
+    expect(container.textContent).not.toContain("Matemáticas");
 
     await cleanup();
   });

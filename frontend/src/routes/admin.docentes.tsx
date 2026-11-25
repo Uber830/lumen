@@ -32,7 +32,11 @@ import { Select } from "@/components/select-field";
 import { useCourseSubjects } from "@/features/academics/hooks";
 import type { SchoolMember } from "@/features/academics/types";
 import { activationLink, useInviteUser, useUpdateMembership } from "@/lib/users/invitations";
-import { useSchoolCourses, useSchoolTeachers, type SchoolMemberRow } from "@/lib/school/community";
+import {
+  useSchoolCourseOptions,
+  useSchoolTeachers,
+  type SchoolMemberRow,
+} from "@/lib/school/community";
 import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/docentes")({
@@ -65,7 +69,7 @@ function DocentesPage() {
   const [page, setPage] = useState(1);
 
   const teachers = useSchoolTeachers({ q: query, status, course_id: courseId, page });
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   const courseSubjects = useCourseSubjects(schoolId);
 
   const invite = useInviteUser();
@@ -491,9 +495,6 @@ function DocentesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           La búsqueda y los filtros se ejecutan en el servidor, sobre los datos del colegio.
         </span>
@@ -503,7 +504,6 @@ function DocentesPage() {
         <MemberManageDialog
           member={asMember(selectedTeacher)}
           roleLabel="docente"
-          courseSubjects={courseSubjectsOf(selectedTeacher)}
           onClose={() => setSelectedTeacher(null)}
           onEdit={() => {
             setEditingTeacher(selectedTeacher);
