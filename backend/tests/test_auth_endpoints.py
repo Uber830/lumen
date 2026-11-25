@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.tokens import hash_refresh_token
 from app.db.models import (
     PasswordResetToken,
+    User,
 )
 from tests.support import sign_in
 
@@ -272,9 +273,16 @@ async def test_the_reset_token_lets_the_user_set_a_new_password(
     assert len(issued) == 1
     plaintext = issued[0]
 
-    # The database holds the hash, not the token.
+    # The database holds the hash, not the token. The count is the one
+    # of this user: the table keeps the tokens of the other tests, and
+    # the suite does not empty it between them.
     async with AsyncSession(bind=engine, expire_on_commit=False) as session:
-        rows = await session.execute(select(PasswordResetToken))
+        rows = await session.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id
+                == select(User.id).where(User.email == "forgot@example.com").scalar_subquery()
+            )
+        )
         stored = rows.scalars().all()
         assert len(stored) == 1
         assert stored[0].token_hash != plaintext
