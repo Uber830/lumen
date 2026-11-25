@@ -100,10 +100,13 @@ paso en blanco se salta: el que solo necesita el curso avanza y cierra.
 La lista tiene **una fila por docente**, no una por asignación: la persona es
 lo que se repite, y lo que importa es lo que cada una enseña. La columna de
 materias muestra **la primera** y el contador **+N** (el mismo patrón que usa
-el panel en la ficha de un docente): el contador abre un modal con todas las
-materias del docente, cada una con el lápiz para editarla y la ✕ para
-quitarla. La barra de arriba dice los dos números: docentes y
-asignaciones.
+el panel en la ficha de un docente): el contador abre un modal **solo con la
+lista**, sin acciones.
+
+Las **acciones van juntas en la columna de acción**: *Asignar otra*, *Editar*
+y *Quitar*. Editar y Quitar abren el modal de las materias del docente con el
+lápiz y la ✕ de cada una, para que el administrador elija cuál. La barra de
+arriba dice los dos números: docentes y asignaciones.
 
 ### La selección múltiple
 
@@ -251,6 +254,21 @@ una corrida real.
 - El estudiante no tiene ruta a este canal.
 - Un mensaje puede llevar **adjuntos** (PDF, imagen o documento, hasta 10 MB):
   el archivo va al almacén del colegio y el hilo guarda su ruta.
+
+### El soporte se escribe igual de los dos lados
+
+El colegio y la plataforma escriben en el mismo hilo, así que usan **el mismo
+formulario** (`frontend/src/features/support/case-message-form.tsx`): mismos
+campos, mismo bloque de adjuntos, mismos botones y el mismo bloque «Para»,
+que dice a quién va el mensaje. La respuesta del colegio sale en un modal,
+como la de la plataforma, y no dentro del cajón del caso.
+
+### Los chips son cuadrados
+
+El panel es rectangular: los chips, las etiquetas y los contadores también
+(esquinas de 4 px). Lo que es un círculo por naturaleza —el interruptor, el
+radio, la barra de progreso, el punto de estado y el avatar— se queda
+circular.
 
 ### La campana avisa de los casos
 
