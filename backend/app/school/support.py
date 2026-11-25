@@ -21,6 +21,10 @@ from sqlalchemy.sql import func as sql_func
 
 from app.core.errors import NotFoundError, ValidationError
 from app.db.models import Profile, SupportCase, SupportMessage, User
+from app.notifications.service import (
+    notify_support_case_answered,
+    notify_support_case_opened,
+)
 
 # The categories a school can pick when it opens a request.
 CATEGORIES = ("problema_tecnico", "solicitud_material", "duda_acceso", "otro")
@@ -246,9 +250,30 @@ async def create_case(
         )
     )
 
+    # The desk has to know that a case arrived: it is the bell of the
+    # platform team that says it.
+    await notify_support_case_opened(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, user_id=user_id),
+    )
+
     await session.commit()
 
     return await get_case(session, school_id, case.id)
+
+
+async def _actor_name(session: AsyncSession, *, user_id: uuid.UUID) -> str:
+    """The name of the person who wrote, for the notification."""
+    result = await session.execute(
+        select(Profile.full_name, User.email)
+        .join(Profile, Profile.id == User.id, isouter=True)
+        .where(User.id == user_id)
+    )
+    row = result.first()
+    if row is None:
+        return "El colegio"
+    return row[0] or row[1] or "El colegio"
 
 
 async def _next_code(session: AsyncSession) -> str:
@@ -302,6 +327,16 @@ async def add_message(
             attachment_ids=list(attachment_ids or []),
         )
     )
+
+    # The school wrote in the thread: the desk has to know it.
+    case = await session.get(SupportCase, case_id)
+    if case is not None:
+        await notify_support_case_answered(
+            session,
+            case=case,
+            actor_name=await _actor_name(session, user_id=user_id),
+        )
+
     await session.commit()
 
     return await get_case(session, school_id, case_id)

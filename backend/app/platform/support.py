@@ -28,6 +28,7 @@ from sqlalchemy import ColumnElement, Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AuditLog, Profile, School, SupportCase, SupportMessage, User
+from app.notifications.service import notify_support_case_replied
 
 # The number the first case gets.
 FIRST_CASE_NUMBER = 1001
@@ -193,6 +194,21 @@ async def actor_names(
     return {user_id: full_name or email or "Colegio" for user_id, full_name, email in result.all()}
 
 
+async def _actor_name(session: AsyncSession, user_id: uuid.UUID | None) -> str:
+    """The name of the author, for the notification of the school."""
+    if user_id is None:
+        return "El equipo de Lumen"
+    result = await session.execute(
+        select(Profile.full_name, User.email)
+        .join(Profile, Profile.id == User.id, isouter=True)
+        .where(User.id == user_id)
+    )
+    row = result.first()
+    if row is None:
+        return "El equipo de Lumen"
+    return row[0] or row[1] or "El equipo de Lumen"
+
+
 async def get_case(session: AsyncSession, case_id: uuid.UUID) -> CaseThread | None:
     """One case with its conversation."""
     result = await session.execute(
@@ -236,6 +252,14 @@ async def answer_case(
         attachment_ids=list(attachment_ids or []),
     )
     session.add(message)
+
+    # The school opened the case and waits for the answer: the bell of
+    # the administrators of the school says that it is there.
+    await notify_support_case_replied(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, author_id),
+    )
 
     case.status = "en_espera"
     case.resolved_at = None

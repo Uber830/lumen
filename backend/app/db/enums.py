@@ -227,6 +227,8 @@ class NotificationKind(StrEnum):
     TASK_GRADED = "task_graded"
     CONTENT_PUBLISHED = "content_published"
     CHAT_MESSAGE = "chat_message"
+    SUPPORT_CASE_OPENED = "support_case_opened"
+    SUPPORT_CASE_REPLIED = "support_case_replied"
 
 
 __all__ = [
