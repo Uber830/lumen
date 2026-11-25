@@ -1,6 +1,6 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { KeyRound, Lock, Plus, Search, Upload, UserRoundX } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { KeyRound, Lock, Plus, Search, UserRoundX } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -17,21 +17,21 @@ import {
 } from "@/components/ui-kit";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
-import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import { CourseSubjectChips, type CourseSubjectItem } from "@/features/admin/course-subject-chips";
 import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import { Select } from "@/components/select-field";
 import { useCourseSubjects } from "@/features/academics/hooks";
 import type { SchoolMember } from "@/features/academics/types";
-import {
-  activationLink,
-  parseCsvInvitations,
-  useBulkInviteUsers,
-  useInviteUser,
-  useUpdateMembership,
-  type InviteUserResult,
-} from "@/lib/users/invitations";
+import { activationLink, useInviteUser, useUpdateMembership } from "@/lib/users/invitations";
 import { useSchoolCourses, useSchoolTeachers, type SchoolMemberRow } from "@/lib/school/community";
 import { formatShortDate } from "@/lib/school/material";
 
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/admin/docentes")({
       { title: "Docentes — Lumen" },
       {
         name: "description",
-        content: "Alta, búsqueda y gestión de docentes del colegio, con importación CSV.",
+        content: "Alta, búsqueda y gestión de docentes del colegio.",
       },
       { property: "og:title", content: "Docentes — Lumen" },
       {
@@ -69,7 +69,6 @@ function DocentesPage() {
   const courseSubjects = useCourseSubjects(schoolId);
 
   const invite = useInviteUser();
-  const bulkInvite = useBulkInviteUsers();
   const updateMembership = useUpdateMembership();
 
   const [open, setOpen] = useState(false);
@@ -77,16 +76,9 @@ function DocentesPage() {
   const [fullName, setFullName] = useState("");
   // The course and the subject the new teacher is assigned to.
   const [newCourseSubjectId, setNewCourseSubjectId] = useState("");
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [csvText, setCsvText] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Activation links for users just created, shown so the admin can
   // copy and share them (there is no email provider yet).
   const [activations, setActivations] = useState<ActivationLink[]>([]);
-  const [bulkSummary, setBulkSummary] = useState<{
-    created: number;
-    failures: BulkImportFailure[];
-  } | null>(null);
   // The teacher whose management modal is open, and the one being edited.
   const [selectedTeacher, setSelectedTeacher] = useState<SchoolMemberRow | null>(null);
   const [editingTeacher, setEditingTeacher] = useState<SchoolMemberRow | null>(null);
@@ -191,63 +183,17 @@ function DocentesPage() {
     setPicked([]);
   }
 
-  async function onBulkFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    setCsvText(text);
-  }
-
-  async function onBulkSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const rows = parseCsvInvitations(csvText);
-    if (!rows.length) return;
-    const result = await bulkInvite.mutateAsync(rows);
-    setBulkOpen(false);
-    setCsvText("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    // Collect activation links for the rows that were created, so the
-    // admin can share them. The failures are reported below the form.
-    const newLinks = result.created
-      .filter((c): c is InviteUserResult & { activation_token: string } => !!c.activation_token)
-      .map((c) => ({ email: c.email, link: activationLink(c.activation_token) }));
-    if (newLinks.length > 0) setActivations((prev) => [...newLinks, ...prev]);
-
-    setBulkSummary({ created: result.created.length, failures: result.failures });
-  }
-
-  const previewRows = csvText ? parseCsvInvitations(csvText) : [];
-
   return (
     <>
       <PageHeader
         title="Docentes"
         subtitle={`${teachers.isLoading ? "—" : total} docentes registrados en el colegio. Asigna cursos y revisa el acceso a la plataforma.`}
         actions={
-          <>
-            <Button variant="outline" icon={Upload} onClick={() => fileInputRef.current?.click()}>
-              Carga masiva CSV
-            </Button>
-            <Button icon={Plus} onClick={() => setOpen(true)}>
-              Nuevo docente
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                void onBulkFile(e);
-                setBulkOpen(true);
-              }}
-            />
-          </>
+          <Button icon={Plus} onClick={() => setOpen(true)}>
+            Nuevo docente
+          </Button>
         }
       />
-
-      {bulkSummary && (
-        <BulkImportSummary created={bulkSummary.created} failures={bulkSummary.failures} />
-      )}
 
       <ActivationLinksCard
         links={activations}
@@ -255,61 +201,18 @@ function DocentesPage() {
         onHide={() => setActivations([])}
       />
 
-      {bulkOpen && (
-        <SectionCard title="Carga masiva CSV" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onBulkSubmit}>
-            <p className="text-xs text-muted-foreground">
-              Encabezados requeridos: <code>email, full_name, role</code> (role: school_admin |
-              teacher | student). Una fila por docente.
-            </p>
-            <textarea
-              rows={6}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"email,full_name,role\nmaria@example.com,Maria Lopez,teacher\n"}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <p className="text-xs text-muted-foreground">
-              {previewRows.length === 0
-                ? "Sin filas pendientes"
-                : `${previewRows.length} fila(s) detectadas`}
-            </p>
-            {bulkInvite.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {bulkInvite.error.message}
-              </p>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={bulkInvite.isPending || previewRows.length === 0}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {bulkInvite.isPending ? "Procesando..." : `Cargar ${previewRows.length} docente(s)`}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkOpen(false);
-                  setCsvText("");
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </SectionCard>
-      )}
+      {/* The form lives in a modal: the list of the teachers does not
+          move when the admin opens it. */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nuevo docente</DialogTitle>
+            <DialogDescription>
+              Entra con el acceso pendiente hasta que le asignes un curso.
+            </DialogDescription>
+          </DialogHeader>
 
-      {open && (
-        <SectionCard
-          title="Nuevo docente"
-          description="Entra con el acceso pendiente hasta que le asignes un curso."
-          bodyClassName="p-0"
-        >
-          <form className="space-y-3 p-4" onSubmit={onCreate}>
+          <form className="space-y-3" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre completo
@@ -320,7 +223,7 @@ function DocentesPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Lucia Ferreyra"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
             <label className="block">
@@ -333,7 +236,7 @@ function DocentesPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="docente@colegio.edu"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
             <label className="block">
@@ -356,30 +259,22 @@ function DocentesPage() {
                 Sin asignación el docente entra con el acceso pendiente.
               </p>
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={invite.isPending}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {invite.isPending ? "Creando..." : "Crear docente"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
             {invite.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {invite.error.message}
               </p>
             )}
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={invite.isPending}>
+                {invite.isPending ? "Creando..." : "Crear docente"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         <Toolbar>
