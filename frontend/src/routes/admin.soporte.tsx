@@ -22,19 +22,10 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/dialog";
+import { Dialog } from "@/components/dialog";
 import { Select } from "@/components/select-field";
-import {
-  SupportAttachmentField,
-  type PickedAttachment,
-} from "@/features/admin/support-attachments";
+import { type PickedAttachment } from "@/features/admin/support-attachments";
+import { CaseMessageForm } from "@/features/support/case-message-form";
 import {
   SUPPORT_CATEGORIES,
   useAddSupportMessage,
@@ -109,6 +100,7 @@ function SoportePage() {
   const [body, setBody] = useState("");
   const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
+  const [replyOpen, setReplyOpen] = useState(false);
   const [reply, setReply] = useState("");
   const [replyAttachments, setReplyAttachments] = useState<PickedAttachment[]>([]);
 
@@ -124,8 +116,7 @@ function SoportePage() {
     return item.title.toLowerCase().includes(needle) || item.code.toLowerCase().includes(needle);
   });
 
-  async function onOpenCase(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onOpenCase() {
     if (!title.trim() || !body.trim()) {
       setFormError("Escribe el asunto y el mensaje de la solicitud.");
       return;
@@ -148,8 +139,7 @@ function SoportePage() {
     }
   }
 
-  async function onReply(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function onReply() {
     if (!selected || !reply.trim()) return;
     try {
       await addMessage.mutateAsync({
@@ -204,86 +194,79 @@ function SoportePage() {
           if (!open) setFormError(null);
         }}
       >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="text-[16px]">Nueva solicitud</DialogTitle>
-            <DialogDescription>
-              Cuéntale al equipo de Lumen qué pasó. Puedes adjuntar una captura o un documento.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form className="space-y-3" onSubmit={onOpenCase}>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Asunto
-              </span>
-              <input
-                type="text"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-                placeholder="El material de 7° no aparece en el curso"
-                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
-              />
-            </label>
-
-            <label className="block max-w-[320px]">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Categoría
-              </span>
-              <div className="mt-1.5">
-                <Select
-                  value={category}
-                  onChange={setCategory}
-                  options={SUPPORT_CATEGORIES.map((option) => ({
-                    value: option.id,
-                    label: option.label,
-                  }))}
-                  placeholder="Elige la categoría"
+        <CaseMessageForm
+          title="Nueva solicitud"
+          description="Cuéntale al equipo de Lumen qué pasó. Puedes adjuntar una captura o un documento."
+          recipients={["Equipo de Lumen"]}
+          fields={
+            <>
+              <label className="block">
+                <span className="text-xs font-medium">Asunto</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                  placeholder="El material de 7° no aparece en el curso"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
                 />
-              </div>
-            </label>
+              </label>
 
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Mensaje
-              </span>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                required
-                rows={4}
-                placeholder="Cuéntale qué pasó, con qué curso y qué material."
-                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
-              />
-              <span className="mt-1.5 block text-xs text-muted-foreground">
-                Queda registrado en el historial del caso.
-              </span>
-            </label>
+              <label className="block max-w-[320px]">
+                <span className="text-xs font-medium">Categoría</span>
+                <div className="mt-1.5">
+                  <Select
+                    value={category}
+                    onChange={setCategory}
+                    options={SUPPORT_CATEGORIES.map((option) => ({
+                      value: option.id,
+                      label: option.label,
+                    }))}
+                    placeholder="Elige la categoría"
+                  />
+                </div>
+              </label>
+            </>
+          }
+          message={body}
+          onMessageChange={setBody}
+          messagePlaceholder="Cuéntale qué pasó, con qué curso y qué material."
+          messageHint="Queda registrado en el historial del caso."
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
+          problem={formError ?? openCase.error?.message ?? null}
+          submitLabel="Enviar solicitud"
+          pending={openCase.isPending}
+          onSubmit={() => void onOpenCase()}
+          onCancel={() => setFormOpen(false)}
+          cancelLabel="Cancelar"
+        />
+      </Dialog>
 
-            <SupportAttachmentField attachments={attachments} onChange={setAttachments} />
-
-            {formError && (
-              <p role="alert" className="text-[13px] text-destructive">
-                {formError}
-              </p>
-            )}
-            {openCase.error && (
-              <p role="alert" className="text-[13px] text-destructive">
-                {openCase.error.message}
-              </p>
-            )}
-
-            <DialogFooter>
-              <Button variant="ghost" type="button" onClick={() => setFormOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" icon={Send} disabled={openCase.isPending}>
-                {openCase.isPending ? "Enviando..." : "Enviar solicitud"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
+      {/* The answer of the school: the same form the platform writes
+          with, so both sides of the thread look the same. */}
+      <Dialog open={replyOpen} onOpenChange={setReplyOpen}>
+        <CaseMessageForm
+          title="Agregar información"
+          description={
+            selected
+              ? `${selected.code} · ${selected.title}`
+              : "Cuéntale al equipo de Lumen qué más necesita saber."
+          }
+          recipients={["Equipo de Lumen"]}
+          message={reply}
+          onMessageChange={setReply}
+          messagePlaceholder="Escribe aquí lo que el equipo de Lumen necesita saber."
+          messageHint="Queda registrado en el historial del caso."
+          attachments={replyAttachments}
+          onAttachmentsChange={setReplyAttachments}
+          problem={addMessage.error?.message ?? null}
+          submitLabel="Enviar"
+          pending={addMessage.isPending}
+          onSubmit={() => void onReply()}
+          onCancel={() => setReplyOpen(false)}
+          cancelLabel="Cancelar"
+        />
       </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
@@ -495,43 +478,23 @@ function SoportePage() {
 
           {selected && (
             <div className="border-t border-border px-[18px] py-4">
-              <form className="space-y-2" onSubmit={onReply}>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Agregar información
-                  </span>
-                  <textarea
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    rows={3}
-                    placeholder="Escribe aquí lo que el equipo de Lumen necesita saber."
-                    className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                </label>
-                {addMessage.error && (
-                  <p role="alert" className="text-[13px] text-destructive">
-                    {addMessage.error.message}
-                  </p>
-                )}
-                <SupportAttachmentField
-                  attachments={replyAttachments}
-                  onChange={setReplyAttachments}
-                />
-                <Button
-                  type="submit"
-                  icon={Send}
-                  disabled={addMessage.isPending || !reply.trim()}
-                  aria-disabled={!canWrite}
-                  aria-describedby={canWrite ? undefined : "soporte-write-reason"}
-                  title={
-                    canWrite
-                      ? "Agregar información al hilo"
-                      : "Esta acción la hace el administrador principal del colegio."
-                  }
-                >
-                  {addMessage.isPending ? "Enviando..." : "Agregar información"}
-                </Button>
-              </form>
+              <Button
+                type="button"
+                icon={Send}
+                onClick={() => {
+                  if (!canWrite) return;
+                  setReplyOpen(true);
+                }}
+                aria-disabled={!canWrite}
+                aria-describedby={canWrite ? undefined : "soporte-write-reason"}
+                title={
+                  canWrite
+                    ? "Agregar información al hilo"
+                    : "Esta acción la hace el administrador principal del colegio."
+                }
+              >
+                Agregar información
+              </Button>
               <p className="mt-3 text-[12px] text-muted-foreground">
                 El caso no lo resuelve el colegio: eso lo hace el equipo de Lumen.
               </p>

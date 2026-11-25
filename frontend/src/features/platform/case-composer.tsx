@@ -1,23 +1,12 @@
-import { AlertTriangle, Send } from "lucide-react";
 import { useRef, useState } from "react";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/dialog";
-import { Tag } from "@/components/ui-kit";
-import {
-  SupportAttachmentField,
-  type PickedAttachment,
-} from "@/features/admin/support-attachments";
+import { Dialog } from "@/components/dialog";
+import type { PickedAttachment } from "@/features/admin/support-attachments";
 import {
   attachmentPathsForCase,
   planAttachmentCopies,
 } from "@/features/platform/attachment-copies";
+import { CaseMessageForm } from "@/features/support/case-message-form";
 import { useAnswerCase, useUploadCaseAttachment } from "@/lib/platform/hooks";
 import type { CaseSummary } from "@/lib/platform/types";
 
@@ -33,6 +22,9 @@ import type { CaseSummary } from "@/lib/platform/types";
  *
  * The file goes to the store of the school of the case, so when one
  * answer reaches several schools each one gets its own copy of it.
+ *
+ * The form is the shared one: the panel of the school and this desk
+ * write in the same thread and look the same.
  */
 export function CaseComposer({
   open,
@@ -116,106 +108,28 @@ export function CaseComposer({
         }
       }}
     >
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>
-            {cases.length === 1 ? "Responder al caso" : `Responder a ${cases.length} casos`}
-          </DialogTitle>
-          <DialogDescription>
-            {cases.length === 1 && cases[0]
-              ? `${cases[0].code} · ${cases[0].title}`
-              : "La misma respuesta queda en la conversación de cada caso."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium">Para</span>
-          <div className="flex flex-wrap gap-1.5">
-            {[...new Set(recipients)].map((name) => (
-              <Tag key={name}>{name}</Tag>
-            ))}
-            {recipients.length === 0 && (
-              <span className="text-xs text-muted-foreground">Sin destinatario</span>
-            )}
-          </div>
-        </div>
-
-        <label className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium">Mensaje *</span>
-          <textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            rows={6}
-            placeholder="Escribe la respuesta al colegio…"
-            className="w-full resize-y rounded-lg border border-input bg-card px-3 py-2 text-sm"
-          />
-          <span className="text-xs text-muted-foreground">
-            Queda registrado en el historial del caso.
-          </span>
-        </label>
-
-        {canAttach && (
-          <SupportAttachmentField
-            attachments={attachments}
-            onChange={setAttachments}
-            upload={async (file) => {
-              // The file waits for the moment of the answer: it goes to
-              // the store of each school the answer reaches.
-              pendingRef.current += 1;
-              return {
-                id: `pendiente:${pendingRef.current}:${file.name}`,
-                name: file.name,
-                size: file.size,
-                file,
-              };
-            }}
-          />
-        )}
-
-        {notice && (
-          <p
-            role="status"
-            className="rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-xs text-success"
-          >
-            {notice}
-          </p>
-        )}
-
-        {problem && (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive-soft px-3 py-2 text-xs text-destructive"
-          >
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.9} aria-hidden />
-            {problem}
-          </p>
-        )}
-
-        <DialogFooter>
-          <button
-            type="button"
-            onClick={() => {
-              setBody("");
-              setAttachments([]);
-              setNotice(null);
-              setProblem(null);
-              onClose();
-            }}
-            className="rounded-lg border border-border px-3.5 py-2 text-sm font-semibold hover:bg-muted"
-          >
-            Cerrar
-          </button>
-          <button
-            type="button"
-            onClick={() => void onSubmit()}
-            disabled={answer.isPending || body.trim().length === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-          >
-            <Send className="size-4" strokeWidth={1.9} aria-hidden />
-            Enviar respuesta
-          </button>
-        </DialogFooter>
-      </DialogContent>
+      <CaseMessageForm
+        title={cases.length === 1 ? "Responder al caso" : `Responder a ${cases.length} casos`}
+        description={
+          cases.length === 1 && cases[0]
+            ? `${cases[0].code} · ${cases[0].title}`
+            : "La misma respuesta queda en la conversación de cada caso."
+        }
+        recipients={recipients}
+        message={body}
+        onMessageChange={setBody}
+        messagePlaceholder="Escribe la respuesta al colegio…"
+        messageHint="Queda registrado en el historial del caso."
+        attachments={attachments}
+        onAttachmentsChange={setAttachments}
+        showAttachments={canAttach}
+        notice={notice}
+        problem={problem}
+        submitLabel="Enviar respuesta"
+        pending={answer.isPending}
+        onSubmit={() => void onSubmit()}
+        onCancel={onClose}
+      />
     </Dialog>
   );
 }
