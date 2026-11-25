@@ -53,9 +53,7 @@ async def _clean(engine, school_id: uuid.UUID) -> None:
             )
         )
         await session.execute(delete(SupportCase).where(SupportCase.school_id == school_id))
-        await session.execute(
-            delete(Notification).where(Notification.school_id == school_id)
-        )
+        await session.execute(delete(Notification).where(Notification.school_id == school_id))
         await session.commit()
 
 

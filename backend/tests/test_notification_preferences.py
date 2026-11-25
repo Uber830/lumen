@@ -106,6 +106,8 @@ async def test_a_new_user_gets_the_defaults(client, session_factory):
         "task_graded",
         "content_published",
         "chat_message",
+        "support_case_opened",
+        "support_case_replied",
     }
     for preference in preferences:
         assert preference["in_app"] is True
