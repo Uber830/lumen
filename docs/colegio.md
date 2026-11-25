@@ -201,6 +201,12 @@ Los dos lados adjuntan: la plataforma sube el archivo con
 (`attachment_ids`). El archivo va al almacén del colegio del caso, así que
 colegio y soporte leen la misma copia.
 
+Cuando la plataforma responde **varios casos a la vez**, el archivo se copia
+una vez por colegio: los casos del mismo colegio comparten la copia y cada
+colegio recibe la suya, en su propio almacén. El reparto está en
+`frontend/src/features/platform/attachment-copies.ts` y el archivo se sube al
+enviar la respuesta, no al elegirlo.
+
 ---
 
 ## 5. ICFES: tres capas, un solo dueño
