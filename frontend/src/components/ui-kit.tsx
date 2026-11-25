@@ -289,7 +289,7 @@ export function Chip({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-[9px] py-[3px] text-[11.8px] font-medium",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-idx border px-[9px] py-[3px] text-[11.8px] font-medium",
         chipTones[tone],
         className,
       )}
@@ -337,7 +337,7 @@ export function Tag({ children, className }: { children: ReactNode; className?: 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full bg-muted px-[9px] py-[3px] text-[11.8px] font-medium text-muted-foreground",
+        "inline-flex items-center rounded-idx bg-muted px-[9px] py-[3px] text-[11.8px] font-medium text-muted-foreground",
         className,
       )}
     >
@@ -725,10 +725,19 @@ export function MeterRow({
  * list, so the counter is the way into the schools that are not on
  * screen.
  */
-export function ExtraCount({ count, onClick }: { count: number; onClick?: () => void }) {
+export function ExtraCount({
+  count,
+  onClick,
+  title,
+}: {
+  count: number;
+  onClick?: () => void;
+  /** What the counter opens: "Ver los 3 colegio(s) que también tienen acceso". */
+  title?: string;
+}) {
   if (count <= 0) return null;
   const style =
-    "inline-flex items-center rounded-full bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-primary";
+    "inline-flex items-center rounded-idx bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-primary";
   if (!onClick) {
     return <span className={style}>+{count}</span>;
   }
@@ -736,7 +745,7 @@ export function ExtraCount({ count, onClick }: { count: number; onClick?: () => 
     <button
       type="button"
       onClick={onClick}
-      title={`Ver los ${count} colegio(s) que también tienen acceso`}
+      title={title ?? `Ver los ${count} colegio(s) que también tienen acceso`}
       className={cn(style, "transition-opacity hover:opacity-80")}
     >
       +{count}

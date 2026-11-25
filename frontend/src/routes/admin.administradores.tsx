@@ -289,7 +289,7 @@ function AdministradoresPage() {
             {[0, 1].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
                 <span className="h-[11px] w-[190px] animate-pulse rounded bg-muted" />
-                <span className="h-[18px] w-[84px] animate-pulse rounded-full bg-muted" />
+                <span className="h-[18px] w-[84px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>

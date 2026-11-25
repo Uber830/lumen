@@ -325,7 +325,7 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
                     onClick={() => toggleGrade(grade)}
                     aria-pressed={grades.includes(grade)}
                     className={cn(
-                      "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                      "rounded-idx px-2.5 py-1 text-xs font-medium transition-colors",
                       grades.includes(grade)
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted text-muted-foreground hover:text-foreground",

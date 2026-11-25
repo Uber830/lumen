@@ -26,7 +26,7 @@ export function BulkBar({
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary-soft/40 px-[18px] py-2.5">
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-1 text-[12px] font-medium text-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-idx bg-card px-2.5 py-1 text-[12px] font-medium text-foreground">
         <b className="font-semibold">{count}</b> seleccionados
       </span>
       {children}

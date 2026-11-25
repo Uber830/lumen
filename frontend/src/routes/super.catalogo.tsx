@@ -254,7 +254,7 @@ function Catalogo() {
                                 type="button"
                                 onClick={() => setAccessOf(item)}
                                 title="Ver todos los colegios con acceso"
-                                className="inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
+                                className="inline-flex items-center whitespace-nowrap rounded-idx bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
                               >
                                 {schoolNames.get(school.id) ?? school.name}
                               </button>

@@ -304,7 +304,7 @@ function PeriodosPage() {
                 <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
                 <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
                 <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
-                <span className="h-[18px] w-[70px] animate-pulse rounded-full bg-muted" />
+                <span className="h-[18px] w-[70px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>

@@ -207,7 +207,7 @@ function NavGroups({
                       {count !== null && count > 0 && (
                         <span
                           className={cn(
-                            "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-primary",
+                            "ml-auto rounded-idx bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-primary",
                             iconOnly(collapsed),
                           )}
                         >

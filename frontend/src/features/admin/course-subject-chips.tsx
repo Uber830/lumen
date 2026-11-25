@@ -52,7 +52,11 @@ export function CourseSubjectChips({
         {shown.map((item) => (
           <Tag key={item.id}>{item.label}</Tag>
         ))}
-        <ExtraCount count={extra} onClick={() => setOpen(true)} />
+        <ExtraCount
+          count={extra}
+          onClick={() => setOpen(true)}
+          title={`Ver las ${extra} materia(s) más de ${who ?? "el docente"}`}
+        />
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
