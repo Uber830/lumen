@@ -448,7 +448,11 @@ function CursosPage() {
         courseName={openCourse?.name ?? ""}
         items={openCourseSubjects}
         onRemove={(item) => {
-          askRemoveOffering(item.id, item.subjectName, openCourse?.name ?? "el curso");
+          const courseName = openCourse?.name ?? "el curso";
+          // The modal closes first: the confirmation of the removal
+          // opens on top of it, not behind it.
+          setOpenCourseId(null);
+          askRemoveOffering(item.id, item.subjectName, courseName);
         }}
       />
 
