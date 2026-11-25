@@ -1,6 +1,6 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { KeyRound, Lock, Plus, Search, Upload, UserRoundX } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   Button,
@@ -18,6 +18,7 @@ import {
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
 import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
 import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
+import { CourseSubjectChips, type CourseSubjectItem } from "@/features/admin/course-subject-chips";
 import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import { Select } from "@/components/select-field";
@@ -93,6 +94,24 @@ function DocentesPage() {
   const [picked, setPicked] = useState<string[]>([]);
 
   const total = teachers.data?.total ?? 0;
+
+  // The name of each course subject: the row of the teacher carries the
+  // ids, the list of the school carries the names.
+  const labelOfCourseSubject = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const item of courseSubjects.data ?? []) {
+      labels.set(item.id, `${item.course_name} · ${item.subject_name}`);
+    }
+    return labels;
+  }, [courseSubjects.data]);
+
+  /** The courses and subjects of a teacher, ready to be shown. */
+  function courseSubjectsOf(teacher: SchoolMemberRow): CourseSubjectItem[] {
+    return (teacher.course_subject_ids ?? []).map((id) => ({
+      id,
+      label: labelOfCourseSubject.get(id) ?? "Materia",
+    }));
+  }
 
   // The dialog of the old view works with the member of the school. The
   // row of the new list carries everything it needs.
@@ -530,18 +549,10 @@ function DocentesPage() {
                         </p>
                       </td>
                       <td className={tableCellClass}>
-                        {teacher.courses.length > 0 ? (
-                          <>
-                            <p className="text-[13px]">{teacher.courses.join(" · ")}</p>
-                            {teacher.subjects && teacher.subjects.length > 0 && (
-                              <p className="text-[12px] text-muted-foreground">
-                                {teacher.subjects.join(" · ")}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">Sin curso</span>
-                        )}
+                        <CourseSubjectChips
+                          items={courseSubjectsOf(teacher)}
+                          who={teacher.full_name ?? "el docente"}
+                        />
                       </td>
                       <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                         {formatShortDate(teacher.joined_at)}
@@ -597,6 +608,7 @@ function DocentesPage() {
         <MemberManageDialog
           member={asMember(selectedTeacher)}
           roleLabel="docente"
+          courseSubjects={courseSubjectsOf(selectedTeacher)}
           onClose={() => setSelectedTeacher(null)}
           onEdit={() => {
             setEditingTeacher(selectedTeacher);

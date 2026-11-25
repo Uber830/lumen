@@ -18,6 +18,7 @@ import { Info, KeyRound, Link2, Power, PowerOff, X } from "lucide-react";
 
 import { StatusBadge } from "@/components/status-badge";
 import { CopyableActivationLink } from "@/features/admin/activation-links";
+import { CourseSubjectChips, type CourseSubjectItem } from "@/features/admin/course-subject-chips";
 import { useCreateActivationLink, useUpdateMembership } from "@/lib/users/invitations";
 import { activationLink } from "@/lib/users/invitations";
 import type { SchoolMember } from "@/features/academics/types";
@@ -25,12 +26,18 @@ import type { SchoolMember } from "@/features/academics/types";
 export function MemberManageDialog({
   member,
   roleLabel,
+  courseSubjects,
   onClose,
   onEdit,
 }: {
   member: SchoolMember;
   /** How the role is named in the button: "docente" or "estudiante". */
   roleLabel: string;
+  /**
+   * The courses and subjects of a teacher, with their names. The view
+   * resolves them: the drawer only shows them.
+   */
+  courseSubjects?: CourseSubjectItem[];
   onClose: () => void;
   /** Opens the edit form of the person. */
   onEdit: () => void;
@@ -74,6 +81,12 @@ export function MemberManageDialog({
   // subjects of a teacher, the courses of a student.
   const courses = member.courses?.length ? member.courses.join(" · ") : "Sin asignar";
   const subjects = member.subjects?.length ? member.subjects.join(" · ") : null;
+
+  // A teacher can teach many courses and subjects: the list is shown as
+  // chips with a counter, so the row of the drawer never grows. When the
+  // view does not send the pairs, the plain names of the member are used.
+  const isTeacher = roleLabel === "docente";
+  const withChips = isTeacher && courseSubjects !== undefined;
 
   async function toggle() {
     try {
@@ -129,11 +142,23 @@ export function MemberManageDialog({
           <dd className="min-w-0 truncate">{member.email ?? "Sin correo"}</dd>
 
           <dt className="text-[12.4px] text-muted-foreground">
-            {roleLabel === "docente" ? "Curso · Materia" : "Cursos"}
+            {isTeacher ? "Curso · Materia" : "Curso"}
           </dt>
           <dd className="min-w-0">
-            <span className="block truncate">{courses}</span>
-            {subjects && <span className="block truncate text-muted-foreground">{subjects}</span>}
+            {withChips ? (
+              <CourseSubjectChips
+                items={courseSubjects ?? []}
+                emptyLabel="Sin asignar"
+                who={member.full_name ?? "el docente"}
+              />
+            ) : (
+              <>
+                <span className="block truncate">{courses}</span>
+                {subjects && (
+                  <span className="block truncate text-muted-foreground">{subjects}</span>
+                )}
+              </>
+            )}
           </dd>
 
           <dt className="text-[12.4px] text-muted-foreground">Ingreso</dt>
