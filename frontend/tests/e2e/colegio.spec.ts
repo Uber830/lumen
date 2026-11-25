@@ -108,17 +108,14 @@ test.describe("el panel del colegio", () => {
     await expect(fila).toContainText(/7° A/);
   });
 
-  test("el simulacro sin activar ofrece la acción de activarlo", async ({ page }) => {
+  test("el módulo de ICFES avisa que viene en camino", async ({ page }) => {
     await login(page);
     await openPanel(page, "/admin/icfes-colegio");
 
     await expect(page.getByRole("heading", { name: "ICFES" })).toBeVisible(READY);
-    // The simulator the platform published and the school did not activate
-    // offers the activation; the activated ones offer the result.
-    await expect(page.getByRole("button", { name: /^Activar$/ }).first()).toBeVisible(READY);
-    await expect(page.getByRole("button", { name: /^Abrir$/ }).first()).toBeVisible(READY);
-    // The score of the exam is on the 0-500 scale of the module.
-    await expect(page.getByText(/\d+ \/ 500/).first()).toBeVisible(READY);
+    // El módulo se está afinando: el panel lo dice en vez de mostrar
+    // simulacros a medio hacer.
+    await expect(page.getByText("Próximamente")).toBeVisible(READY);
   });
 
   test("el soporte abre una solicitud con su hilo", async ({ page }) => {
