@@ -30,13 +30,17 @@ export type DeleteTarget = {
  *
  * The list keeps the target, the modal asks about it, and the row is
  * removed when the user confirms.
+ *
+ * The generic is for the lists that need to know what kind of row is
+ * going away (a course, a subject, an offering): the extra fields
+ * travel with the target.
  */
-export function useDeleteConfirmation() {
-  const [target, setTarget] = useState<DeleteTarget | null>(null);
+export function useDeleteConfirmation<T extends DeleteTarget = DeleteTarget>() {
+  const [target, setTarget] = useState<T | null>(null);
   return {
     target,
     /** Ask about a row. */
-    ask: (next: DeleteTarget) => setTarget(next),
+    ask: (next: T) => setTarget(next),
     /** Close the modal (cancel, or the deletion is done). */
     close: () => setTarget(null),
   };

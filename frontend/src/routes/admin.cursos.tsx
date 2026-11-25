@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, Plus } from "lucide-react";
-import { useState } from "react";
+import { BookOpen, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 
 import {
   Button,
@@ -13,7 +13,15 @@ import {
   tableCellClass,
   tableHeadClass,
 } from "@/components/ui-kit";
+import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
 import { AcademicStructureWizard } from "@/features/admin/academic-wizard";
+import {
+  useCourseSubjects,
+  useDeleteCourse,
+  useDeleteCourseSubject,
+  useDeleteSubject,
+} from "@/features/academics/hooks";
+import type { CourseSubjectSummary } from "@/features/academics/types";
 import { useSchoolCourses, useSchoolSubjects } from "@/lib/school/community";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +43,18 @@ export const Route = createFileRoute("/admin/cursos")({
   component: CursosPage,
 });
 
+/**
+ * What is being removed.
+ *
+ * A course goes with its offerings and with the assignments of its
+ * teachers; a subject goes with the courses that offer it; an offering
+ * is just the pair (course, subject).
+ */
+type Removal =
+  | { kind: "curso"; id: string; title: string; name: string; courses: number }
+  | { kind: "materia"; id: string; title: string; name: string; courses: number }
+  | { kind: "oferta"; id: string; title: string; name: string; course: string };
+
 function CursosPage() {
   const navigate = useNavigate();
   const { session } = useRouteContext({ from: "/admin/cursos" });
@@ -44,17 +64,129 @@ function CursosPage() {
   // subjects and teachers per course are computed in the server.
   const courses = useSchoolCourses();
   const subjects = useSchoolSubjects();
+  // The offerings: the pairs (curso, materia) the school has.
+  const courseSubjects = useCourseSubjects(schoolId);
 
   // The creation of the structure happens in one big form: course,
   // subject and offering, one step after the other.
   const [wizardOpen, setWizardOpen] = useState(false);
+  // The course whose subjects are open.
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const deleteCourse = useDeleteCourse(schoolId ?? "");
+  const deleteSubject = useDeleteSubject(schoolId ?? "");
+  const deleteOffering = useDeleteCourseSubject(schoolId ?? "");
+  const removal = useDeleteConfirmation<Removal>();
+
+  // The offerings of each course: the row that opens shows them.
+  const offeringsByCourse = useMemo(() => {
+    const map = new Map<string, CourseSubjectSummary[]>();
+    for (const offering of courseSubjects.data ?? []) {
+      map.set(offering.course_id, [...(map.get(offering.course_id) ?? []), offering]);
+    }
+    return map;
+  }, [courseSubjects.data]);
+
+  // The subjects that are in no course: they would be invisible in the
+  // table, and a course that is not wanted has to be removable.
+  const offeredSubjectIds = useMemo(
+    () => new Set((courseSubjects.data ?? []).map((offering) => offering.subject_id)),
+    [courseSubjects.data],
+  );
+  const orphanSubjects = useMemo(
+    () => (subjects.data ?? []).filter((subject) => !offeredSubjectIds.has(subject.id)),
+    [subjects.data, offeredSubjectIds],
+  );
 
   if (!schoolId) {
     return <NoSchoolFallback onSignOut={() => navigate({ to: "/login" })} />;
   }
 
   const activeCourses = (courses.data ?? []).filter((course) => course.status === "activo");
-  const coveredCourses = new Set((subjects.data ?? []).flatMap((subject) => subject.courses)).size;
+
+  function askRemoveCourse(courseId: string, name: string) {
+    const offered = offeringsByCourse.get(courseId)?.length ?? 0;
+    removal.ask({
+      id: courseId,
+      title: name,
+      kind: "curso",
+      name,
+      courses: offered,
+    });
+  }
+
+  function askRemoveSubject(subjectId: string, name: string) {
+    const offered = (courseSubjects.data ?? []).filter(
+      (offering) => offering.subject_id === subjectId,
+    ).length;
+    removal.ask({
+      id: subjectId,
+      title: name,
+      kind: "materia",
+      name,
+      courses: offered,
+    });
+  }
+
+  function askRemoveOffering(offeringId: string, subjectName: string, courseName: string) {
+    removal.ask({
+      id: offeringId,
+      title: subjectName,
+      kind: "oferta",
+      name: subjectName,
+      course: courseName,
+    });
+  }
+
+  async function onRemove() {
+    const target = removal.target;
+    if (!target) return;
+    try {
+      if (target.kind === "curso") {
+        await deleteCourse.mutateAsync(target.id);
+      } else if (target.kind === "materia") {
+        await deleteSubject.mutateAsync(target.id);
+      } else {
+        await deleteOffering.mutateAsync(target.id);
+      }
+      removal.close();
+    } catch {
+      // The error is shown by the dialog, in Spanish.
+    }
+  }
+
+  // What is about to be lost: the modal says it in words.
+  const removalTitle = (() => {
+    if (!removal.target) return "Quitar";
+    if (removal.target.kind === "curso") return `Quitar el curso ${removal.target.name}`;
+    if (removal.target.kind === "materia") return `Quitar la materia ${removal.target.name}`;
+    return `Quitar ${removal.target.name} de ${removal.target.course}`;
+  })();
+
+  const removalConfirmLabel = (() => {
+    if (!removal.target) return "Quitar";
+    if (removal.target.kind === "curso") return "Quitar el curso";
+    if (removal.target.kind === "materia") return "Quitar la materia";
+    return "Quitar del curso";
+  })();
+
+  const removalDescription = (() => {
+    const target = removal.target;
+    if (!target) return undefined;
+    if (target.kind === "curso") {
+      const offered =
+        target.courses > 0
+          ? `Sus ${target.courses} materia(s) ofrecidas y las asignaciones de los docentes que las impartían se borran con él.`
+          : "No tiene materias ofrecidas.";
+      return `El curso ${target.name} se borra del colegio. ${offered} El material ya subido se conserva.`;
+    }
+    if (target.kind === "materia") {
+      const offered =
+        target.courses > 0 ? ` y de los ${target.courses} curso(s) donde estaba ofrecida` : "";
+      return `La materia ${target.name} se borra del colegio${offered}.`;
+    }
+    return `La materia deja de ofrecerse en ${target.course}.`;
+  })();
 
   return (
     <>
@@ -68,168 +200,256 @@ function CursosPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <SectionCard
-          className="overflow-hidden"
-          bodyClassName="p-0"
-          title="Cursos del colegio"
-          description={`${courses.isLoading ? "—" : activeCourses.length} cursos en el periodo vigente`}
-        >
-          {courses.isError ? (
-            <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
-              {courses.error.message}
-            </p>
-          ) : courses.isLoading ? (
-            <div className="px-[18px] py-4" aria-hidden>
-              {[0, 1, 2].map((row) => (
-                <div key={row} className="flex items-center gap-4 py-[11px]">
-                  <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
-                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
-                  <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
-                </div>
-              ))}
-            </div>
-          ) : (courses.data?.length ?? 0) === 0 ? (
-            <EmptyState
-              icon={BookOpen}
-              title="Sin cursos"
-              description="Crea el primer curso del colegio para empezar a estructurar el año."
-              action={
-                <Button icon={Plus} onClick={() => setWizardOpen(true)}>
-                  Nuevo curso
-                </Button>
-              }
-            />
-          ) : (
-            <TableShell>
-              <PanelTable className="w-full border-collapse">
-                <caption className="sr-only">
-                  Cursos del colegio, con sus materias, sus docentes y su estado
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className={tableHeadClass}>
-                      Curso
-                    </th>
-                    <th scope="col" className={tableHeadClass}>
-                      Grado
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} text-right`}>
-                      Materias
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} text-right`}>
-                      Docentes
-                    </th>
-                    <th scope="col" className={tableHeadClass}>
-                      Estado
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} text-right`}>
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(courses.data ?? []).map((course) => (
-                    <tr key={course.id} className="transition-colors hover:bg-muted">
-                      <td className={tableCellClass}>
-                        <p className="font-medium text-foreground">{course.name}</p>
-                        <p className="text-[12px] text-muted-foreground">{course.grade_label}</p>
-                      </td>
-                      <td className={tableCellClass}>{course.grade_label}</td>
-                      <td
-                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
+      <SectionCard
+        className="mb-5 overflow-hidden"
+        bodyClassName="p-0"
+        title="Cursos del colegio"
+        description={`${courses.isLoading ? "—" : activeCourses.length} cursos en el periodo vigente`}
+      >
+        {courses.isError ? (
+          <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
+            {courses.error.message}
+          </p>
+        ) : courses.isLoading ? (
+          <div className="px-[18px] py-4" aria-hidden>
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="flex items-center gap-4 py-[11px]">
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[70px] animate-pulse rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        ) : (courses.data?.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={BookOpen}
+            title="Sin cursos"
+            description="Crea el primer curso del colegio para empezar a estructurar el año."
+            action={
+              <Button icon={Plus} onClick={() => setWizardOpen(true)}>
+                Nuevo curso
+              </Button>
+            }
+          />
+        ) : (
+          <TableShell>
+            <PanelTable className="w-full border-collapse">
+              <caption className="sr-only">
+                Cursos del colegio, con sus materias, sus docentes y su estado
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" className={tableHeadClass}>
+                    Curso
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Grado
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Materias
+                  </th>
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Docentes
+                  </th>
+                  <th scope="col" className={tableHeadClass}>
+                    Estado
+                  </th>
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Acción
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(courses.data ?? []).map((course) => {
+                  const offerings = offeringsByCourse.get(course.id) ?? [];
+                  const isOpen = expanded === course.id;
+                  return (
+                    <Fragment key={course.id}>
+                      <tr
+                        className={cn("transition-colors hover:bg-muted", isOpen && "bg-muted/60")}
                       >
-                        {course.subject_count}
-                      </td>
-                      <td
-                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
-                      >
-                        {course.teacher_count}
-                      </td>
-                      <td className={tableCellClass}>
-                        <Chip tone={course.status === "activo" ? "teal" : "muted"} dot>
-                          {course.status === "activo" ? "Activo" : "Inactivo"}
-                        </Chip>
-                      </td>
-                      <td className={`${tableCellClass} text-right`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate({ to: "/admin/asignaciones" })}
+                        <td className={tableCellClass}>
+                          <p className="font-medium text-foreground">{course.name}</p>
+                          <p className="text-[12px] text-muted-foreground">{course.grade_label}</p>
+                        </td>
+                        <td className={tableCellClass}>{course.grade_label}</td>
+                        <td className={tableCellClass}>
+                          {/* The subjects of the course live here: the row
+                              opens with a click. */}
+                          <button
+                            type="button"
+                            onClick={() => setExpanded(isOpen ? null : course.id)}
+                            aria-expanded={isOpen}
+                            className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2.5 py-1 text-[12.4px] font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-secondary"
+                          >
+                            {offerings.length === 0
+                              ? "Sin materias"
+                              : `${offerings.length} materia${offerings.length === 1 ? "" : "s"}`}
+                            <ChevronRight
+                              className={cn(
+                                "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                                isOpen && "rotate-90",
+                              )}
+                              strokeWidth={1.9}
+                              aria-hidden
+                            />
+                          </button>
+                        </td>
+                        <td
+                          className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
                         >
-                          Abrir
-                          <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </PanelTable>
-            </TableShell>
-          )}
-        </SectionCard>
+                          {course.teacher_count}
+                        </td>
+                        <td className={tableCellClass}>
+                          <Chip tone={course.status === "activo" ? "teal" : "muted"} dot>
+                            {course.status === "activo" ? "Activo" : "Inactivo"}
+                          </Chip>
+                        </td>
+                        <td className={`${tableCellClass} text-right`}>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate({ to: "/admin/asignaciones" })}
+                            >
+                              Asignar
+                              <ChevronRight
+                                className="size-[15.5px]"
+                                strokeWidth={1.9}
+                                aria-hidden
+                              />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={Trash2}
+                              onClick={() => askRemoveCourse(course.id, course.name)}
+                            >
+                              Quitar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
 
+                      {/* The subjects of the open course, under its row. */}
+                      {isOpen && (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="border-t border-border bg-secondary/50 px-[18px] py-3"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+                              Materias de {course.name}
+                            </p>
+                            {offerings.length === 0 ? (
+                              <p className="mt-2 text-[13px] text-muted-foreground">
+                                Este curso no tiene materias ofrecidas todavía.
+                              </p>
+                            ) : (
+                              <ul className="mt-2 space-y-1.5">
+                                {offerings.map((offering) => (
+                                  <li
+                                    key={offering.id}
+                                    className="flex flex-wrap items-center gap-2.5 rounded-idx border border-border bg-card px-3 py-2"
+                                  >
+                                    <BookOpen
+                                      className="size-[15px] shrink-0 text-primary"
+                                      strokeWidth={1.9}
+                                      aria-hidden
+                                    />
+                                    <span className="truncate text-[13.4px] font-medium">
+                                      {offering.subject_name}
+                                    </span>
+                                    <span className="shrink-0 text-[12px] text-muted-foreground">
+                                      {offering.subject_area ?? "Sin área"}
+                                    </span>
+                                    <Chip tone="muted">
+                                      {offering.assigned_teachers} docente
+                                      {offering.assigned_teachers === 1 ? "" : "s"}
+                                    </Chip>
+                                    <div className="ml-auto flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          askRemoveOffering(
+                                            offering.id,
+                                            offering.subject_name,
+                                            offering.course_name,
+                                          )
+                                        }
+                                      >
+                                        Quitar del curso
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        icon={Trash2}
+                                        onClick={() =>
+                                          askRemoveSubject(
+                                            offering.subject_id,
+                                            offering.subject_name,
+                                          )
+                                        }
+                                      >
+                                        Quitar la materia
+                                      </Button>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </PanelTable>
+          </TableShell>
+        )}
+      </SectionCard>
+
+      {/* The subjects that are in no course: without this list they
+          would not be seen anywhere and could never be removed. */}
+      {orphanSubjects.length > 0 && (
         <SectionCard
           className="overflow-hidden"
           bodyClassName="p-0"
-          title="Materias"
-          description={`${subjects.isLoading ? "—" : (subjects.data?.length ?? 0)} materias · ${subjects.isLoading ? "—" : coveredCourses} cursos cubiertos`}
+          title="Materias sin curso"
+          description="No están ofrecidas en ningún curso: ofrece la que quieras usar o quítala."
         >
-          {subjects.isError ? (
-            <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
-              {subjects.error.message}
-            </p>
-          ) : subjects.isLoading ? (
-            <div className="px-[18px] py-4" aria-hidden>
-              {[0, 1, 2].map((row) => (
-                <div key={row} className="flex items-center gap-3 py-[11px]">
-                  <span className="h-[11px] w-[130px] animate-pulse rounded bg-muted" />
-                  <span className="h-[18px] w-[64px] animate-pulse rounded-full bg-muted" />
+          <ul>
+            {orphanSubjects.map((subject) => (
+              <li
+                key={subject.id}
+                className="flex flex-wrap items-center gap-2.5 border-b border-border px-[18px] py-[13px] last:border-b-0"
+              >
+                <BookOpen
+                  className="size-[15px] shrink-0 text-muted-foreground"
+                  strokeWidth={1.9}
+                  aria-hidden
+                />
+                <span className="truncate text-[13.4px] font-medium">{subject.name}</span>
+                <span className="shrink-0 text-[12px] text-muted-foreground">
+                  {subject.area ?? "Sin área"}
+                </span>
+                <div className="ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => askRemoveSubject(subject.id, subject.name)}
+                  >
+                    Quitar la materia
+                  </Button>
                 </div>
-              ))}
-            </div>
-          ) : (subjects.data?.length ?? 0) === 0 ? (
-            <EmptyState
-              icon={BookOpen}
-              title="Sin materias"
-              description="Crea la primera materia para poder ofrecerla en los cursos."
-            />
-          ) : (
-            <ul>
-              {(subjects.data ?? []).map((subject) => (
-                <li
-                  key={subject.id}
-                  className="border-b border-border px-[18px] py-[13px] last:border-b-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <BookOpen
-                      className="size-[15px] shrink-0 text-primary"
-                      strokeWidth={1.9}
-                      aria-hidden
-                    />
-                    <span className="truncate text-[13.4px] font-medium">{subject.name}</span>
-                    <span className="shrink-0 text-[12px] text-muted-foreground">
-                      {subject.area ?? "Sin área"}
-                    </span>
-                    <span className="ml-auto shrink-0 font-mono text-[12.4px] text-foreground">
-                      {subject.course_count}
-                    </span>
-                  </div>
-                  {subject.courses.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5 pl-[23px]">
-                      {subject.courses.map((course) => (
-                        <Chip key={course} tone="muted">
-                          {course}
-                        </Chip>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+              </li>
+            ))}
+          </ul>
         </SectionCard>
-      </div>
+      )}
 
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
@@ -246,6 +466,18 @@ function CursosPage() {
         schoolId={schoolId}
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={removal.target !== null}
+        title={removalTitle}
+        description={removalDescription}
+        confirmLabel={removalConfirmLabel}
+        pending={deleteCourse.isPending || deleteSubject.isPending || deleteOffering.isPending}
+        onCancel={removal.close}
+        onConfirm={() => {
+          void onRemove();
+        }}
       />
     </>
   );
