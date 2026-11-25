@@ -36,8 +36,8 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
-| Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se despliegan las de ese curso. La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
-| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, **agrupadas por docente**: una fila por persona y sus materias en fichas |
+| Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se abre un **modal** con las de ese curso (la tabla no se mueve). La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
+| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, **agrupadas por docente**: una fila por persona, con la primera materia y el contador **+N**; el contador abre un modal con todas, para editarlas o quitarlas |
 | Períodos | `/admin/periodos` | Ciclo lectivo, cierre de periodo y periodo vigente |
 | ICFES | `/admin/icfes-colegio` | Los simulacros del colegio: el módulo se está afinando y el panel lo avisa |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
@@ -69,15 +69,24 @@ coinciden con los del cliente.
 ### La vista de cursos y las materias dentro
 
 La tabla de cursos ocupa el ancho completo: el panel de materias que estaba
-al lado se fue. Cada fila tiene un botón **Materias** que despliega, bajo el
-curso, la lista de sus materias con el área, los docentes que la imparten y
-las acciones (**Quitar del curso**, **Quitar la materia**).
+al lado se fue. Cada fila tiene un botón **Materias** que abre un **modal**
+con las materias de ese curso, con el área, los docentes que la imparten y
+la ✕ para **quitarla del curso**. El modal no mueve la tabla: los cursos
+siguen donde estaban.
 
 Las materias que **no están en ningún curso** se listan aparte: si no, no se
-verían en ninguna parte y no se podrían quitar. Los cursos también se
-quitan (con confirmación: el curso se borra con sus materias ofrecidas y con
-las asignaciones de los docentes que las impartían; el material ya subido se
-conserva).
+verían en ninguna parte y no se podrían quitar. Allí sí está **Quitar la
+materia**, porque es el único sitio donde no tiene asignaciones. Los cursos
+también se quitan (con confirmación: el curso se borra con sus materias
+ofrecidas y con las asignaciones de los docentes que las impartían; el
+material ya subido se conserva).
+
+### Las listas largas se paginan
+
+Los cursos, las materias sin curso y las asignaciones se cortan en páginas de
+**10**, con el mismo pie que usan las otras listas del panel («Mostrando 1–10
+de 24» y los números de página). El corte vive en
+`frontend/src/lib/pagination.ts`, para que todas las vistas lo hagan igual.
 
 ### La estructura académica, en un formulario
 
@@ -89,9 +98,12 @@ paso en blanco se salta: el que solo necesita el curso avanza y cierra.
 ### Las asignaciones, agrupadas por docente
 
 La lista tiene **una fila por docente**, no una por asignación: la persona es
-lo que se repite, y lo que importa es lo que cada una enseña. Sus materias
-van en fichas («7° B · Matemáticas»), con el lápiz para editarla y la ✕ para
-quitarla. La barra de arriba dice los dos números: docentes y asignaciones.
+lo que se repite, y lo que importa es lo que cada una enseña. La columna de
+materias muestra **la primera** y el contador **+N** (el mismo patrón que usa
+el panel en la ficha de un docente): el contador abre un modal con todas las
+materias del docente, cada una con el lápiz para editarla y la ✕ para
+quitarla. La barra de arriba dice los dos números: docentes y
+asignaciones.
 
 ### La selección múltiple
 
@@ -239,6 +251,24 @@ una corrida real.
 - El estudiante no tiene ruta a este canal.
 - Un mensaje puede llevar **adjuntos** (PDF, imagen o documento, hasta 10 MB):
   el archivo va al almacén del colegio y el hilo guarda su ruta.
+
+### La campana avisa de los casos
+
+Los dos lados se enteran por la **campana** de la barra superior:
+
+| Qué pasa | Quién lo recibe | Qué dice |
+| --- | --- | --- |
+| El colegio abre una solicitud | El equipo de Lumen | «Nuevo caso de soporte: {asunto}» |
+| El colegio escribe en el hilo | El equipo de Lumen | «Respuesta en el caso {código}» |
+| La plataforma responde | Los administradores del colegio | «El equipo de Lumen respondió tu caso {código}» |
+
+Cada notificación lleva a su sitio: la plataforma a `/super/soporte`, el
+colegio a `/admin/soporte`. La lista de la mesa se refresca sola cuando
+llega una de ellas, sin recargar la página.
+
+Los tipos son `support_case_opened` y `support_case_replied`
+(`app/db/enums.py`), y la migración que los agrega al enum de Postgres es
+`backend/migrations/20261125010000_support_notifications.sql`.
 
 ---
 
