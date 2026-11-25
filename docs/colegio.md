@@ -34,7 +34,7 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | --- | --- | --- |
 | Dashboard | `/admin` | KPIs del colegio, material por área, estado del colegio, actividad reciente y acciones rápidas |
 | Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
-| Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
+| Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso**. La ficha de **Gestionar** muestra los datos de la persona y su acceso: sus materias se cambian en Asignaciones |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se abre un **modal** con las de ese curso (la tabla no se mueve). La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
 | Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, **agrupadas por docente**: una fila por persona, con la primera materia y el contador **+N**; el contador abre un modal con todas, para editarlas o quitarlas |
@@ -83,10 +83,21 @@ material ya subido se conserva).
 
 ### Las listas largas se paginan
 
-Los cursos, las materias sin curso y las asignaciones se cortan en páginas de
-**10**, con el mismo pie que usan las otras listas del panel («Mostrando 1–10
-de 24» y los números de página). El corte vive en
-`frontend/src/lib/pagination.ts`, para que todas las vistas lo hagan igual.
+Los cursos, las materias y las asignaciones se cortan en páginas de **10**,
+con el mismo pie que usan las otras listas del panel («Mostrando 1–10 de 24»
+y los números de página). El corte lo hace **el servidor**, como el de los
+docentes y los estudiantes:
+
+| Endpoint | Qué devuelve |
+| --- | --- |
+| `GET /v1/school/courses` | Una página de cursos |
+| `GET /v1/school/courses/options` | Todos los cursos, para los formularios |
+| `GET /v1/school/subjects` | Una página de materias (`?offered=false` para las que no están en ningún curso) |
+| `GET /v1/school/subjects/options` | Todas las materias, para los formularios |
+| `GET /v1/school/assignments` | Una página de docentes, cada uno con sus materias |
+
+La fila de las asignaciones es el docente, y el servidor la agrupa: la
+persona no se repite.
 
 ### La estructura académica, en un formulario
 
@@ -103,10 +114,11 @@ materias muestra **la primera** y el contador **+N** (el mismo patrón que usa
 el panel en la ficha de un docente): el contador abre un modal **solo con la
 lista**, sin acciones.
 
-Las **acciones van juntas en la columna de acción**: *Asignar otra*, *Editar*
-y *Quitar*. Editar y Quitar abren el modal de las materias del docente con el
-lápiz y la ✕ de cada una, para que el administrador elija cuál. La barra de
-arriba dice los dos números: docentes y asignaciones.
+Las **acciones van juntas en la columna de acción** y son dos: *Asignar otra*
+y *Gestionar*. Gestionar abre el modal de las materias del docente con el
+lápiz y la ✕ de cada una, para que el administrador elija cuál. El contador
+**+N** abre el mismo modal, pero solo para leerlo. La barra de arriba dice los
+dos números: docentes y asignaciones.
 
 ### La selección múltiple
 
