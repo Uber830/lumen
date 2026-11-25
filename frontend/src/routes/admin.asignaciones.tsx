@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ClipboardList, GraduationCap, Link2, Plus } from "lucide-react";
+import { ClipboardList, GraduationCap, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -96,6 +96,13 @@ function AsignacionesPage() {
   // Removing an assignment asks for confirmation: the teacher stops
   // seeing the content of that subject.
   const assignmentToDelete = useDeleteConfirmation();
+
+  // The list of the subjects of a teacher: the counter opens it to
+  // read it, the column of the actions opens it to act on it.
+  const [subjectsDialog, setSubjectsDialog] = useState<{
+    teacherId: string;
+    withActions: boolean;
+  } | null>(null);
 
   const teacherOptions = useMemo(
     () =>
@@ -386,7 +393,7 @@ function AsignacionesPage() {
                 <span className="h-[11px] w-[190px] animate-pulse rounded bg-muted" />
                 <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
                 <span className="h-[11px] w-[110px] animate-pulse rounded bg-muted" />
-                <span className="h-[18px] w-[92px] animate-pulse rounded-full bg-muted" />
+                <span className="h-[18px] w-[92px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>
@@ -448,6 +455,15 @@ function AsignacionesPage() {
                           subjectName: assignment.subject_name,
                         }))}
                         who={group.name}
+                        open={subjectsDialog?.teacherId === group.teacherId}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setSubjectsDialog(null);
+                            return;
+                          }
+                          setSubjectsDialog({ teacherId: group.teacherId, withActions: false });
+                        }}
+                        withActions={subjectsDialog?.withActions ?? false}
                         onEdit={(item) => {
                           const assignment = group.assignments.find((one) => one.id === item.id);
                           if (assignment) openEdit(assignment);
@@ -467,17 +483,43 @@ function AsignacionesPage() {
                       )}
                     </td>
                     <td className={`${tableCellClass} text-right`}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={Plus}
-                        onClick={() => {
-                          openCreate();
-                          setTeacherId(group.teacherId);
-                        }}
-                      >
-                        Asignar otra
-                      </Button>
+                      {/* The three actions of the row live together:
+                          adding, editing and removing. */}
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Plus}
+                          onClick={() => {
+                            openCreate();
+                            setTeacherId(group.teacherId);
+                          }}
+                        >
+                          Asignar otra
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Pencil}
+                          onClick={() =>
+                            setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
+                          }
+                          aria-label={`Editar las materias de ${group.name}`}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() =>
+                            setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
+                          }
+                          aria-label={`Quitar las materias de ${group.name}`}
+                        >
+                          Quitar
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

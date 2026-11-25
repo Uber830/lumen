@@ -5,13 +5,15 @@
 // the other, the list grows until it breaks the row it lives in.
 //
 // So only the first one is shown, and the rest are counted: the "+2"
-// opens a modal with the whole list, where each subject can be edited
-// or removed. It is the same way the panel shows the courses and
-// subjects of a teacher in the drawer.
+// opens a modal with the whole list. It is the same way the panel shows
+// the courses and subjects of a teacher in the drawer.
+//
+// The list can also be opened with the actions on it: that is what the
+// column of the actions does, where the adding, the editing and the
+// removing live together.
 // =============================================================================
 
 import { Pencil, X } from "lucide-react";
-import { useState } from "react";
 
 import {
   Dialog,
@@ -33,25 +35,36 @@ export type AssignmentChipItem = {
 export function AssignmentSubjectChips({
   items,
   who,
+  open,
+  onOpenChange,
   onEdit,
   onRemove,
+  withActions = false,
 }: {
   items: AssignmentChipItem[];
   /** The name of the teacher, to title the modal. */
   who?: string;
+  /** Whether the list is on screen. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   /** Opens the edit form of the assignment. */
-  onEdit: (item: AssignmentChipItem) => void;
+  onEdit?: (item: AssignmentChipItem) => void;
   /** Asks to remove the assignment. */
-  onRemove: (item: AssignmentChipItem) => void;
+  onRemove?: (item: AssignmentChipItem) => void;
+  /**
+   * Whether the list is opened to act on it: the actions are shown
+   * only then. The counter opens it to read it.
+   */
+  withActions?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-
   if (items.length === 0) {
     return <span className="text-muted-foreground">Sin asignar</span>;
   }
 
   const shown = items.slice(0, 1);
   const extra = items.length - shown.length;
+  // The actions are shown only when the list is opened to act on it.
+  const canAct = withActions && Boolean(onEdit || onRemove);
 
   return (
     <>
@@ -64,16 +77,16 @@ export function AssignmentSubjectChips({
         {extra > 0 && (
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() => onOpenChange(true)}
             title={`Ver las ${extra} materia(s) más`}
-            className="inline-flex items-center rounded-full bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-primary transition-opacity hover:opacity-80"
+            className="inline-flex items-center rounded-idx bg-primary-soft px-[9px] py-[3px] font-mono text-[11.8px] font-semibold text-primary transition-opacity hover:opacity-80"
           >
             +{extra}
           </button>
         )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-[16px]">
@@ -94,30 +107,34 @@ export function AssignmentSubjectChips({
                   <span className="font-medium">{item.courseName}</span>
                   <span className="text-muted-foreground"> · {item.subjectName}</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    onEdit(item);
-                  }}
-                  aria-label={`Editar la asignación de ${item.subjectName} en ${item.courseName}`}
-                  title="Editar la asignación"
-                  className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Pencil className="size-3.5" strokeWidth={1.9} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    onRemove(item);
-                  }}
-                  aria-label={`Quitar la asignación de ${item.subjectName} en ${item.courseName}`}
-                  title="Quitar la asignación"
-                  className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                >
-                  <X className="size-3.5" strokeWidth={1.9} aria-hidden />
-                </button>
+                {canAct && onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onEdit(item);
+                    }}
+                    aria-label={`Editar la asignación de ${item.subjectName} en ${item.courseName}`}
+                    title="Editar la asignación"
+                    className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Pencil className="size-3.5" strokeWidth={1.9} aria-hidden />
+                  </button>
+                )}
+                {canAct && onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onRemove(item);
+                    }}
+                    aria-label={`Quitar la asignación de ${item.subjectName} en ${item.courseName}`}
+                    title="Quitar la asignación"
+                    className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                  >
+                    <X className="size-3.5" strokeWidth={1.9} aria-hidden />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
