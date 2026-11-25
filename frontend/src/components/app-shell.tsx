@@ -43,7 +43,7 @@ import { useSchool } from "@/lib/school/hooks";
 import { useSchoolOverview } from "@/lib/school/overview";
 import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
-import { getCollapsedSidebar, setCollapsedSidebar, subscribeSidebar } from "@/lib/sidebar";
+import { useCollapsedSidebar } from "@/lib/sidebar";
 import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -371,11 +371,7 @@ export function AppShell({
   // The shape of the rail: expanded or collapsed. It is a personal
   // preference that lives in the browser, so every panel of the app
   // starts with the rail the way the person left it.
-  const collapsed = useSyncExternalStore(
-    subscribeSidebar,
-    getCollapsedSidebar,
-    getCollapsedSidebar,
-  );
+  const [collapsed, setCollapsed] = useCollapsedSidebar();
 
   const entitlement = useEntitlement(session.primarySchoolId);
   const school = useSchool(session.primarySchoolId);
@@ -579,7 +575,7 @@ export function AppShell({
             title={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
             aria-pressed={collapsed}
             className="hidden size-9 shrink-0 place-items-center rounded-idx border border-border bg-card text-muted-foreground transition-colors hover:text-foreground min-[900px]:grid"
-            onClick={() => setCollapsedSidebar(!collapsed)}
+            onClick={() => setCollapsed(!collapsed)}
           >
             {collapsed ? (
               <PanelLeftOpen className="size-[18px]" strokeWidth={1.9} />

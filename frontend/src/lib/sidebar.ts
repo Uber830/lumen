@@ -11,9 +11,16 @@
 //   collapsed  the rail is a strip of icons, 68 px wide
 //
 // The store is the source of truth for the UI: the shell reads it with
-// `useSyncExternalStore` instead of copying it into a state, so every
-// view of the app shares the same shape.
+// `useCollapsedSidebar`, so every view of the app shares the same shape.
 // =============================================================================
+
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+
+/**
+ * The effect that runs before the paint in the browser and after it in
+ * the server: the server has no browser to paint.
+ */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export const SIDEBAR_STORAGE_KEY = "lumen-sidebar-collapsed";
 
@@ -53,4 +60,32 @@ export function setCollapsedSidebar(collapsed: boolean): void {
     }
   }
   notifySidebarChange();
+}
+
+/**
+ * The shape of the rail, as the interface sees it.
+ *
+ * The preference lives in the browser and the server does not know it:
+ * the server always sends the rail expanded. Reading the stored value
+ * during the render would make the client and the server disagree, and
+ * React does not patch the attributes that do not match — the rail
+ * would stay expanded even with the preference saved.
+ *
+ * So the value is read once the component is mounted: the first paint
+ * is the one the server sent and the rail folds right after, before
+ * the browser shows the frame.
+ */
+export function useCollapsedSidebar(): [boolean, (collapsed: boolean) => void] {
+  const [collapsed, setCollapsed] = useState(false);
+
+  useIsomorphicLayoutEffect(() => {
+    setCollapsed(getCollapsedSidebar());
+    return subscribeSidebar(() => setCollapsed(getCollapsedSidebar()));
+  }, []);
+
+  const change = useCallback((next: boolean) => {
+    setCollapsedSidebar(next);
+  }, []);
+
+  return [collapsed, change];
 }
