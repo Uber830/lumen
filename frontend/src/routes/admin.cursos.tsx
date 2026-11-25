@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useRouteContext } from "@tanstack/react-router";
 import { BookOpen, ChevronRight, Plus, Trash2 } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   Chip,
   EmptyState,
   PageHeader,
+  Pagination,
   SectionCard,
   TableShell,
   tableCellClass,
@@ -16,12 +17,17 @@ import {
 import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
 import { AcademicStructureWizard } from "@/features/admin/academic-wizard";
 import {
+  CourseSubjectsDialog,
+  type CourseSubjectItem,
+} from "@/features/admin/course-subjects-dialog";
+import {
   useCourseSubjects,
   useDeleteCourse,
   useDeleteCourseSubject,
   useDeleteSubject,
 } from "@/features/academics/hooks";
 import type { CourseSubjectSummary } from "@/features/academics/types";
+import { paginate } from "@/lib/pagination";
 import { useSchoolCourses, useSchoolSubjects } from "@/lib/school/community";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +48,9 @@ export const Route = createFileRoute("/admin/cursos")({
   }),
   component: CursosPage,
 });
+
+/** How many courses are on a page. */
+const PAGE_SIZE = 10;
 
 /**
  * What is being removed.
@@ -70,15 +79,18 @@ function CursosPage() {
   // The creation of the structure happens in one big form: course,
   // subject and offering, one step after the other.
   const [wizardOpen, setWizardOpen] = useState(false);
-  // The course whose subjects are open.
-  const [expanded, setExpanded] = useState<string | null>(null);
+  // The course whose subjects are open in the modal.
+  const [openCourseId, setOpenCourseId] = useState<string | null>(null);
+  // The pages of the two lists.
+  const [page, setPage] = useState(1);
+  const [orphanPageNumber, setOrphanPage] = useState(1);
 
   const deleteCourse = useDeleteCourse(schoolId ?? "");
   const deleteSubject = useDeleteSubject(schoolId ?? "");
   const deleteOffering = useDeleteCourseSubject(schoolId ?? "");
   const removal = useDeleteConfirmation<Removal>();
 
-  // The offerings of each course: the row that opens shows them.
+  // The offerings of each course: the modal of the course shows them.
   const offeringsByCourse = useMemo(() => {
     const map = new Map<string, CourseSubjectSummary[]>();
     for (const offering of courseSubjects.data ?? []) {
@@ -103,6 +115,28 @@ function CursosPage() {
   }
 
   const activeCourses = (courses.data ?? []).filter((course) => course.status === "activo");
+  const courseList = courses.data ?? [];
+
+  // The list of courses is cut in pages: the view keeps the place it
+  // has when the school grows.
+  const coursePage = paginate(courseList, page, PAGE_SIZE);
+  const visibleCourses = coursePage.items;
+
+  const orphanPage = paginate(orphanSubjects, orphanPageNumber, PAGE_SIZE);
+  const visibleOrphans = orphanPage.items;
+
+  // The course whose subjects the modal shows.
+  const openCourse = openCourseId
+    ? (courseList.find((course) => course.id === openCourseId) ?? null)
+    : null;
+  const openCourseSubjects: CourseSubjectItem[] = openCourse
+    ? (offeringsByCourse.get(openCourse.id) ?? []).map((offering) => ({
+        id: offering.id,
+        subjectName: offering.subject_name,
+        area: offering.subject_area ?? null,
+        assignedTeachers: offering.assigned_teachers,
+      }))
+    : [];
 
   function askRemoveCourse(courseId: string, name: string) {
     const offered = offeringsByCourse.get(courseId)?.length ?? 0;
@@ -232,64 +266,57 @@ function CursosPage() {
             }
           />
         ) : (
-          <TableShell>
-            <PanelTable className="w-full border-collapse">
-              <caption className="sr-only">
-                Cursos del colegio, con sus materias, sus docentes y su estado
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col" className={tableHeadClass}>
-                    Curso
-                  </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Grado
-                  </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Materias
-                  </th>
-                  <th scope="col" className={`${tableHeadClass} text-right`}>
-                    Docentes
-                  </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Estado
-                  </th>
-                  <th scope="col" className={`${tableHeadClass} text-right`}>
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(courses.data ?? []).map((course) => {
-                  const offerings = offeringsByCourse.get(course.id) ?? [];
-                  const isOpen = expanded === course.id;
-                  return (
-                    <Fragment key={course.id}>
-                      <tr
-                        className={cn("transition-colors hover:bg-muted", isOpen && "bg-muted/60")}
-                      >
+          <>
+            <TableShell>
+              <PanelTable className="w-full border-collapse">
+                <caption className="sr-only">
+                  Cursos del colegio, con sus materias, sus docentes y su estado
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className={tableHeadClass}>
+                      Curso
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Grado
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Materias
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Docentes
+                    </th>
+                    <th scope="col" className={tableHeadClass}>
+                      Estado
+                    </th>
+                    <th scope="col" className={`${tableHeadClass} text-right`}>
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleCourses.map((course) => {
+                    const offerings = offeringsByCourse.get(course.id) ?? [];
+                    return (
+                      <tr key={course.id} className="transition-colors hover:bg-muted">
                         <td className={tableCellClass}>
                           <p className="font-medium text-foreground">{course.name}</p>
                           <p className="text-[12px] text-muted-foreground">{course.grade_label}</p>
                         </td>
                         <td className={tableCellClass}>{course.grade_label}</td>
                         <td className={tableCellClass}>
-                          {/* The subjects of the course live here: the row
-                              opens with a click. */}
+                          {/* The subjects of the course live in a modal:
+                              the table does not move when it opens. */}
                           <button
                             type="button"
-                            onClick={() => setExpanded(isOpen ? null : course.id)}
-                            aria-expanded={isOpen}
+                            onClick={() => setOpenCourseId(course.id)}
                             className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2.5 py-1 text-[12.4px] font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-secondary"
                           >
                             {offerings.length === 0
                               ? "Sin materias"
                               : `${offerings.length} materia${offerings.length === 1 ? "" : "s"}`}
                             <ChevronRight
-                              className={cn(
-                                "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                                isOpen && "rotate-90",
-                              )}
+                              className="size-3.5 shrink-0 text-muted-foreground"
                               strokeWidth={1.9}
                               aria-hidden
                             />
@@ -330,84 +357,20 @@ function CursosPage() {
                           </div>
                         </td>
                       </tr>
+                    );
+                  })}
+                </tbody>
+              </PanelTable>
+            </TableShell>
 
-                      {/* The subjects of the open course, under its row. */}
-                      {isOpen && (
-                        <tr>
-                          <td
-                            colSpan={6}
-                            className="border-t border-border bg-secondary/50 px-[18px] py-3"
-                          >
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
-                              Materias de {course.name}
-                            </p>
-                            {offerings.length === 0 ? (
-                              <p className="mt-2 text-[13px] text-muted-foreground">
-                                Este curso no tiene materias ofrecidas todavía.
-                              </p>
-                            ) : (
-                              <ul className="mt-2 space-y-1.5">
-                                {offerings.map((offering) => (
-                                  <li
-                                    key={offering.id}
-                                    className="flex flex-wrap items-center gap-2.5 rounded-idx border border-border bg-card px-3 py-2"
-                                  >
-                                    <BookOpen
-                                      className="size-[15px] shrink-0 text-primary"
-                                      strokeWidth={1.9}
-                                      aria-hidden
-                                    />
-                                    <span className="truncate text-[13.4px] font-medium">
-                                      {offering.subject_name}
-                                    </span>
-                                    <span className="shrink-0 text-[12px] text-muted-foreground">
-                                      {offering.subject_area ?? "Sin área"}
-                                    </span>
-                                    <Chip tone="muted">
-                                      {offering.assigned_teachers} docente
-                                      {offering.assigned_teachers === 1 ? "" : "s"}
-                                    </Chip>
-                                    <div className="ml-auto flex items-center gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          askRemoveOffering(
-                                            offering.id,
-                                            offering.subject_name,
-                                            offering.course_name,
-                                          )
-                                        }
-                                      >
-                                        Quitar del curso
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        icon={Trash2}
-                                        onClick={() =>
-                                          askRemoveSubject(
-                                            offering.subject_id,
-                                            offering.subject_name,
-                                          )
-                                        }
-                                      >
-                                        Quitar la materia
-                                      </Button>
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </PanelTable>
-          </TableShell>
+            <Pagination
+              page={coursePage.page}
+              pageCount={coursePage.pageCount}
+              total={coursePage.total}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </SectionCard>
 
@@ -421,7 +384,7 @@ function CursosPage() {
           description="No están ofrecidas en ningún curso: ofrece la que quieras usar o quítala."
         >
           <ul>
-            {orphanSubjects.map((subject) => (
+            {visibleOrphans.map((subject) => (
               <li
                 key={subject.id}
                 className="flex flex-wrap items-center gap-2.5 border-b border-border px-[18px] py-[13px] last:border-b-0"
@@ -448,6 +411,14 @@ function CursosPage() {
               </li>
             ))}
           </ul>
+
+          <Pagination
+            page={orphanPage.page}
+            pageCount={orphanPage.pageCount}
+            total={orphanPage.total}
+            pageSize={PAGE_SIZE}
+            onPageChange={setOrphanPage}
+          />
         </SectionCard>
       )}
 
@@ -466,6 +437,19 @@ function CursosPage() {
         schoolId={schoolId}
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
+      />
+
+      {/* The subjects of a course, in a modal. */}
+      <CourseSubjectsDialog
+        open={openCourse !== null}
+        onOpenChange={(open) => {
+          if (!open) setOpenCourseId(null);
+        }}
+        courseName={openCourse?.name ?? ""}
+        items={openCourseSubjects}
+        onRemove={(item) => {
+          askRemoveOffering(item.id, item.subjectName, openCourse?.name ?? "el curso");
+        }}
       />
 
       <ConfirmDialog
