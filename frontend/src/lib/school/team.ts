@@ -6,8 +6,9 @@
 // decide what a rank may do: the API returns the permissions of the
 // caller and of each member of the team.
 //
-// The school always keeps one principal: the API refuses to demote or
-// remove the last one.
+// The school has a single principal: the rank is handed over from one
+// person to another, so the API refuses to create a second one and to
+// demote or remove the last one.
 // =============================================================================
 
 import {
@@ -88,6 +89,27 @@ export function useUpdateAdminRank(): UseMutationResult<
   return useMutation({
     mutationFn: ({ membership_id, admin_role }) =>
       api.patch<SchoolAdmin>(`/v1/school/admins/${membership_id}`, { admin_role }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: teamKeys.admins() });
+    },
+  });
+}
+
+/**
+ * Hand the principal rank over to another administrator.
+ *
+ * The school has a single principal: the rank moves from one person
+ * to another, and the one who gives it away stays in the team.
+ */
+export function useTransferPrincipal(): UseMutationResult<
+  SchoolAdmin,
+  Error,
+  { membership_id: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membership_id }) =>
+      api.post<SchoolAdmin>(`/v1/school/admins/${membership_id}/transfer`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: teamKeys.admins() });
     },
