@@ -54,7 +54,11 @@ const buttonVariants = {
     "bg-primary text-primary-foreground shadow-[0_6px_16px_-8px_rgba(26,76,240,.55)] hover:bg-primary/90",
   outline:
     "border border-input bg-card text-foreground hover:bg-secondary hover:border-foreground/40",
-  ghost: "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+  // The ghost one lives inside the cards: on hover it takes a surface,
+  // a hairline border and a soft shadow, so the reader sees that the
+  // control is there and that it can be pressed.
+  ghost:
+    "bg-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground hover:shadow-[0_2px_10px_-6px_rgba(10,13,19,.38)]",
   danger:
     "border border-destructive/35 bg-destructive-soft text-destructive hover:bg-destructive/20",
 } as const;
