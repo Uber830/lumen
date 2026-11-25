@@ -36,8 +36,8 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
-| Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos. La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
-| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia |
+| Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se despliegan las de ese curso. La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
+| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, **agrupadas por docente**: una fila por persona y sus materias en fichas |
 | Períodos | `/admin/periodos` | Ciclo lectivo, cierre de periodo y periodo vigente |
 | ICFES | `/admin/icfes-colegio` | Los simulacros del colegio: el módulo se está afinando y el panel lo avisa |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
@@ -46,6 +46,14 @@ metadatos: el administrador consulta el material habilitado y nada más.
 
 «Mi perfil» vive en el **menú de usuario** (arriba a la derecha), no en el menú
 lateral.
+
+### Los formularios van en un modal
+
+Todos los formularios del panel (invitar administrador, nuevo periodo, nueva
+asignación, enviar solicitud, la ficha del administrador) se abren en un
+**modal centrado**, con el estilo del panel: esquinas de 4 px, Space Grotesk y
+los colores del colegio. La lista de detrás no se mueve, y el control que no
+puede ejecutarse aparece **deshabilitado con el motivo**.
 
 ### La barra lateral se contrae
 
@@ -58,12 +66,32 @@ El valor se lee **al montar el componente**, no durante el render: el servidor
 siempre envía la barra desplegada y React no parchea los atributos que no
 coinciden con los del cliente.
 
+### La vista de cursos y las materias dentro
+
+La tabla de cursos ocupa el ancho completo: el panel de materias que estaba
+al lado se fue. Cada fila tiene un botón **Materias** que despliega, bajo el
+curso, la lista de sus materias con el área, los docentes que la imparten y
+las acciones (**Quitar del curso**, **Quitar la materia**).
+
+Las materias que **no están en ningún curso** se listan aparte: si no, no se
+verían en ninguna parte y no se podrían quitar. Los cursos también se
+quitan (con confirmación: el curso se borra con sus materias ofrecidas y con
+las asignaciones de los docentes que las impartían; el material ya subido se
+conserva).
+
 ### La estructura académica, en un formulario
 
 Crear un curso, una materia y ofrecerla ya no son tres cajas sueltas: la
 vista **Cursos y materias** abre un modal grande y central con tres pasos
 (**curso → materia → ofrecer**) y los botones **Siguiente** y **Atrás**. Un
 paso en blanco se salta: el que solo necesita el curso avanza y cierra.
+
+### Las asignaciones, agrupadas por docente
+
+La lista tiene **una fila por docente**, no una por asignación: la persona es
+lo que se repite, y lo que importa es lo que cada una enseña. Sus materias
+van en fichas («7° B · Matemáticas»), con el lápiz para editarla y la ✕ para
+quitarla. La barra de arriba dice los dos números: docentes y asignaciones.
 
 ### La selección múltiple
 
@@ -167,6 +195,11 @@ solicitud necesita el mismo archivo, así que `GET /v1/platform/cases/{id}`
 devuelve los `attachment_ids` de cada mensaje y el panel los muestra como
 enlaces. La puerta de los archivos deja pasar al administrador de plataforma
 (`context.is_platform_admin`) para cualquier colegio.
+
+Los dos lados adjuntan: la plataforma sube el archivo con
+`POST /v1/platform/cases/{id}/attachments` y lo manda en la respuesta
+(`attachment_ids`). El archivo va al almacén del colegio del caso, así que
+colegio y soporte leen la misma copia.
 
 ---
 
