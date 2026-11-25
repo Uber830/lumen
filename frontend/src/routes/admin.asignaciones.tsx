@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ClipboardList, GraduationCap, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, GraduationCap, Link2, ListChecks, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -461,8 +461,8 @@ function AsignacionesPage() {
                       {group.visibleMaterialsCount}
                     </td>
                     <td className={`${tableCellClass} text-right`}>
-                      {/* The three actions of the row live together:
-                          adding, editing and removing. */}
+                      {/* The actions of the row live together: adding
+                          a subject and managing the ones it has. */}
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -478,24 +478,13 @@ function AsignacionesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={Pencil}
+                          icon={ListChecks}
                           onClick={() =>
                             setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
                           }
-                          aria-label={`Editar las materias de ${group.name}`}
+                          aria-label={`Gestionar las materias de ${group.name}`}
                         >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Trash2}
-                          onClick={() =>
-                            setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
-                          }
-                          aria-label={`Quitar las materias de ${group.name}`}
-                        >
-                          Quitar
+                          Gestionar
                         </Button>
                       </div>
                     </td>
