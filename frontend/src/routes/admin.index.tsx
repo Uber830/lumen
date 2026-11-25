@@ -364,9 +364,6 @@ function AdminDashboard() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>Los datos son del colegio y se cuentan en el servidor al abrir la vista.</span>
       </p>
     </>

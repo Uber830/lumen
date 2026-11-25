@@ -22,7 +22,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useSchoolCourses } from "@/lib/school/community";
+import { useSchoolCourseOptions } from "@/lib/school/community";
 import {
   useActivateSimulator,
   useSchoolSimulators,
@@ -119,7 +119,7 @@ function SimuladoresDeLaEscuela() {
   const { session } = useRouteContext({ from: "/admin" });
 
   const simulators = useSchoolSimulators();
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   const activate = useActivateSimulator();
 
   // The simulator the admin is about to activate, and the one whose
@@ -583,9 +583,6 @@ function SimuladoresDeLaEscuela() {
       )}
 
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           El puntaje promedio se calcula con las respuestas de los estudiantes de los cursos
           activados, sobre una escala de {kpis?.max_score ?? 500} puntos.

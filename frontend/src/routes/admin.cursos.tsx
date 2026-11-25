@@ -27,8 +27,7 @@ import {
   useDeleteSubject,
 } from "@/features/academics/hooks";
 import type { CourseSubjectSummary } from "@/features/academics/types";
-import { paginate } from "@/lib/pagination";
-import { useSchoolCourses, useSchoolSubjects } from "@/lib/school/community";
+import { useSchoolCoursesPage, useSchoolSubjects } from "@/lib/school/community";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/cursos")({
@@ -69,13 +68,6 @@ function CursosPage() {
   const { session } = useRouteContext({ from: "/admin/cursos" });
   const schoolId = session.primarySchoolId;
 
-  // The read side comes from the panel's own endpoints: the counts of
-  // subjects and teachers per course are computed in the server.
-  const courses = useSchoolCourses();
-  const subjects = useSchoolSubjects();
-  // The offerings: the pairs (curso, materia) the school has.
-  const courseSubjects = useCourseSubjects(schoolId);
-
   // The creation of the structure happens in one big form: course,
   // subject and offering, one step after the other.
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -84,6 +76,16 @@ function CursosPage() {
   // The pages of the two lists.
   const [page, setPage] = useState(1);
   const [orphanPageNumber, setOrphanPage] = useState(1);
+
+  // The read side comes from the panel's own endpoints: the counts of
+  // subjects and teachers per course are computed in the server, and
+  // so is the page of the list.
+  const courses = useSchoolCoursesPage(page);
+  // The subjects that are in no course: the server knows which ones
+  // are offered and which ones are not.
+  const subjects = useSchoolSubjects({ offered: false, page: orphanPageNumber });
+  // The offerings: the pairs (curso, materia) the school has.
+  const courseSubjects = useCourseSubjects(schoolId);
 
   const deleteCourse = useDeleteCourse(schoolId ?? "");
   const deleteSubject = useDeleteSubject(schoolId ?? "");
@@ -99,31 +101,16 @@ function CursosPage() {
     return map;
   }, [courseSubjects.data]);
 
-  // The subjects that are in no course: they would be invisible in the
-  // table, and a course that is not wanted has to be removable.
-  const offeredSubjectIds = useMemo(
-    () => new Set((courseSubjects.data ?? []).map((offering) => offering.subject_id)),
-    [courseSubjects.data],
-  );
-  const orphanSubjects = useMemo(
-    () => (subjects.data ?? []).filter((subject) => !offeredSubjectIds.has(subject.id)),
-    [subjects.data, offeredSubjectIds],
-  );
-
   if (!schoolId) {
     return <NoSchoolFallback onSignOut={() => navigate({ to: "/login" })} />;
   }
 
-  const activeCourses = (courses.data ?? []).filter((course) => course.status === "activo");
-  const courseList = courses.data ?? [];
-
-  // The list of courses is cut in pages: the view keeps the place it
-  // has when the school grows.
-  const coursePage = paginate(courseList, page, PAGE_SIZE);
-  const visibleCourses = coursePage.items;
-
-  const orphanPage = paginate(orphanSubjects, orphanPageNumber, PAGE_SIZE);
-  const visibleOrphans = orphanPage.items;
+  // The page of the courses and the page of the subjects that are in
+  // no course: the server cuts both.
+  const courseList = courses.data?.items ?? [];
+  const visibleCourses = courseList;
+  const orphanSubjects = subjects.data?.items ?? [];
+  const visibleOrphans = orphanSubjects;
 
   // The course whose subjects the modal shows.
   const openCourse = openCourseId
@@ -238,7 +225,7 @@ function CursosPage() {
         className="mb-5 overflow-hidden"
         bodyClassName="p-0"
         title="Cursos del colegio"
-        description={`${courses.isLoading ? "—" : activeCourses.length} cursos en el periodo vigente`}
+        description={`${courses.isLoading ? "—" : (courses.data?.total ?? 0)} cursos en el colegio`}
       >
         {courses.isError ? (
           <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
@@ -254,7 +241,7 @@ function CursosPage() {
               </div>
             ))}
           </div>
-        ) : (courses.data?.length ?? 0) === 0 ? (
+        ) : (courses.data?.total ?? 0) === 0 ? (
           <EmptyState
             icon={BookOpen}
             title="Sin cursos"
@@ -364,10 +351,10 @@ function CursosPage() {
             </TableShell>
 
             <Pagination
-              page={coursePage.page}
-              pageCount={coursePage.pageCount}
-              total={coursePage.total}
-              pageSize={PAGE_SIZE}
+              page={courses.data?.page ?? 1}
+              pageCount={courses.data?.pages ?? 0}
+              total={courses.data?.total ?? 0}
+              pageSize={courses.data?.per_page ?? PAGE_SIZE}
               onPageChange={setPage}
             />
           </>
@@ -413,10 +400,10 @@ function CursosPage() {
           </ul>
 
           <Pagination
-            page={orphanPage.page}
-            pageCount={orphanPage.pageCount}
-            total={orphanPage.total}
-            pageSize={PAGE_SIZE}
+            page={subjects.data?.page ?? 1}
+            pageCount={subjects.data?.pages ?? 0}
+            total={subjects.data?.total ?? 0}
+            pageSize={subjects.data?.per_page ?? PAGE_SIZE}
             onPageChange={setOrphanPage}
           />
         </SectionCard>
@@ -425,9 +412,6 @@ function CursosPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>Los conteos de materias y docentes se calculan en el servidor.</span>
       </p>
 

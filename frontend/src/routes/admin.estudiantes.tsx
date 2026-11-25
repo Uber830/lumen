@@ -30,7 +30,11 @@ import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import type { SchoolMember } from "@/features/academics/types";
 import { activationLink, useInviteUser, useUpdateMembership } from "@/lib/users/invitations";
-import { useSchoolCourses, useSchoolStudents, type SchoolMemberRow } from "@/lib/school/community";
+import {
+  useSchoolCourseOptions,
+  useSchoolStudents,
+  type SchoolMemberRow,
+} from "@/lib/school/community";
 import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/estudiantes")({
@@ -64,7 +68,7 @@ function EstudiantesPage() {
   const [page, setPage] = useState(1);
 
   const students = useSchoolStudents({ q: query, status, course_id: courseId, page });
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
 
   const invite = useInviteUser();
   const updateMembership = useUpdateMembership();
@@ -485,9 +489,6 @@ function EstudiantesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>El filtro por curso y la búsqueda se ejecutan en el servidor.</span>
       </p>
 

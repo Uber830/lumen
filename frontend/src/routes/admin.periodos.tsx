@@ -426,9 +426,6 @@ function PeriodosPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           Al cerrar un periodo, el material de ese ciclo se archiva para el colegio: queda en el
           histórico y sale del material activo.

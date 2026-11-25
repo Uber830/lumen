@@ -386,9 +386,6 @@ function Personalizacion() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-            <Chip tone="muted" dot>
-              Sistema operativo
-            </Chip>
             <span>
               El escudo se sube de verdad: el archivo que eliges se guarda en el almacenamiento y
               aparece en toda la plataforma.
