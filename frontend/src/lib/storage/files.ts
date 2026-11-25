@@ -38,6 +38,20 @@ export function fileUrl(stored: string | null | undefined): string | null {
 }
 
 /**
+ * The name of a file, read from the path it has in the store.
+ *
+ * The store prefixes the name with the moment of the upload
+ * (`1750000000-factura.pdf`). That prefix is not what the person
+ * wrote: it is removed, so the list of attachments says what the
+ * files are.
+ */
+export function fileNameFromPath(path: string): string {
+  const file = path.split("/").pop() ?? path;
+  const dash = file.indexOf("-");
+  return dash > 0 ? file.slice(dash + 1) : file;
+}
+
+/**
  * A file name that is safe to put in a storage path.
  *
  * The browser sends the name the user gave the file: it can have

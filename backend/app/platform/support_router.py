@@ -120,6 +120,7 @@ async def _detail(
                 ),
                 author_role=message.author_role,
                 body=message.body,
+                attachment_ids=list(message.attachment_ids or []),
                 created_at=message.created_at,
             )
             for message in thread.messages

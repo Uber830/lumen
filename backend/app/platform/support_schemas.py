@@ -32,6 +32,9 @@ class CaseMessageOut(BaseModel):
     # colegio or plataforma.
     author_role: str = "colegio"
     body: str
+    # The files the author attached to the message: the support team
+    # reads the same ones the school sent.
+    attachment_ids: list[str] = Field(default_factory=list)
     created_at: datetime
 
 

@@ -34,6 +34,7 @@ import {
   useSchoolSupportCases,
   type SupportCaseSummary,
 } from "@/lib/school/support";
+import { fileNameFromPath, fileUrl } from "@/lib/storage/files";
 
 export const Route = createFileRoute("/admin/soporte")({
   head: () => ({
@@ -82,14 +83,6 @@ function shortDate(value: string): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${day}/${month}/${date.getFullYear()}`;
-}
-
-/** The name of an attached file, read from the path it has in the store. */
-function attachmentName(path: string): string {
-  const file = path.split("/").pop() ?? path;
-  // The store prefixes the name with the moment of the upload.
-  const dash = file.indexOf("-");
-  return dash > 0 ? file.slice(dash + 1) : file;
 }
 
 function SoportePage() {
@@ -448,7 +441,7 @@ function SoportePage() {
                           {message.attachment_ids.map((attachment) => (
                             <li key={attachment}>
                               <a
-                                href={`/v1/files/${attachment}`}
+                                href={fileUrl(attachment) ?? "#"}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground transition-colors hover:bg-secondary"
@@ -458,7 +451,7 @@ function SoportePage() {
                                   strokeWidth={1.9}
                                   aria-hidden
                                 />
-                                {attachmentName(attachment)}
+                                {fileNameFromPath(attachment)}
                               </a>
                             </li>
                           ))}

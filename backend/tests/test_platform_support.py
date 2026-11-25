@@ -168,6 +168,55 @@ async def test_the_detail_carries_the_conversation_and_the_audit(
     assert body["can_resolve"] is True
 
 
+async def test_the_platform_reads_the_attachments_of_the_school(
+    client, platform_admin, engine, a_case, case_school
+) -> None:
+    """The files the school sent travel with the message.
+
+    The support team has to open the same document the school
+    attached, so the detail of the case carries the path of each one.
+    """
+    attached = f"support-attachments/{case_school}/1750000000-captura.png"
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        message = (
+            await session.execute(select(SupportMessage).where(SupportMessage.case_id == a_case))
+        ).scalar_one()
+        message.attachment_ids = [attached]
+        await session.commit()
+
+    response = client.get(f"/v1/platform/cases/{a_case}", headers=platform_admin)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["messages"][0]["attachment_ids"] == [attached]
+
+
+def test_the_platform_admin_downloads_the_attachments_of_the_school(
+    client, platform_admin, tmp_path, monkeypatch, case_school
+) -> None:
+    """The file of the school is served to the platform team.
+
+    The file belongs to the school, but the support team is the one
+    that has to read it: the door of the files lets it in.
+    """
+    from app.config import get_settings
+    from app.core import storage
+
+    monkeypatch.setenv("UPLOADS_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    try:
+        relative = f"support-attachments/{case_school}/1750000000-captura.txt"
+        storage.write_file(relative, b"la captura del problema")
+
+        response = client.get(f"/v1/files/{relative}", headers=platform_admin)
+
+        assert response.status_code == 200
+        assert response.content == b"la captura del problema"
+    finally:
+        get_settings.cache_clear()
+
+
 async def test_the_answer_is_written_and_the_case_goes_to_waiting(
     client, platform_admin, a_case
 ) -> None:
