@@ -461,7 +461,9 @@ class AdminInviteIn(BaseModel):
 
     email: str
     full_name: str
-    # principal or secundario. The school keeps one principal.
+    # principal or secundario. The school has a single principal, so
+    # the invitation creates a secondary: the rank is handed over
+    # later, from the file of the team.
     admin_role: str = "secundario"
 
 

@@ -472,6 +472,10 @@ async def invite_school_admin(
 
     Only the principal does it: inviting a colleague is a decision of
     the school, not of its helper.
+
+    The school has a single principal, so the invitation always
+    creates a secondary: the rank is handed over later, from the file
+    of the team.
     """
     membership = _require_admin(context)
     require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
@@ -481,6 +485,16 @@ async def invite_school_admin(
     from app.users.operations import create_invited_user
 
     rank = SchoolAdminRole(body.admin_role)
+
+    if rank == SchoolAdminRole.PRINCIPAL:
+        principals = await team.count_principals(session, membership.school_id)
+        if principals > 0:
+            raise ConflictError(
+                "El colegio tiene un solo administrador principal. "
+                "Los administradores nuevos entran como secundarios: "
+                "cede el rango desde la ficha del equipo.",
+                code="only_one_principal",
+            )
 
     try:
         user, admin_membership = await create_invited_user(
@@ -529,6 +543,32 @@ async def update_school_admin(
 
     rank = SchoolAdminRole(body.admin_role)
     await team.set_rank(session, membership.school_id, membership_id, rank)
+
+    admins = await team.list_admins(session, membership.school_id)
+    for admin in admins:
+        if admin["membership_id"] == str(membership_id):
+            return AdminOut.model_validate(admin)
+
+    raise NotFoundError("Administrator not found.")
+
+
+@router.post("/admins/{membership_id}/transfer", response_model=AdminOut)
+async def transfer_principal_role(
+    membership_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminOut:
+    """Hand the principal rank over to another administrator.
+
+    The school has a single principal: the rank moves from one person
+    to another in a single step, so the school is never left without
+    one. The administrator who gives it away stays in the team, as a
+    secondary.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
+
+    await team.transfer_principal(session, membership.school_id, membership.id, membership_id)
 
     admins = await team.list_admins(session, membership.school_id)
     for admin in admins:
