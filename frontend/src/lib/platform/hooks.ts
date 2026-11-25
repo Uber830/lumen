@@ -411,15 +411,50 @@ export function useCase(id: string | null): UseQueryResult<CaseDetail, Error> {
 export function useAnswerCase(): UseMutationResult<
   CaseDetail,
   Error,
-  { id: string; body: string }
+  { id: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      api.post<CaseDetail>(`/v1/platform/cases/${id}/messages`, { body }),
+    mutationFn: ({ id, body, attachment_ids }) =>
+      api.post<CaseDetail>(`/v1/platform/cases/${id}/messages`, { body, attachment_ids }),
     onSuccess: (updated) => {
       qc.setQueryData(platformKeys.case(updated.id), updated);
       qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/**
+ * Upload a file to attach to the answer of a case.
+ *
+ * The file goes to the store of the school of the case: the school
+ * and the support team read the same copy.
+ */
+export function useUploadCaseAttachment(): UseMutationResult<
+  { id: string; name: string; size: number },
+  Error,
+  { caseId: string; file: File }
+> {
+  return useMutation({
+    mutationFn: async ({ caseId, file }) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const response = await fetch(`${apiBaseUrl}/v1/platform/cases/${caseId}/attachments`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) {
+        let detail = `No se pudo adjuntar el archivo (${response.status}).`;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? detail;
+        } catch {
+          // The answer was not JSON: the message above is enough.
+        }
+        throw new Error(detail);
+      }
+      return (await response.json()) as { id: string; name: string; size: number };
     },
   });
 }

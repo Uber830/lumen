@@ -23,6 +23,15 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
+import { Select } from "@/components/select-field";
+import {
   SupportAttachmentField,
   type PickedAttachment,
 } from "@/features/admin/support-attachments";
@@ -186,8 +195,23 @@ function SoportePage() {
         </p>
       )}
 
-      {formOpen && (
-        <SectionCard className="mb-4" title="Nueva solicitud">
+      {/* The form lives in a modal: the list of the requests does not
+          move when the admin opens it. */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setFormError(null);
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">Nueva solicitud</DialogTitle>
+            <DialogDescription>
+              Cuéntale al equipo de Lumen qué pasó. Puedes adjuntar una captura o un documento.
+            </DialogDescription>
+          </DialogHeader>
+
           <form className="space-y-3" onSubmit={onOpenCase}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -199,7 +223,7 @@ function SoportePage() {
                 onChange={(event) => setTitle(event.target.value)}
                 required
                 placeholder="El material de 7° no aparece en el curso"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
 
@@ -207,17 +231,17 @@ function SoportePage() {
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Categoría
               </span>
-              <select
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {SUPPORT_CATEGORIES.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1.5">
+                <Select
+                  value={category}
+                  onChange={setCategory}
+                  options={SUPPORT_CATEGORIES.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  }))}
+                  placeholder="Elige la categoría"
+                />
+              </div>
             </label>
 
             <label className="block">
@@ -230,7 +254,7 @@ function SoportePage() {
                 required
                 rows={4}
                 placeholder="Cuéntale qué pasó, con qué curso y qué material."
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
               <span className="mt-1.5 block text-xs text-muted-foreground">
                 Queda registrado en el historial del caso.
@@ -250,17 +274,17 @@ function SoportePage() {
               </p>
             )}
 
-            <div className="flex items-center gap-2">
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setFormOpen(false)}>
+                Cancelar
+              </Button>
               <Button type="submit" icon={Send} disabled={openCase.isPending}>
                 {openCase.isPending ? "Enviando..." : "Enviar solicitud"}
               </Button>
-              <Button variant="ghost" icon={X} type="button" onClick={() => setFormOpen(false)}>
-                Cancelar
-              </Button>
-            </div>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         <Toolbar>

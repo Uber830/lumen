@@ -415,69 +415,81 @@ function AdministradoresPage() {
         </span>
       </p>
 
-      {detail && (
-        <SectionCard
-          className="mt-4"
-          title={`${detail.full_name} · ${detail.admin_role === "principal" ? "Principal" : "Secundario"}`}
-          description="Qué puede hacer este rango en el colegio"
-          actions={
-            <div className="flex items-center gap-2">
-              {detail.admin_role === "secundario" ? (
-                <Button
-                  icon={ShieldCheck}
-                  aria-disabled={!canManage}
-                  aria-describedby={canManage ? undefined : "admins-manage-reason"}
-                  title={
-                    canManage
-                      ? "Cederle el rango principal del colegio"
-                      : "Esta acción la hace el administrador principal del colegio."
-                  }
-                  disabled={transfer.isPending}
-                  onClick={() => {
-                    if (!canManage) return;
-                    setToTransfer(detail);
-                  }}
-                >
-                  Ceder el rango principal
-                </Button>
-              ) : (
-                <span className="text-[12.5px] text-muted-foreground">
-                  Es el administrador principal del colegio.
+      {/* The file of the administrator lives in a modal: the list of the
+          team does not move when the principal opens it. */}
+      <Dialog open={detail !== null} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-w-2xl">
+          {detail && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-[16px]">
+                  {detail.full_name} ·{" "}
+                  {detail.admin_role === "principal" ? "Principal" : "Secundario"}
+                </DialogTitle>
+                <DialogDescription>Qué puede hacer este rango en el colegio</DialogDescription>
+              </DialogHeader>
+
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {detail.permissions.map((permission) => (
+                  <li key={permission.permission} className="flex items-start gap-2 text-[13px]">
+                    <span
+                      className="mt-[7px] size-1.5 shrink-0 rounded-full bg-success"
+                      aria-hidden
+                    />
+                    <span className="text-muted-foreground">{permission.label}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* What separates the two ranks, in one place. */}
+              <p className="flex items-start gap-2 rounded-idx bg-warning-soft px-3 py-2.5 text-[13px] text-warning-foreground">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={1.9} aria-hidden />
+                <span>
+                  <strong className="font-semibold">Permisos por rol.</strong> El colegio tiene un
+                  solo administrador principal: el rango se cede, nunca se duplica. El principal
+                  administra personas, períodos y personalizaciones. El secundario hace lo mismo,
+                  menos administrar a otros administradores.
                 </span>
+              </p>
+
+              {transfer.error && (
+                <p role="alert" className="text-[13px] text-destructive">
+                  {transfer.error.message}
+                </p>
               )}
-              <Button variant="ghost" size="sm" icon={X} onClick={() => setDetail(null)}>
-                Cerrar
-              </Button>
-            </div>
-          }
-        >
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {detail.permissions.map((permission) => (
-              <li key={permission.permission} className="flex items-start gap-2 text-[13px]">
-                <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
-                <span className="text-muted-foreground">{permission.label}</span>
-              </li>
-            ))}
-          </ul>
 
-          {/* What separates the two ranks, in one place. */}
-          <p className="mt-4 flex items-start gap-2 rounded-idx bg-warning-soft px-3 py-2.5 text-[13px] text-warning-foreground">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={1.9} aria-hidden />
-            <span>
-              <strong className="font-semibold">Permisos por rol.</strong> El colegio tiene un solo
-              administrador principal: el rango se cede, nunca se duplica. El principal administra
-              personas, períodos y personalizaciones. El secundario hace lo mismo, menos administrar
-              a otros administradores.
-            </span>
-          </p>
-
-          {transfer.error && (
-            <p role="alert" className="mt-3 text-[13px] text-destructive">
-              {transfer.error.message}
-            </p>
+              <DialogFooter className="sm:justify-between">
+                {detail.admin_role === "secundario" ? (
+                  <Button
+                    icon={ShieldCheck}
+                    aria-disabled={!canManage}
+                    aria-describedby={canManage ? undefined : "admins-manage-reason"}
+                    title={
+                      canManage
+                        ? "Cederle el rango principal del colegio"
+                        : "Esta acción la hace el administrador principal del colegio."
+                    }
+                    disabled={transfer.isPending}
+                    onClick={() => {
+                      if (!canManage) return;
+                      setToTransfer(detail);
+                    }}
+                  >
+                    Ceder el rango principal
+                  </Button>
+                ) : (
+                  <span className="text-[12.5px] text-muted-foreground">
+                    Es el administrador principal del colegio.
+                  </span>
+                )}
+                <Button variant="ghost" type="button" onClick={() => setDetail(null)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </>
           )}
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={adminToRemove.target !== null}

@@ -10,7 +10,11 @@ import {
   DialogTitle,
 } from "@/components/dialog";
 import { Tag } from "@/components/ui-kit";
-import { useAnswerCase } from "@/lib/platform/hooks";
+import {
+  SupportAttachmentField,
+  type PickedAttachment,
+} from "@/features/admin/support-attachments";
+import { useAnswerCase, useUploadCaseAttachment } from "@/lib/platform/hooks";
 import type { CaseSummary } from "@/lib/platform/types";
 
 /**
@@ -19,6 +23,9 @@ import type { CaseSummary } from "@/lib/platform/types";
  * It answers one case or several at once: the body is the same for
  * all of them and each conversation keeps its own turn. What is
  * written here stays in the history of the case.
+ *
+ * The answer may carry files, the same way the school's request does:
+ * a guide, a capture of the fix, the document the school asked for.
  */
 export function CaseComposer({
   open,
@@ -30,12 +37,17 @@ export function CaseComposer({
   onClose: () => void;
 }) {
   const answer = useAnswerCase();
+  const uploadFile = useUploadCaseAttachment();
 
   const [body, setBody] = useState("");
+  const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const recipients = cases.map((item) => item.school_name ?? item.opened_by_name);
+  // The file belongs to the case: with several cases at once there is
+  // no single case to attach it to.
+  const singleCase = cases.length === 1 ? cases[0] : null;
 
   async function onSubmit() {
     if (!body.trim()) {
@@ -45,7 +57,11 @@ export function CaseComposer({
     setProblem(null);
     try {
       for (const item of cases) {
-        await answer.mutateAsync({ id: item.id, body: body.trim() });
+        await answer.mutateAsync({
+          id: item.id,
+          body: body.trim(),
+          attachment_ids: item.id === singleCase?.id ? attachments.map((file) => file.id) : [],
+        });
       }
       setNotice(
         cases.length === 1
@@ -53,6 +69,7 @@ export function CaseComposer({
           : `La respuesta quedó en ${cases.length} casos.`,
       );
       setBody("");
+      setAttachments([]);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : "No se pudo enviar la respuesta.");
     }
@@ -64,6 +81,7 @@ export function CaseComposer({
       onOpenChange={(next) => {
         if (!next) {
           setBody("");
+          setAttachments([]);
           setNotice(null);
           setProblem(null);
           onClose();
@@ -108,6 +126,18 @@ export function CaseComposer({
           </span>
         </label>
 
+        {singleCase && (
+          <SupportAttachmentField
+            attachments={attachments}
+            onChange={setAttachments}
+            upload={(file) =>
+              uploadFile
+                .mutateAsync({ caseId: singleCase.id, file })
+                .then((item) => ({ id: item.id, name: item.name, size: item.size }))
+            }
+          />
+        )}
+
         {notice && (
           <p
             role="status"
@@ -132,6 +162,7 @@ export function CaseComposer({
             type="button"
             onClick={() => {
               setBody("");
+              setAttachments([]);
               setNotice(null);
               setProblem(null);
               onClose();

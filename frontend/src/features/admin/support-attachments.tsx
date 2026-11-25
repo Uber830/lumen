@@ -5,6 +5,9 @@
 // of the problem, a document, a photo of the material. The file goes to
 // the store of the school and the thread keeps the path of it.
 //
+// The support team answers with files too: the field is the same one and
+// the door of the upload is the one of the role that writes.
+//
 // The limit is 10 MB per file, the same one the API enforces.
 // =============================================================================
 
@@ -24,14 +27,20 @@ export type PickedAttachment = {
   size: number;
 };
 
+/** The door of the upload: the school and the platform have their own. */
+export type AttachmentUploader = (file: File) => Promise<PickedAttachment>;
+
 export function SupportAttachmentField({
   attachments,
   onChange,
+  upload,
 }: {
   attachments: PickedAttachment[];
   onChange: (next: PickedAttachment[]) => void;
+  /** The upload of the role that writes; the school by default. */
+  upload?: AttachmentUploader;
 }) {
-  const upload = useUploadSupportAttachment();
+  const schoolUpload = useUploadSupportAttachment();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,8 +51,12 @@ export function SupportAttachmentField({
       return;
     }
     try {
-      const uploaded = await upload.mutateAsync(file);
-      onChange([...attachments, { id: uploaded.id, name: uploaded.name, size: uploaded.size }]);
+      const uploaded = upload
+        ? await upload(file)
+        : await schoolUpload
+            .mutateAsync(file)
+            .then((item) => ({ id: item.id, name: item.name, size: item.size }));
+      onChange([...attachments, uploaded]);
     } catch (error) {
       setError(error instanceof Error ? error.message : "No se pudo adjuntar el archivo.");
     }
@@ -110,9 +123,9 @@ export function SupportAttachmentField({
         </ul>
       )}
 
-      {(error || upload.error) && (
+      {(error || schoolUpload.error) && (
         <p role="alert" className="mt-2 text-[13px] text-destructive">
-          {error ?? upload.error?.message}
+          {error ?? schoolUpload.error?.message}
         </p>
       )}
     </div>
