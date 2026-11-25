@@ -36,7 +36,7 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
-| Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos |
+| Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos. La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
 | Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia |
 | Períodos | `/admin/periodos` | Ciclo lectivo, cierre de periodo y periodo vigente |
 | ICFES | `/admin/icfes-colegio` | Los simulacros del colegio: el módulo se está afinando y el panel lo avisa |
@@ -46,6 +46,24 @@ metadatos: el administrador consulta el material habilitado y nada más.
 
 «Mi perfil» vive en el **menú de usuario** (arriba a la derecha), no en el menú
 lateral.
+
+### La barra lateral se contrae
+
+El botón de la barra superior pliega la barra lateral a una franja de iconos
+(68 px) y la vuelve a desplegar (270 px). La preferencia es personal y vive
+en el navegador (`localStorage`, `lumen-sidebar-collapsed`), así que es la
+misma en todos los paneles: colegio, docente, estudiante y plataforma.
+
+El valor se lee **al montar el componente**, no durante el render: el servidor
+siempre envía la barra desplegada y React no parchea los atributos que no
+coinciden con los del cliente.
+
+### La estructura académica, en un formulario
+
+Crear un curso, una materia y ofrecerla ya no son tres cajas sueltas: la
+vista **Cursos y materias** abre un modal grande y central con tres pasos
+(**curso → materia → ofrecer**) y los botones **Siguiente** y **Atrás**. Un
+paso en blanco se salta: el que solo necesita el curso avanza y cierra.
 
 ### La selección múltiple
 
@@ -61,6 +79,23 @@ seleccionados y ofrece lo que se puede hacer con ellos:
 Quitar el acceso es revocar la membresía: la persona deja de llegar al
 material del colegio y su historial se conserva. El backend sigue negándose a
 degradar o quitar al último administrador principal (`409`, `last_principal`).
+
+### El equipo de administradores
+
+El formulario de **invitar administrador** vive en un modal centrado, con el
+mismo estilo que el resto de formularios del panel. El rango **no se elige**:
+el colegio tiene un solo administrador principal, así que toda invitación entra
+como **secundario**.
+
+Para cambiar de manos el rango, la ficha del administrador tiene **Ceder el
+rango principal**: la persona que lo recibe queda como principal y quien lo
+cede sigue en el equipo como secundario. El backend lo hace en un solo paso
+(`POST /v1/school/admins/{id}/transfer`), de modo que el colegio nunca se
+queda sin principal; la promoción directa está rechazada con `409`
+(`only_one_principal`).
+
+Después de ceder el rango, la sesión se vuelve a leer: los permisos de quien
+cede cambian en el panel (la acción queda deshabilitada con el motivo).
 
 ### El plan de estudios
 
@@ -90,8 +125,10 @@ El frontend **no decide** permisos: los recibe en `GET /v1/school/me`
 (`permissions: string[]`). Una acción que el rango no puede ejecutar aparece
 **deshabilitada con el motivo**, no invisible.
 
-El colegio siempre conserva **un principal**: el equipo no puede degradar ni
-quitar al último (`409`, `last_principal`).
+El colegio tiene **un solo administrador principal**: el rango se cede de una
+persona a otra, nunca se duplica. Por eso la invitación siempre crea un
+secundario, la promoción directa se rechaza (`409`, `only_one_principal`) y el
+equipo no puede degradar ni quitar al principal (`409`, `last_principal`).
 
 ---
 
@@ -112,12 +149,24 @@ revela la existencia de material ajeno.
 | `GET /v1/academics/study-plans` · `POST /study-plans/import` | El plan de estudios del colegio y su importación |
 | `GET /v1/school/settings` · `PATCH` | Identidad del colegio (el color se valida en el backend) |
 | `POST /v1/school/logo` | Escudo: PNG o SVG, máximo 2 MB, tipo real |
-| `GET /v1/school/admins` · `POST /admins/invite` · `PATCH|DELETE /admins/{id}` | El equipo del colegio |
+| `GET /v1/school/admins` · `POST /admins/invite` · `PATCH|DELETE /admins/{id}` · `POST /admins/{id}/transfer` | El equipo del colegio |
 | `GET /v1/school/icfes` · `POST /icfes/{id}/activations` · `GET /icfes/{id}/results` | Simulacros del colegio |
 | `GET/POST /v1/school/support/cases` · `GET /cases/{id}` · `POST /cases/{id}/messages` | Canal con el soporte |
 | `POST /v1/school/support/attachments` | El archivo que se adjunta a una solicitud (10 MB) |
 
 La API responde en inglés; el frontend traduce los mensajes de error.
+
+### Los adjuntos, de los dos lados
+
+El archivo que el colegio adjunta a una solicitud vive en el bucket
+`support-attachments/{school_id}/` y el hilo guarda su ruta (`attachment_ids`).
+El archivo **pertenece al colegio**: solo sus miembros lo leen.
+
+La mesa de soporte de la plataforma es la excepción: el equipo que atiende la
+solicitud necesita el mismo archivo, así que `GET /v1/platform/cases/{id}`
+devuelve los `attachment_ids` de cada mensaje y el panel los muestra como
+enlaces. La puerta de los archivos deja pasar al administrador de plataforma
+(`context.is_platform_admin`) para cualquier colegio.
 
 ---
 
