@@ -7,6 +7,8 @@ import {
   Monitor,
   Moon,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sun,
   UserSquare2,
   X,
@@ -41,6 +43,7 @@ import { useSchool } from "@/lib/school/hooks";
 import { useSchoolOverview } from "@/lib/school/overview";
 import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
+import { getCollapsedSidebar, setCollapsedSidebar, subscribeSidebar } from "@/lib/sidebar";
 import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -57,9 +60,18 @@ type BadgeCounts = Partial<Record<NonNullable<NavItem["badgeSource"]>, number | 
  *   from 1180 px   the labels are shown
  *   900 to 1180    the rail is a strip of icons
  *   below 900      the rail is a drawer, opened from the top bar
+ *
+ * On top of that, the person can collapse the rail from the top bar:
+ * then it stays a strip of icons on any screen, and the choice is
+ * remembered in the browser (see `lib/sidebar.ts`).
  */
-const ICON_ONLY = "max-[1179px]:hidden";
-const ICON_ONLY_ITEM = "max-[1179px]:justify-center max-[1179px]:px-0";
+function iconOnly(collapsed: boolean): string {
+  return collapsed ? "hidden" : "max-[1179px]:hidden";
+}
+
+function iconOnlyItem(collapsed: boolean): string {
+  return collapsed ? "justify-center px-0" : "max-[1179px]:justify-center max-[1179px]:px-0";
+}
 
 function initials(name: string): string {
   return name
@@ -75,10 +87,12 @@ function Brand({
   role,
   schoolName,
   schoolLogo,
+  collapsed,
 }: {
   role: AppShellRole;
   schoolName: string | null;
   schoolLogo: string | null;
+  collapsed: boolean;
 }) {
   // The mark of the platform is the logo of Lumen. The roles of a school
   // wear the shield of their school instead: it is the identity of the
@@ -97,11 +111,21 @@ function Brand({
   );
 
   return (
-    <div className="flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]">
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]",
+        collapsed && "justify-center px-0",
+      )}
+    >
       {mark}
-      <div className="min-w-0">
+      <div className={cn("min-w-0", collapsed && "hidden")}>
         <p className="truncate text-[15.5px] font-bold leading-tight tracking-[-0.01em]">Lumen</p>
-        <p className={cn("truncate text-[11.5px] leading-tight text-muted-foreground", ICON_ONLY)}>
+        <p
+          className={cn(
+            "truncate text-[11.5px] leading-tight text-muted-foreground",
+            iconOnly(collapsed),
+          )}
+        >
           {role === "super" ? "Panel de plataforma" : (schoolName ?? "Colegio")}
         </p>
       </div>
@@ -121,11 +145,13 @@ function NavGroups({
   role,
   icfesEnabled,
   badges,
+  collapsed,
   onNavigate,
 }: {
   role: AppShellRole;
   icfesEnabled: boolean;
   badges: BadgeCounts;
+  collapsed: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -141,7 +167,7 @@ function NavGroups({
             <p
               className={cn(
                 "px-[10px] pb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-muted-foreground",
-                ICON_ONLY,
+                iconOnly(collapsed),
               )}
             >
               {group.label}
@@ -163,7 +189,7 @@ function NavGroups({
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "flex w-full items-center gap-[11px] rounded-idx border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
-                        ICON_ONLY_ITEM,
+                        iconOnlyItem(collapsed),
                         active
                           ? "border-sidebar-border bg-sidebar-accent font-medium text-sidebar-active-foreground"
                           : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
@@ -177,12 +203,12 @@ function NavGroups({
                         strokeWidth={1.9}
                         aria-hidden
                       />
-                      <span className={cn("truncate", ICON_ONLY)}>{item.label}</span>
+                      <span className={cn("truncate", iconOnly(collapsed))}>{item.label}</span>
                       {count !== null && count > 0 && (
                         <span
                           className={cn(
                             "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-primary",
-                            ICON_ONLY,
+                            iconOnly(collapsed),
                           )}
                         >
                           {count}
@@ -201,12 +227,17 @@ function NavGroups({
 }
 
 /** The foot of the rail: what the role of the session can do. */
-function RoleNote({ role }: { role: AppShellRole }) {
+function RoleNote({ role, collapsed }: { role: AppShellRole; collapsed: boolean }) {
   return (
-    <div className="border-t border-sidebar-border p-3">
-      <div className="flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground">
+    <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
+      <div
+        className={cn(
+          "flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground",
+          collapsed && "justify-center p-2",
+        )}
+      >
         <Info className="mt-0.5 size-[15px] shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
-        <p className={cn("min-w-0 leading-snug", ICON_ONLY)}>
+        <p className={cn("min-w-0 leading-snug", iconOnly(collapsed))}>
           <span className="font-semibold text-sidebar-foreground">{ROLE_LABEL[role]}</span>
           <br />
           {ROLE_NOTE[role]}
@@ -337,6 +368,15 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  // The shape of the rail: expanded or collapsed. It is a personal
+  // preference that lives in the browser, so every panel of the app
+  // starts with the rail the way the person left it.
+  const collapsed = useSyncExternalStore(
+    subscribeSidebar,
+    getCollapsedSidebar,
+    getCollapsedSidebar,
+  );
+
   const entitlement = useEntitlement(session.primarySchoolId);
   const school = useSchool(session.primarySchoolId);
   // The stream of events of the user: the badge of the bell and the
@@ -460,14 +500,24 @@ export function AppShell({
         className={cn(
           "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar",
           "min-[900px]:flex",
-          "w-[270px] max-[1179px]:w-[68px]",
+          collapsed ? "w-[68px]" : "w-[270px] max-[1179px]:w-[68px]",
         )}
       >
-        <Brand role={role} schoolName={resolvedSchoolName} schoolLogo={schoolLogo} />
+        <Brand
+          role={role}
+          schoolName={resolvedSchoolName}
+          schoolLogo={schoolLogo}
+          collapsed={collapsed}
+        />
         <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
-          <NavGroups role={role} icfesEnabled={icfesEnabled} badges={badges} />
+          <NavGroups
+            role={role}
+            icfesEnabled={icfesEnabled}
+            badges={badges}
+            collapsed={collapsed}
+          />
         </div>
-        <RoleNote role={role} />
+        <RoleNote role={role} collapsed={collapsed} />
       </aside>
 
       {open && (
@@ -479,7 +529,12 @@ export function AppShell({
           />
           <div className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-sidebar">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-              <Brand role={role} schoolName={resolvedSchoolName} schoolLogo={schoolLogo} />
+              <Brand
+                role={role}
+                schoolName={resolvedSchoolName}
+                schoolLogo={schoolLogo}
+                collapsed={false}
+              />
               <button
                 aria-label="Cerrar menú"
                 className="mt-[18px] grid size-9 shrink-0 place-items-center rounded-lg hover:bg-sidebar-accent"
@@ -493,15 +548,20 @@ export function AppShell({
                 role={role}
                 icfesEnabled={icfesEnabled}
                 badges={badges}
+                collapsed={false}
                 onNavigate={() => setOpen(false)}
               />
             </div>
-            <RoleNote role={role} />
+            <RoleNote role={role} collapsed={false} />
           </div>
         </div>
       )}
 
-      <div className="min-[900px]:pl-[270px] max-[1179px]:pl-[68px]">
+      <div
+        className={cn(
+          collapsed ? "min-[900px]:pl-[68px]" : "min-[900px]:pl-[270px] max-[1179px]:pl-[68px]",
+        )}
+      >
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-6">
           <button
             aria-label="Abrir menú"
@@ -509,6 +569,23 @@ export function AppShell({
             onClick={() => setOpen(true)}
           >
             <Menu className="size-[18px]" strokeWidth={1.9} />
+          </button>
+
+          {/* The rail folds away from here: the choice is remembered in
+              the browser, so it is the same in every panel of the app. */}
+          <button
+            type="button"
+            aria-label={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+            title={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+            aria-pressed={collapsed}
+            className="hidden size-9 shrink-0 place-items-center rounded-idx border border-border bg-card text-muted-foreground transition-colors hover:text-foreground min-[900px]:grid"
+            onClick={() => setCollapsedSidebar(!collapsed)}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-[18px]" strokeWidth={1.9} />
+            ) : (
+              <PanelLeftClose className="size-[18px]" strokeWidth={1.9} />
+            )}
           </button>
 
           {/* The bar shows the context of the session, not a search: the
