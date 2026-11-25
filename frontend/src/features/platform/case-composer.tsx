@@ -1,5 +1,5 @@
 import { AlertTriangle, Send } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   Dialog,
@@ -14,6 +14,10 @@ import {
   SupportAttachmentField,
   type PickedAttachment,
 } from "@/features/admin/support-attachments";
+import {
+  attachmentPathsForCase,
+  planAttachmentCopies,
+} from "@/features/platform/attachment-copies";
 import { useAnswerCase, useUploadCaseAttachment } from "@/lib/platform/hooks";
 import type { CaseSummary } from "@/lib/platform/types";
 
@@ -26,6 +30,9 @@ import type { CaseSummary } from "@/lib/platform/types";
  *
  * The answer may carry files, the same way the school's request does:
  * a guide, a capture of the fix, the document the school asked for.
+ *
+ * The file goes to the store of the school of the case, so when one
+ * answer reaches several schools each one gets its own copy of it.
  */
 export function CaseComposer({
   open,
@@ -43,11 +50,12 @@ export function CaseComposer({
   const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const pendingRef = useRef(0);
 
   const recipients = cases.map((item) => item.school_name ?? item.opened_by_name);
-  // The file belongs to the case: with several cases at once there is
-  // no single case to attach it to.
-  const singleCase = cases.length === 1 ? cases[0] : null;
+  // A file lives in the store of the school: a case that does not
+  // belong to one has nowhere to keep it.
+  const canAttach = cases.length > 0 && cases.every((item) => item.school_id);
 
   async function onSubmit() {
     if (!body.trim()) {
@@ -56,11 +64,31 @@ export function CaseComposer({
     }
     setProblem(null);
     try {
+      // One copy of the files per school: the cases of the same school
+      // share it, the ones of another school get their own.
+      const copies = planAttachmentCopies(cases, attachments);
+      const paths = new Map<string, string[]>();
+      for (const copy of copies) {
+        const stored: string[] = [];
+        for (const attachment of copy.attachments) {
+          if (!attachment.file) {
+            stored.push(attachment.id);
+            continue;
+          }
+          const result = await uploadFile.mutateAsync({
+            caseId: copy.caseId,
+            file: attachment.file,
+          });
+          stored.push(result.id);
+        }
+        paths.set(copy.schoolId, stored);
+      }
+
       for (const item of cases) {
         await answer.mutateAsync({
           id: item.id,
           body: body.trim(),
-          attachment_ids: item.id === singleCase?.id ? attachments.map((file) => file.id) : [],
+          attachment_ids: attachmentPathsForCase(copies, item.school_id, paths),
         });
       }
       setNotice(
@@ -126,15 +154,21 @@ export function CaseComposer({
           </span>
         </label>
 
-        {singleCase && (
+        {canAttach && (
           <SupportAttachmentField
             attachments={attachments}
             onChange={setAttachments}
-            upload={(file) =>
-              uploadFile
-                .mutateAsync({ caseId: singleCase.id, file })
-                .then((item) => ({ id: item.id, name: item.name, size: item.size }))
-            }
+            upload={async (file) => {
+              // The file waits for the moment of the answer: it goes to
+              // the store of each school the answer reaches.
+              pendingRef.current += 1;
+              return {
+                id: `pendiente:${pendingRef.current}:${file.name}`,
+                name: file.name,
+                size: file.size,
+                file,
+              };
+            }}
           />
         )}
 

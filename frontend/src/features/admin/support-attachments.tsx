@@ -25,6 +25,12 @@ export type PickedAttachment = {
   id: string;
   name: string;
   size: number;
+  /**
+   * The file that is not in the store yet: it waits for the moment the
+   * answer is sent. The platform uses it when one answer goes to
+   * several schools, because each one needs its own copy.
+   */
+  file?: File;
 };
 
 /** The door of the upload: the school and the platform have their own. */
@@ -107,7 +113,9 @@ export function SupportAttachmentField({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-medium">{attachment.name}</span>
                 <span className="block text-[11.6px] text-muted-foreground">
-                  {formatSize(attachment.size)} · adjunto
+                  {attachment.file
+                    ? `${formatSize(attachment.size)} · se envía con la respuesta`
+                    : `${formatSize(attachment.size)} · adjunto`}
                 </span>
               </span>
               <button
