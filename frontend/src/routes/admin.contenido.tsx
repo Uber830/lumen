@@ -1,26 +1,22 @@
-import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, Info, Search, X } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Archive, BookOpen, CheckCircle2, FileText, Film, Info, Search, Users } from "lucide-react";
 import { useState } from "react";
 
 import {
   Chip,
   EmptyState,
-  PanelTable,
   PageHeader,
   Pagination,
   SectionCard,
   Toolbar,
-  tableCellClass,
-  tableHeadClass,
 } from "@/components/ui-kit";
 import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import {
   formatFileSize,
   formatShortDate,
@@ -28,6 +24,7 @@ import {
   useSchoolMaterialDetail,
   type MaterialListItem,
 } from "@/lib/school/material";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/contenido")({
   head: () => ({
@@ -51,9 +48,37 @@ const KIND_LABELS: Record<string, string> = {
   zip: "Comprimido",
 };
 
-function Contenido() {
-  const { session } = useRouteContext({ from: "/admin" });
+/** The cover of a book is the color of its area. */
+const COVER_TONES = [
+  "bg-chart-1/12 text-chart-1",
+  "bg-chart-2/12 text-chart-2",
+  "bg-chart-3/12 text-chart-3",
+  "bg-chart-4/14 text-chart-4",
+  "bg-chart-5/12 text-chart-5",
+] as const;
 
+/** The color of a cover: the same area always has the same one. */
+function toneOf(area: string): string {
+  let sum = 0;
+  for (const letter of area) sum += letter.charCodeAt(0);
+  return COVER_TONES[sum % COVER_TONES.length];
+}
+
+function IconOf({ kind, className }: { kind: string; className?: string }) {
+  const strokeWidth = 1.8;
+  if (kind === "mp4") {
+    return <Film className={className} strokeWidth={strokeWidth} aria-hidden />;
+  }
+  if (kind === "zip") {
+    return <Archive className={className} strokeWidth={strokeWidth} aria-hidden />;
+  }
+  if (kind === "epub") {
+    return <BookOpen className={className} strokeWidth={strokeWidth} aria-hidden />;
+  }
+  return <FileText className={className} strokeWidth={strokeWidth} aria-hidden />;
+}
+
+function Contenido() {
   // The filters live in the URL state of the view: the browser can go
   // back and the page keeps them.
   const [query, setQuery] = useState("");
@@ -129,79 +154,73 @@ function Contenido() {
             {material.error.message}
           </p>
         ) : material.isLoading ? (
-          <div className="space-y-2 px-[18px] py-4" aria-hidden>
+          <div className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
             {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-11 animate-pulse rounded-lg bg-muted"
-                style={{ animationDelay: `${index * 70}ms` }}
-              />
+              <div key={index} className="flex gap-3.5">
+                <div
+                  className="h-[132px] w-[96px] shrink-0 animate-pulse rounded-sm bg-muted"
+                  style={{ animationDelay: `${index * 70}ms` }}
+                />
+                <div className="flex-1 space-y-2 py-1">
+                  <div
+                    className="h-[13px] w-full animate-pulse rounded bg-muted"
+                    style={{ animationDelay: `${index * 70}ms` }}
+                  />
+                  <div className="h-[11px] w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
             ))}
           </div>
         ) : material.data && material.data.items.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
-              <PanelTable className="w-full border-collapse">
-                <caption className="sr-only">Material habilitado para tu colegio</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className={tableHeadClass}>
-                      Material
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[120px]`}>
-                      Tipo
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[130px]`}>
-                      Área
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[130px]`}>
-                      Cursos
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[140px]`}>
-                      Disponible desde
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[90px]`}>
-                      <span className="sr-only">Acciones</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {material.data.items.map((item) => (
-                    <tr key={item.id} className="transition-colors hover:bg-muted">
-                      <td className={tableCellClass}>
-                        <div className="font-medium">{item.title}</div>
-                        <div className="mt-px font-mono text-[12px] text-muted-foreground">
-                          {item.ref} · {formatFileSize(item.file_size_bytes)}
-                        </div>
-                      </td>
-                      <td className={tableCellClass}>
-                        <Chip tone="muted">{KIND_LABELS[item.kind] ?? item.kind}</Chip>
-                      </td>
-                      <td className={tableCellClass}>{item.area}</td>
-                      <td className={`${tableCellClass} text-muted-foreground`}>
+            {/* The shelf: the material as the books it is. Each one opens
+                in place, without leaving the view. */}
+            <ul className="grid gap-5 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3">
+              {material.data.items.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(item)}
+                    className="group flex w-full gap-3.5 text-left"
+                  >
+                    <span
+                      className={cn(
+                        "relative flex h-[132px] w-[96px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-2.5 transition-colors group-hover:border-primary/40",
+                        toneOf(item.area),
+                      )}
+                    >
+                      {/* The spine of the book. */}
+                      <span
+                        className="absolute inset-y-0 left-0 w-[5px] bg-current opacity-25"
+                        aria-hidden
+                      />
+                      <span className="pl-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] opacity-90">
+                        {item.area}
+                      </span>
+                      <IconOf kind={item.kind} className="size-6 self-end opacity-80" />
+                    </span>
+
+                    <span className="flex min-w-0 flex-1 flex-col py-0.5">
+                      <span className="line-clamp-2 text-[13.5px] font-semibold leading-snug text-foreground">
+                        {item.title}
+                      </span>
+                      <span className="mt-1 font-mono text-[11.5px] text-muted-foreground">
+                        {item.ref} · {formatFileSize(item.file_size_bytes)}
+                      </span>
+                      <span className="mt-1.5 text-[12px] text-muted-foreground">
                         {item.courses.length > 0
                           ? item.courses.map((course) => course.name).join(" · ")
                           : "Todo el colegio"}
-                      </td>
-                      <td className={`${tableCellClass} font-mono text-muted-foreground`}>
-                        {formatShortDate(item.available_since)}
-                      </td>
-                      <td className={tableCellClass}>
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setSelected(item)}
-                            className="rounded-md px-1.5 py-0.5 text-[13px] text-primary transition-colors hover:bg-primary-soft"
-                          >
-                            Ver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </PanelTable>
-            </div>
+                      </span>
+                      <span className="mt-auto pt-2 text-[11.5px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                        Ver el material
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
             <Pagination
               page={material.data.page}
               pageCount={material.data.pages}
@@ -229,71 +248,95 @@ function Contenido() {
         </p>
       </SectionCard>
 
-      {/* The detail of the material: what it is and that the school has
-          access to it. The switches that enable the material belong to
-          the platform team, and the material is not downloaded by
+      {/* The material, as it is: it opens on top of the shelf, without
+          leaving the view. The switches that enable the material belong
+          to the platform team, and the material is not downloaded by
           anybody: it is consulted inside the platform. */}
-      <Drawer open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)}>
-        <DrawerContent className="w-full border-l border-border bg-card sm:max-w-[440px]">
-          <DrawerHeader className="border-b border-border px-[18px] py-4">
-            <DrawerTitle className="text-[15px] font-semibold">
+      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">
               {detail.data?.title ?? selected?.title ?? "Material"}
-            </DrawerTitle>
-            <DrawerDescription className="font-mono text-[12px] text-muted-foreground">
-              {detail.data?.ref ?? selected?.ref}
-            </DrawerDescription>
-          </DrawerHeader>
+            </DialogTitle>
+            <DialogDescription className="font-mono text-[12px]">
+              {detail.data?.ref ?? selected?.ref} ·{" "}
+              {formatFileSize(detail.data?.file_size_bytes ?? selected?.file_size_bytes ?? null)}
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-[18px] py-4">
-            {detail.isLoading ? (
-              <div className="h-24 animate-pulse rounded-xl bg-muted" aria-hidden />
-            ) : detail.data ? (
-              <dl className="grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
-                <dt className="text-[12.4px] text-muted-foreground">Área</dt>
-                <dd>{detail.data.area}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Tipo</dt>
-                <dd>{KIND_LABELS[detail.data.kind] ?? detail.data.kind}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Tamaño</dt>
-                <dd className="font-mono">{formatFileSize(detail.data.file_size_bytes)}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Disponible desde</dt>
-                <dd className="font-mono">{formatShortDate(detail.data.available_since)}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Cursos</dt>
-                <dd>
-                  {detail.data.courses.length > 0
-                    ? detail.data.courses.map((course) => course.name).join(" · ")
-                    : "Todo el colegio"}
-                </dd>
-                {detail.data.description && (
-                  <>
-                    <dt className="text-[12.4px] text-muted-foreground">Descripción</dt>
-                    <dd className="text-muted-foreground">{detail.data.description}</dd>
-                  </>
-                )}
-              </dl>
-            ) : (
-              <p className="text-[13px] text-muted-foreground">No se pudo cargar el material.</p>
-            )}
-          </div>
-
-          <div className="border-t border-border px-[18px] py-4">
-            <p className="flex items-start gap-2 rounded-xl border border-border bg-secondary p-3 text-[12.5px] text-muted-foreground">
-              <CheckCircle2
-                className="mt-px size-4 shrink-0 text-success"
-                strokeWidth={1.9}
+          <div className="flex flex-col gap-5 sm:flex-row">
+            <div
+              className={cn(
+                "relative flex h-[220px] w-[152px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-4",
+                toneOf(detail.data?.area ?? selected?.area ?? ""),
+              )}
+            >
+              <span
+                className="absolute inset-y-0 left-0 w-[7px] bg-current opacity-25"
                 aria-hidden
               />
-              <span>
-                <b className="font-semibold text-foreground">Acceso confirmado.</b>{" "}
-                {detail.data?.access.note ?? "Este material está habilitado para tu colegio."}
+              <span className="pl-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] opacity-90">
+                {detail.data?.area ?? selected?.area}
               </span>
-            </p>
-            <DrawerClose className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-idx border border-input bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
-              <X className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
-              Cerrar
-            </DrawerClose>
+              <IconOf
+                kind={detail.data?.kind ?? selected?.kind ?? ""}
+                className="size-9 self-end opacity-80"
+              />
+              <span className="pl-1.5 text-[12px] font-semibold leading-snug opacity-95">
+                {detail.data?.title ?? selected?.title}
+              </span>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {detail.isLoading ? (
+                <div className="h-24 animate-pulse rounded-xl bg-muted" aria-hidden />
+              ) : detail.data ? (
+                <>
+                  <dl className="grid grid-cols-[112px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
+                    <dt className="text-[12.4px] text-muted-foreground">Área</dt>
+                    <dd>{detail.data.area}</dd>
+                    <dt className="text-[12.4px] text-muted-foreground">Tipo</dt>
+                    <dd>{KIND_LABELS[detail.data.kind] ?? detail.data.kind}</dd>
+                    <dt className="text-[12.4px] text-muted-foreground">Disponible desde</dt>
+                    <dd className="font-mono">{formatShortDate(detail.data.available_since)}</dd>
+                    <dt className="text-[12.4px] text-muted-foreground">Cursos</dt>
+                    <dd className="flex flex-wrap items-center gap-1.5">
+                      {detail.data.courses.length > 0
+                        ? detail.data.courses.map((course) => (
+                            <Chip key={course.id} tone="muted">
+                              <Users className="size-3" strokeWidth={1.9} aria-hidden />
+                              {course.name}
+                            </Chip>
+                          ))
+                        : "Todo el colegio"}
+                    </dd>
+                    {detail.data.description && (
+                      <>
+                        <dt className="text-[12.4px] text-muted-foreground">Descripción</dt>
+                        <dd className="text-muted-foreground">{detail.data.description}</dd>
+                      </>
+                    )}
+                  </dl>
+
+                  <p className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-secondary p-3 text-[12.5px] text-muted-foreground">
+                    <CheckCircle2
+                      className="mt-px size-4 shrink-0 text-success"
+                      strokeWidth={1.9}
+                      aria-hidden
+                    />
+                    <span>
+                      <b className="font-semibold text-foreground">Acceso confirmado.</b>{" "}
+                      {detail.data.access.note ?? "Este material está habilitado para tu colegio."}
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="text-[13px] text-muted-foreground">No se pudo cargar el material.</p>
+              )}
+            </div>
           </div>
-        </DrawerContent>
-      </Drawer>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
