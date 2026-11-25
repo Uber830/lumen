@@ -303,7 +303,13 @@ export type ChatMessage = {
 // --- Notifications ---------------------------------------------------------
 
 export type NotificationKind =
-  "task_assigned" | "task_submitted" | "task_graded" | "content_published" | "chat_message";
+  | "task_assigned"
+  | "task_submitted"
+  | "task_graded"
+  | "content_published"
+  | "chat_message"
+  | "support_case_opened"
+  | "support_case_replied";
 
 export type Notification = {
   id: string;

@@ -18,6 +18,7 @@ import {
 } from "@tanstack/react-query";
 
 import { api, apiBaseUrl } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 
 /** One message of the thread of a case. */
 export type SupportMessage = {
@@ -84,6 +85,15 @@ export const supportKeys = {
  * channel: the rail only counts the open cases of the administrator.
  */
 export function useSchoolSupportCases(enabled = true): UseQueryResult<SupportCaseSummary[], Error> {
+  const qc = useQueryClient();
+
+  // The bell says that there is something new in the thread: the list
+  // is asked again, so the answer of the platform shows up without a
+  // reload.
+  useEvent("notification", () => {
+    qc.invalidateQueries({ queryKey: supportKeys.cases() });
+  });
+
   return useQuery({
     queryKey: supportKeys.cases(),
     enabled,

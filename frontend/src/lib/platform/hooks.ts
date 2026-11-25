@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-query";
 
 import { ApiError, api, apiBaseUrl } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 import type {
   AuditEntry,
   CaseDetail,
@@ -383,6 +384,14 @@ export function useCaseOptions(): UseQueryResult<CaseOptions, Error> {
 
 /** The cases of the desk, filtered and paginated. */
 export function useCases(filters: CaseFilters): UseQueryResult<Page<CaseSummary>, Error> {
+  const qc = useQueryClient();
+
+  // The bell says that a case arrived or that the school wrote in one:
+  // the list is asked again, so the new case shows up without a reload.
+  useEvent("notification", () => {
+    qc.invalidateQueries({ queryKey: platformKeys.cases(filters) });
+  });
+
   return useQuery({
     queryKey: platformKeys.cases(filters),
     queryFn: () =>
