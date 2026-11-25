@@ -37,9 +37,8 @@ import {
   useSchoolMembers,
   useUpdateTeacherAssignment,
 } from "@/features/academics/hooks";
-import { paginate } from "@/lib/pagination";
 import { useSchoolAssignments, type SchoolAssignment } from "@/lib/school/cycles";
-import { useSchoolCourses } from "@/lib/school/community";
+import { useSchoolCourseOptions } from "@/lib/school/community";
 
 export const Route = createFileRoute("/admin/asignaciones")({
   head: () => ({
@@ -74,13 +73,14 @@ function AsignacionesPage() {
   const assignments = useSchoolAssignments(
     teacherFilter === "all" ? undefined : teacherFilter,
     courseFilter === "all" ? undefined : courseFilter,
+    page,
   );
 
   // The write side keeps using the academic hooks: an assignment is the
   // same operation it always was.
   const courseSubjects = useCourseSubjects(schoolId);
   const teachers = useSchoolMembers(schoolId, "teacher");
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   const createAssignment = useCreateTeacherAssignment(schoolId ?? "");
   const updateAssignment = useUpdateTeacherAssignment(schoolId ?? "");
   const deleteAssignment = useDeleteTeacherAssignment(schoolId ?? "");
@@ -130,39 +130,20 @@ function AsignacionesPage() {
   const noTeachers = teacherOptions.length === 0;
   const noCourseSubjects = courseSubjectOptions.length === 0;
 
-  // One row per teacher, not one per assignment: the person is the
-  // one that repeats, and what matters is what each one teaches.
-  const byTeacher = useMemo(() => {
-    const groups = new Map<
-      string,
-      {
-        teacherId: string;
-        name: string;
-        email: string | null;
-        avatarUrl: string | null;
-        assignments: SchoolAssignment[];
-      }
-    >();
-    for (const assignment of assignments.data ?? []) {
-      const group = groups.get(assignment.teacher_id) ?? {
-        teacherId: assignment.teacher_id,
-        name: assignment.teacher_name ?? "Docente",
-        email: assignment.teacher_email,
-        avatarUrl: assignment.teacher_avatar_url,
-        assignments: [],
-      };
-      group.assignments.push(assignment);
-      groups.set(assignment.teacher_id, group);
-    }
-    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [assignments.data]);
+  // The rows are the teachers, not the assignments: the person is the
+  // one that repeats, and what matters is what each one teaches. The
+  // server groups them and cuts the page.
+  const byTeacher = (assignments.data?.items ?? []).map((group) => ({
+    teacherId: group.teacher_id,
+    name: group.teacher_name ?? "Docente",
+    email: group.teacher_email,
+    avatarUrl: group.teacher_avatar_url,
+    assignments: group.assignments,
+    visibleMaterialsCount: group.visible_materials_count,
+  }));
+  const visibleGroups = byTeacher;
 
-  const totalAssignments = (assignments.data ?? []).length;
-
-  // The rows are the teachers: the list is cut in pages, so the view
-  // keeps its place when the school grows.
-  const teacherPage = paginate(byTeacher, page, PAGE_SIZE);
-  const visibleGroups = teacherPage.items;
+  const totalAssignments = byTeacher.reduce((total, group) => total + group.assignments.length, 0);
 
   function openCreate() {
     setEditing(null);
@@ -376,7 +357,7 @@ function AsignacionesPage() {
           <div className="ml-auto">
             <Chip tone="muted">
               {assignments.data
-                ? `${byTeacher.length} docente(s) · ${totalAssignments} asignación(es)`
+                ? `${assignments.data.total} docente(s) · ${totalAssignments} asignación(es)`
                 : "—"}
             </Chip>
           </div>
@@ -397,7 +378,7 @@ function AsignacionesPage() {
               </div>
             ))}
           </div>
-        ) : (assignments.data?.length ?? 0) === 0 ? (
+        ) : (assignments.data?.total ?? 0) === 0 ? (
           <EmptyState
             icon={ClipboardList}
             title="Sin asignaciones"
@@ -477,10 +458,7 @@ function AsignacionesPage() {
                     <td
                       className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
                     >
-                      {group.assignments.reduce(
-                        (total, assignment) => total + assignment.visible_materials_count,
-                        0,
-                      )}
+                      {group.visibleMaterialsCount}
                     </td>
                     <td className={`${tableCellClass} text-right`}>
                       {/* The three actions of the row live together:
@@ -532,12 +510,12 @@ function AsignacionesPage() {
             {deleteAssignment.error.message}
           </p>
         )}
-        {(assignments.data?.length ?? 0) > 0 && (
+        {(assignments.data?.total ?? 0) > 0 && (
           <Pagination
-            page={teacherPage.page}
-            pageCount={teacherPage.pageCount}
-            total={teacherPage.total}
-            pageSize={PAGE_SIZE}
+            page={assignments.data?.page ?? 1}
+            pageCount={assignments.data?.pages ?? 0}
+            total={assignments.data?.total ?? 0}
+            pageSize={assignments.data?.per_page ?? PAGE_SIZE}
             onPageChange={setPage}
           />
         )}
@@ -565,9 +543,6 @@ function AsignacionesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           Cada docente aparece una sola vez con todas sus materias: cada asignación habilita el
           acceso del docente al material de esa materia, que es lo que abre el contenido que el

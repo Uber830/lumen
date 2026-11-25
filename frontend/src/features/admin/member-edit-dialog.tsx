@@ -18,7 +18,7 @@ import { Check, X } from "lucide-react";
 
 import { Button } from "@/components/ui-kit";
 import { useCourseSubjects } from "@/features/academics/hooks";
-import { useSchoolCourses, useUpdateMember } from "@/lib/school/community";
+import { useSchoolCourseOptions, useUpdateMember } from "@/lib/school/community";
 
 export type EditableMember = {
   membership_id: string;
@@ -230,7 +230,7 @@ export function MemberEditDialog({
  * set of checkboxes, so two courses can never be picked at once.
  */
 function StudentCourses({ courseId, onPick }: { courseId: string; onPick: (id: string) => void }) {
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   return (
     <div className="mt-2 max-h-[220px] space-y-1.5 overflow-y-auto">
       {(courses.data ?? []).map((course) => {

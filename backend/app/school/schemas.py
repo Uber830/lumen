@@ -340,6 +340,30 @@ class SubjectOut(BaseModel):
     courses: list[str] = Field(default_factory=list)
 
 
+class CoursePageOut(BaseModel):
+    """A page of the courses of the school.
+
+    The page comes from the server: the list is never pulled into the
+    browser to be cut there.
+    """
+
+    items: list[CourseOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
+
+
+class SubjectPageOut(BaseModel):
+    """A page of the subjects of the school."""
+
+    items: list[SubjectOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
+
+
 class AssignmentOut(BaseModel):
     """One assignment: a teacher, a course and a subject.
 
@@ -363,6 +387,31 @@ class AssignmentOut(BaseModel):
     subject_name: str
     subject_area: str | None = None
     visible_materials_count: int = 0
+
+
+class TeacherAssignmentsOut(BaseModel):
+    """The assignments of one teacher, with what each one shows.
+
+    The person is the one that repeats, so the row is the teacher and
+    the subjects it teaches live inside it.
+    """
+
+    teacher_id: str
+    teacher_name: str | None = None
+    teacher_email: str | None = None
+    teacher_avatar_url: str | None = None
+    assignments: list[AssignmentOut] = Field(default_factory=list)
+    visible_materials_count: int = 0
+
+
+class AssignmentPageOut(BaseModel):
+    """A page of the teachers that have assignments."""
+
+    items: list[TeacherAssignmentsOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
 
 
 class PeriodOut(BaseModel):

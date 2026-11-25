@@ -340,20 +340,62 @@ async def test_the_courses_and_the_subjects_are_the_ones_of_the_school(
     assert response.status_code == 200, response.text
 
     courses = response.json()
-    assert len(courses) == 1
-    assert courses[0]["name"] == "7° A"
-    assert courses[0]["subject_count"] == 1
-    assert courses[0]["teacher_count"] == 1
-    assert courses[0]["student_count"] == 1
+    assert courses["total"] == 1
+    assert courses["page"] == 1
+    assert len(courses["items"]) == 1
+    assert courses["items"][0]["name"] == "7° A"
+    assert courses["items"][0]["subject_count"] == 1
+    assert courses["items"][0]["teacher_count"] == 1
+    assert courses["items"][0]["student_count"] == 1
 
     response = client.get("/v1/school/subjects", headers=await _auth())
     assert response.status_code == 200, response.text
 
     subjects = response.json()
-    assert len(subjects) == 1
-    assert subjects[0]["name"] == "Matemáticas"
-    assert subjects[0]["course_count"] == 1
-    assert subjects[0]["courses"] == ["7° A"]
+    assert subjects["total"] == 1
+    assert len(subjects["items"]) == 1
+    assert subjects["items"][0]["name"] == "Matemáticas"
+    assert subjects["items"][0]["course_count"] == 1
+    assert subjects["items"][0]["courses"] == ["7° A"]
+
+
+async def test_the_lists_are_cut_in_pages_by_the_server(
+    client, engine, seeded_school, community
+):
+    """The page comes from the server: the browser asks for it."""
+    response = client.get("/v1/school/courses?page=1&per_page=1", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    courses = response.json()
+    assert courses["page"] == 1
+    assert courses["per_page"] == 1
+    assert courses["total"] == 1
+    assert courses["pages"] == 1
+    assert len(courses["items"]) == 1
+
+
+async def test_the_options_bring_the_whole_list(
+    client, engine, seeded_school, community
+):
+    """The forms that offer a choice need every course, not a page."""
+    response = client.get("/v1/school/courses/options", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    courses = response.json()
+    assert len(courses) == 1
+    assert courses[0]["name"] == "7° A"
+
+
+async def test_the_subjects_can_be_filtered_by_the_courses_that_offer_them(
+    client, engine, seeded_school, community
+):
+    """The subjects that are in no course are the ones that can be offered."""
+    response = client.get("/v1/school/subjects?offered=false", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    subjects = response.json()
+    assert subjects["total"] == 0
+    assert subjects["items"] == []
 
 
 async def test_the_community_is_not_for_a_teacher(client, engine, seeded_school, community):

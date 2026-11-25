@@ -37,8 +37,9 @@ from app.school.schemas import (
     AdminRankIn,
     AdminSchoolOut,
     AdminUserOut,
-    AssignmentOut,
+    AssignmentPageOut,
     CourseOut,
+    CoursePageOut,
     CurrentPeriodOut,
     IcfesSimulatorsOut,
     MaterialDetailOut,
@@ -55,14 +56,21 @@ from app.school.schemas import (
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
+    SubjectPageOut,
     SupportAttachmentOut,
     SupportCaseIn,
     SupportCaseOut,
     SupportCaseSummaryOut,
     SupportMessageIn,
+    TeacherAssignmentsOut,
 )
 
 router = APIRouter(prefix="/v1/school", tags=["school"])
+
+
+def _pages(total: int, per_page: int) -> int:
+    """How many pages a list of that size has."""
+    return (total + per_page - 1) // per_page if total else 0
 
 
 def _require_admin(context: RequestContext) -> Membership:
@@ -292,49 +300,115 @@ async def update_school_member(
     return MemberEditOut.model_validate(updated)
 
 
-@router.get("/courses", response_model=list[CourseOut])
+@router.get("/courses", response_model=CoursePageOut)
 async def list_school_courses(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[CourseOut]:
-    """The courses of the school, with how much structure they hold."""
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Cursos por página")] = 10,
+) -> CoursePageOut:
+    """The courses of the school, with how much structure they hold.
+
+    The page is cut in the server: the browser only asks for the page it
+    is going to show.
+    """
     membership = _require_admin(context)
-    courses = await community.list_courses(session, membership.school_id)
+    courses, total = await community.list_courses(
+        session, membership.school_id, page=page, per_page=per_page
+    )
+    return CoursePageOut(
+        items=[CourseOut.model_validate(course) for course in courses],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
+
+
+@router.get("/courses/options", response_model=list[CourseOut])
+async def list_school_course_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CourseOut]:
+    """Every course of the school, for the forms that offer a choice."""
+    membership = _require_admin(context)
+    courses, _ = await community.list_courses(session, membership.school_id)
     return [CourseOut.model_validate(course) for course in courses]
 
 
-@router.get("/subjects", response_model=list[SubjectOut])
+@router.get("/subjects", response_model=SubjectPageOut)
 async def list_school_subjects(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[SubjectOut]:
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Materias por página")] = 10,
+    offered: Annotated[
+        bool | None,
+        Query(description="Solo las que se ofrecen en un curso, o solo las que no"),
+    ] = None,
+) -> SubjectPageOut:
     """The subjects of the school, with the courses they are taught in."""
     membership = _require_admin(context)
-    subjects = await community.list_subjects(session, membership.school_id)
+    subjects, total = await community.list_subjects(
+        session,
+        membership.school_id,
+        offered=offered,
+        page=page,
+        per_page=per_page,
+    )
+    return SubjectPageOut(
+        items=[SubjectOut.model_validate(subject) for subject in subjects],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
+
+
+@router.get("/subjects/options", response_model=list[SubjectOut])
+async def list_school_subject_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[SubjectOut]:
+    """Every subject of the school, for the forms that offer a choice."""
+    membership = _require_admin(context)
+    subjects, _ = await community.list_subjects(session, membership.school_id)
     return [SubjectOut.model_validate(subject) for subject in subjects]
 
 
-@router.get("/assignments", response_model=list[AssignmentOut])
+@router.get("/assignments", response_model=AssignmentPageOut)
 async def list_school_assignments(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
     teacher_id: Annotated[uuid.UUID | None, Query(description="Docente del filtro")] = None,
     course_id: Annotated[uuid.UUID | None, Query(description="Curso del filtro")] = None,
-) -> list[AssignmentOut]:
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Docentes por página")] = 10,
+) -> AssignmentPageOut:
     """The assignments of the school, with the material each one sees.
 
     The count of visible material is computed in the server: it is the
     published material of the area of the subject, enabled for the
     school, that applies to the course of the assignment.
+
+    The rows are the teachers: each one carries the subjects it teaches.
     """
     membership = _require_admin(context)
-    assignments = await cycles.list_assignments(
+    rows, total = await cycles.list_assignments(
         session,
         membership.school_id,
         teacher_id=teacher_id,
         course_id=course_id,
+        page=page,
+        per_page=per_page,
     )
-    return [AssignmentOut.model_validate(assignment) for assignment in assignments]
+    return AssignmentPageOut(
+        items=[TeacherAssignmentsOut.model_validate(row) for row in rows],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
 
 
 @router.get("/periods", response_model=list[PeriodOut])

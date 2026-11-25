@@ -451,11 +451,20 @@ async def _averages_of(
     return {student_id: average for student_id, average in result.all() if average is not None}
 
 
-async def list_courses(session: AsyncSession, school_id: uuid.UUID) -> list[dict[str, Any]]:
+async def list_courses(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    *,
+    page: int | None = None,
+    per_page: int = 10,
+) -> tuple[list[dict[str, Any]], int]:
     """The courses of the school, with how much of the structure they hold.
 
     A course is active when it has students enrolled in it: a course
     without students is a course that is not running.
+
+    When a page is asked for, only that page comes back, with the total
+    count of courses: the cut is made here, not in the browser.
     """
     subject_count = (
         select(func.count(distinct(CourseSubject.id)))
@@ -480,20 +489,29 @@ async def list_courses(session: AsyncSession, school_id: uuid.UUID) -> list[dict
         .scalar_subquery()
     )
 
-    result = await session.execute(
-        select(
-            Course.id,
-            Course.name,
-            Course.grade_label,
-            subject_count,
-            teacher_count,
-            student_count,
-        )
-        .where(Course.school_id == school_id)
-        .order_by(Course.grade_label, Course.name)
+    statement = select(
+        Course.id,
+        Course.name,
+        Course.grade_label,
+        subject_count,
+        teacher_count,
+        student_count,
+    ).where(Course.school_id == school_id)
+
+    total = int(
+        (
+            await session.execute(
+                select(func.count(Course.id)).where(Course.school_id == school_id)
+            )
+        ).scalar_one()
     )
 
-    return [
+    if page is not None:
+        statement = statement.offset((max(page, 1) - 1) * per_page).limit(per_page)
+
+    result = await session.execute(statement.order_by(Course.grade_label, Course.name))
+
+    courses = [
         {
             "id": str(course_id),
             "name": name,
@@ -505,11 +523,24 @@ async def list_courses(session: AsyncSession, school_id: uuid.UUID) -> list[dict
         }
         for course_id, name, grade_label, subjects, teachers, students in result.all()
     ]
+    return courses, total
 
 
-async def list_subjects(session: AsyncSession, school_id: uuid.UUID) -> list[dict[str, Any]]:
-    """The subjects of the school, with the courses they are taught in."""
-    result = await session.execute(
+async def list_subjects(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    *,
+    offered: bool | None = None,
+    page: int | None = None,
+    per_page: int = 10,
+) -> tuple[list[dict[str, Any]], int]:
+    """The subjects of the school, with the courses they are taught in.
+
+    `offered` says which ones come back: the ones that are taught in
+    some course, the ones that are in no course, or all of them. When a
+    page is asked for, only that page comes back, with the total count.
+    """
+    statement = (
         select(
             Subject.id,
             Subject.name,
@@ -522,8 +553,21 @@ async def list_subjects(session: AsyncSession, school_id: uuid.UUID) -> list[dic
         )
         .where(Subject.school_id == school_id)
         .group_by(Subject.id, Subject.name, Subject.area)
-        .order_by(Subject.name)
     )
+
+    if offered is True:
+        statement = statement.having(func.count(distinct(CourseSubject.course_id)) > 0)
+    elif offered is False:
+        statement = statement.having(func.count(distinct(CourseSubject.course_id)) == 0)
+
+    total = int(
+        (await session.execute(select(func.count()).select_from(statement.subquery()))).scalar_one()
+    )
+
+    if page is not None:
+        statement = statement.offset((max(page, 1) - 1) * per_page).limit(per_page)
+
+    result = await session.execute(statement.order_by(Subject.name))
 
     subjects = [
         {
@@ -536,7 +580,7 @@ async def list_subjects(session: AsyncSession, school_id: uuid.UUID) -> list[dic
     ]
 
     if not subjects:
-        return subjects
+        return subjects, total
 
     courses_result = await session.execute(
         select(CourseSubject.subject_id, Course.name)
@@ -557,7 +601,7 @@ async def list_subjects(session: AsyncSession, school_id: uuid.UUID) -> list[dic
     for subject in subjects:
         subject["courses"] = courses_by_subject.get(uuid.UUID(subject["id"]), [])
 
-    return subjects
+    return subjects, total
 
 
 # ---------------------------------------------------------------------------

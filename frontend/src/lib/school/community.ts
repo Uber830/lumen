@@ -60,6 +60,15 @@ export type MemberPage = {
   pages: number;
 };
 
+/** One page of a list the server cuts. */
+export type Page<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+};
+
 /** One course of the school. */
 export type SchoolCourse = {
   id: string;
@@ -91,8 +100,11 @@ export type MemberFilters = {
 export const communityKeys = {
   teachers: (filters: MemberFilters) => ["school", "teachers", filters] as const,
   students: (filters: MemberFilters) => ["school", "students", filters] as const,
-  courses: () => ["school", "courses"] as const,
-  subjects: () => ["school", "subjects"] as const,
+  coursesPage: (page: number) => ["school", "courses", "page", page] as const,
+  courseOptions: () => ["school", "courses", "options"] as const,
+  subjectsPage: (offered: boolean | undefined, page: number) =>
+    ["school", "subjects", "page", offered ?? "all", page] as const,
+  subjectOptions: () => ["school", "subjects", "options"] as const,
 };
 
 /**
@@ -127,19 +139,52 @@ export function useSchoolStudents(filters: MemberFilters): UseQueryResult<Member
   });
 }
 
-/** The courses of the school, with the structure they hold. */
-export function useSchoolCourses(): UseQueryResult<SchoolCourse[], Error> {
+/** One page of the courses of the school, cut in the server. */
+export function useSchoolCoursesPage(page = 1): UseQueryResult<Page<SchoolCourse>, Error> {
   return useQuery({
-    queryKey: communityKeys.courses(),
-    queryFn: () => api.get<SchoolCourse[]>("/v1/school/courses"),
+    queryKey: communityKeys.coursesPage(page),
+    queryFn: () => api.get<Page<SchoolCourse>>(`/v1/school/courses?page=${page}&per_page=10`),
+    placeholderData: (previous) => previous,
   });
 }
 
-/** The subjects of the school, with the courses they are taught in. */
-export function useSchoolSubjects(): UseQueryResult<SchoolSubject[], Error> {
+/**
+ * Every course of the school, for the forms that offer a choice.
+ *
+ * The list is not cut here: the selector needs all of them.
+ */
+export function useSchoolCourseOptions(): UseQueryResult<SchoolCourse[], Error> {
   return useQuery({
-    queryKey: communityKeys.subjects(),
-    queryFn: () => api.get<SchoolSubject[]>("/v1/school/subjects"),
+    queryKey: communityKeys.courseOptions(),
+    queryFn: () => api.get<SchoolCourse[]>("/v1/school/courses/options"),
+  });
+}
+
+/**
+ * One page of the subjects of the school.
+ *
+ * `offered` says which ones come back: the ones that are taught in
+ * some course, or the ones that are in no course.
+ */
+export function useSchoolSubjects(
+  options: { offered?: boolean; page?: number } = {},
+): UseQueryResult<Page<SchoolSubject>, Error> {
+  const offered = options.offered;
+  const page = options.page ?? 1;
+  const query = new URLSearchParams({ page: String(page), per_page: "10" });
+  if (offered !== undefined) query.set("offered", String(offered));
+  return useQuery({
+    queryKey: communityKeys.subjectsPage(offered, page),
+    queryFn: () => api.get<Page<SchoolSubject>>(`/v1/school/subjects?${query}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Every subject of the school, for the forms that offer a choice. */
+export function useSchoolSubjectOptions(): UseQueryResult<SchoolSubject[], Error> {
+  return useQuery({
+    queryKey: communityKeys.subjectOptions(),
+    queryFn: () => api.get<SchoolSubject[]>("/v1/school/subjects/options"),
   });
 }
 
