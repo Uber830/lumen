@@ -215,7 +215,7 @@ function PeriodosPage() {
           if (!open) setDateError(null);
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-[16px]">Nuevo periodo</DialogTitle>
             <DialogDescription>
