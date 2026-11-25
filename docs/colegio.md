@@ -37,9 +37,9 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso** |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Dos paneles: los cursos del colegio y las materias con sus cursos |
-| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, e importación del plan de estudios |
+| Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia |
 | Períodos | `/admin/periodos` | Ciclo lectivo, cierre de periodo y periodo vigente |
-| ICFES | `/admin/icfes-colegio` | Simulacros que la plataforma habilitó, activados por curso, con sus resultados |
+| ICFES | `/admin/icfes-colegio` | Los simulacros del colegio: el módulo se está afinando y el panel lo avisa |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
 | Administradores | `/admin/administradores` | El equipo del colegio, con rango Principal o Secundario |
 | Soporte | `/admin/soporte` | Solicitudes al equipo de Lumen, con adjuntos, y el hilo de respuesta |
@@ -64,14 +64,15 @@ degradar o quitar al último administrador principal (`409`, `last_principal`).
 
 ### El plan de estudios
 
-**Asignaciones → Importar desde plan de estudios** crea de una vez los cursos
-de un grado con sus materias ofrecidas. La importación es **idempotente**: un
-curso que ya existe se omite y las materias del colegio se reutilizan en vez
-de duplicarse.
+La API sabe crear de una vez los cursos de un grado con sus materias
+ofrecidas (`POST /v1/academics/study-plans/import`): la importación es
+**idempotente**, un curso que ya existe se omite y las materias del colegio
+se reutilizan en vez de duplicarse.
 
 Los planes que la plataforma ofrece (sexto a décimo) viven en
 `backend/app/academics/study_plan.py`; el endpoint dice cuáles ya existen y
-cuántos estudiantes hay en cada uno.
+cuántos estudiantes hay en cada uno. **El panel todavía no lo ofrece**: la
+acción de importar quedó fuera del menú de asignaciones.
 
 ---
 
