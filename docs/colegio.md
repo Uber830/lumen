@@ -23,7 +23,7 @@ De ahí sale la regla que atraviesa todo el panel:
 | Administrar administradores del colegio | Sí | **Sí** |
 | Cambiar la identidad del colegio | Sí | **Sí** |
 
-En la vista **Contenido** no hay botón de subir, ni de publicar, ni de editar
+En la vista **Biblioteca** no hay botón de subir, ni de publicar, ni de editar
 metadatos: el administrador consulta el material habilitado y nada más.
 
 ---
@@ -33,7 +33,7 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Vista | Ruta | Qué hace |
 | --- | --- | --- |
 | Dashboard | `/admin` | KPIs del colegio, material por área, estado del colegio, actividad reciente y acciones rápidas |
-| Contenido | `/admin/contenido` | Material habilitado, **solo lectura**, como una estantería de libros; cada pieza se abre en un modal sobre la vista |
+| Biblioteca | `/admin/contenido` | Los recursos habilitados, **solo lectura**, como una estantería: cada recurso es una tarjeta con su portada y se abre en un modal sobre la vista |
 | Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso**. La ficha de **Gestionar** muestra los datos de la persona y su acceso: sus materias se cambian en Asignaciones |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se abre un **modal** con las de ese curso (la tabla no se mueve). La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
@@ -98,6 +98,31 @@ docentes y los estudiantes:
 
 La fila de las asignaciones es el docente, y el servidor la agrupa: la
 persona no se repite.
+
+### La biblioteca, como una estantería
+
+**Contenido** pasó a llamarse **Biblioteca** (`/admin/contenido`) y el
+**Catálogo editorial** de la plataforma, **Biblioteca de recursos**
+(`/super/catalogo`). Las rutas no cambian; lo que cambia es la vista: los
+recursos ya no son filas de una tabla, son **tarjetas**.
+
+Cada tarjeta lleva la **portada** con el color de su área (la misma área
+tiene siempre el mismo color), el **tipo** del recurso (Libro, Guía,
+Evaluación…), el nombre, la línea de abajo (área · cursos · tamaño) y las
+**etiquetas** que dicen a quién va dirigido y de dónde salió. La acción
+depende del rol: el colegio **ver** el recurso, la plataforma lo
+**gestiona**.
+
+Los filtros son los del diseño y corren en el servidor: la búsqueda, el
+área, el destinatario (y en la plataforma, el tipo y el estado).
+
+| Vista | Qué filtra |
+| --- | --- |
+| `GET /v1/school/material` | `q`, `area`, `audience` |
+| `GET /v1/platform/catalog` | `q`, `type`, `status`, `visible_to` |
+
+El colegio **no sube** recursos: la biblioteca la carga el equipo de
+plataforma. Por eso su vista no tiene botón de subir.
 
 ### La estructura académica, en un formulario
 
@@ -177,7 +202,7 @@ acción de importar quedó fuera del menú de asignaciones.
 
 | Capacidad | Principal | Secundario |
 | --- | --- | --- |
-| Ver dashboard, contenido, docentes, estudiantes, cursos, asignaciones, períodos, ICFES | Sí | Sí |
+| Ver dashboard, biblioteca, docentes, estudiantes, cursos, asignaciones, períodos, ICFES | Sí | Sí |
 | Crear y editar docentes, estudiantes, cursos, materias, asignaciones | Sí | Sí |
 | Cerrar y marcar períodos | Sí | **No** |
 | Invitar y quitar administradores | Sí | **No** |
@@ -366,7 +391,7 @@ npm run test:e2e
 ```
 
 El e2e del panel (`tests/e2e/colegio.spec.ts`) recorre la cadena del
-producto: entrar como administrador, ver el contenido habilitado del colegio,
+producto: entrar como administrador, ver la biblioteca habilitada del colegio,
 crear un docente, asignarlo a un curso y comprobar que la asignación dice
 cuánto material ve el docente, activar un simulacro y abrir una solicitud de
 soporte.
