@@ -750,7 +750,7 @@ async def list_members(
     school_id: uuid.UUID,
     role: SchoolRole | None = None,
     include_revoked: bool = False,
-) -> list[tuple[SchoolMembership, Profile, str | None, bool]]:
+) -> list[tuple[SchoolMembership, Profile | None, str | None, bool, str | None]]:
     """List the school's members, joined with their profile.
 
     The frontend used to build this with a PostgREST join. Doing it
@@ -763,9 +763,20 @@ async def list_members(
     ``include_revoked`` is set, which the admin management view uses to
     show deactivated members too.
     """
+    # The profile is joined on the left: a member without a profile
+    # still is a member of the school, and the name it has is in the
+    # account. With an inner join the members without a profile were
+    # missing from the directory, and the forms that offer a choice of
+    # teacher came out empty.
     statement = (
-        select(SchoolMembership, Profile, User.email, User.password_hash)
-        .join(Profile, Profile.id == SchoolMembership.user_id)
+        select(
+            SchoolMembership,
+            Profile,
+            User.email,
+            User.password_hash,
+            func.coalesce(Profile.full_name, User.full_name),
+        )
+        .outerjoin(Profile, Profile.id == SchoolMembership.user_id)
         .join(User, User.id == SchoolMembership.user_id)
         .where(SchoolMembership.school_id == school_id)
         .order_by(SchoolMembership.joined_at.desc())
@@ -777,7 +788,7 @@ async def list_members(
 
     result = await session.execute(statement)
     # The account is "activated" once it has a non-empty password hash.
-    return [(row[0], row[1], row[2], bool(row[3])) for row in result.all()]
+    return [(row[0], row[1], row[2], bool(row[3]), row[4]) for row in result.all()]
 
 
 async def list_teachers_for_student(

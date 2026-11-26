@@ -678,14 +678,16 @@ async def list_members(
             role=membership.role.value,
             is_primary=membership.is_primary,
             joined_at=membership.joined_at,
-            full_name=profile.full_name,
+            # The name of the member: the profile when it has one, the
+            # account otherwise.
+            full_name=full_name or email or "Colegio",
             email=email,
-            phone=profile.phone,
-            avatar_url=profile.avatar_url,
+            phone=profile.phone if profile is not None else None,
+            avatar_url=profile.avatar_url if profile is not None else None,
             revoked_at=membership.revoked_at,
             account_activated=account_activated,
         )
-        for membership, profile, email, account_activated in rows
+        for membership, profile, email, account_activated, full_name in rows
     ]
 
 
