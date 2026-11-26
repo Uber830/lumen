@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ClipboardList, GraduationCap, Link2, ListChecks, Plus } from "lucide-react";
+import { ClipboardList, GraduationCap, Link2, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -35,7 +35,6 @@ import {
   useCreateTeacherAssignment,
   useDeleteTeacherAssignment,
   useSchoolMembers,
-  useUpdateTeacherAssignment,
 } from "@/features/academics/hooks";
 import { useSchoolAssignments, type SchoolAssignment } from "@/lib/school/cycles";
 import { useSchoolCourseOptions } from "@/lib/school/community";
@@ -82,13 +81,12 @@ function AsignacionesPage() {
   const teachers = useSchoolMembers(schoolId, "teacher");
   const courses = useSchoolCourseOptions();
   const createAssignment = useCreateTeacherAssignment(schoolId ?? "");
-  const updateAssignment = useUpdateTeacherAssignment(schoolId ?? "");
   const deleteAssignment = useDeleteTeacherAssignment(schoolId ?? "");
 
-  // The form is the same for creating and for editing: what changes is
-  // what it holds and what the button says.
+  // The form adds a subject to a teacher. When it comes from a row,
+  // the teacher is the one of that row and does not change.
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<SchoolAssignment | null>(null);
+  const [fixedTeacher, setFixedTeacher] = useState<{ id: string; name: string } | null>(null);
   const [teacherId, setTeacherId] = useState("");
   const [courseSubjectId, setCourseSubjectId] = useState("");
   const [justAssigned, setJustAssigned] = useState<string | null>(null);
@@ -145,18 +143,10 @@ function AsignacionesPage() {
 
   const totalAssignments = byTeacher.reduce((total, group) => total + group.assignments.length, 0);
 
-  function openCreate() {
-    setEditing(null);
-    setTeacherId("");
+  function openCreate(fixed?: { id: string; name: string }) {
+    setFixedTeacher(fixed ?? null);
+    setTeacherId(fixed?.id ?? "");
     setCourseSubjectId("");
-    setJustAssigned(null);
-    setFormOpen(true);
-  }
-
-  function openEdit(assignment: SchoolAssignment) {
-    setEditing(assignment);
-    setTeacherId(assignment.teacher_id);
-    setCourseSubjectId(assignment.course_subject_id);
     setJustAssigned(null);
     setFormOpen(true);
   }
@@ -168,7 +158,7 @@ function AsignacionesPage() {
       id: assignment.id,
       title: `la asignación de ${
         assignment.teacher_name ?? "el docente"
-      } a ${assignment.subject_name}`,
+      } a ${assignment.course_name ? `${assignment.course_name} · ` : ""}${assignment.subject_name}`,
       description:
         "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
       confirmLabel: "Quitar asignación",
@@ -179,24 +169,16 @@ function AsignacionesPage() {
     event.preventDefault();
     if (!teacherId || !courseSubjectId) return;
 
-    if (editing) {
-      await updateAssignment.mutateAsync({
-        id: editing.id,
-        patch: { teacher_id: teacherId, course_subject_id: courseSubjectId },
-      });
-      setJustAssigned("Cambios guardados");
-    } else {
-      await createAssignment.mutateAsync({
-        course_subject_id: courseSubjectId,
-        teacher_id: teacherId,
-      });
-      setJustAssigned("Asignación creada");
-    }
+    await createAssignment.mutateAsync({
+      course_subject_id: courseSubjectId,
+      teacher_id: teacherId,
+    });
+    setJustAssigned(fixedTeacher ? `Materia asignada a ${fixedTeacher.name}` : "Asignación creada");
     setFormOpen(false);
-    setEditing(null);
+    setFixedTeacher(null);
   }
 
-  const pending = createAssignment.isPending || updateAssignment.isPending;
+  const pending = createAssignment.isPending;
 
   return (
     <>
@@ -204,7 +186,7 @@ function AsignacionesPage() {
         title="Asignaciones"
         subtitle="Vincula docentes con cursos y materias. Cada asignación habilita el acceso al contenido."
         actions={
-          <Button icon={Plus} onClick={openCreate}>
+          <Button icon={Plus} onClick={() => openCreate()}>
             Nueva asignación
           </Button>
         }
@@ -216,37 +198,49 @@ function AsignacionesPage() {
         open={formOpen}
         onOpenChange={(open) => {
           setFormOpen(open);
-          if (!open) setEditing(null);
+          if (!open) setFixedTeacher(null);
         }}
       >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle className="text-[16px]">
-              {editing ? "Editar asignación" : "Nueva asignación"}
+              {fixedTeacher ? `Asignar otra materia a ${fixedTeacher.name}` : "Nueva asignación"}
             </DialogTitle>
             <DialogDescription>
-              {editing
-                ? "El docente deja de ver el material de la materia anterior y empieza a ver el de la nueva."
-                : "La asignación habilita el acceso del docente al material de esa materia."}
+              La asignación habilita el acceso del docente al material de esa materia.
             </DialogDescription>
           </DialogHeader>
 
           <form className="space-y-3" onSubmit={onSubmit}>
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Docente
-                </span>
-                <div className="mt-1.5">
-                  <Select
-                    value={teacherId}
-                    onChange={setTeacherId}
-                    options={teacherOptions}
-                    placeholder={noTeachers ? "No hay docentes" : "Elige un docente"}
-                    emptyLabel="Todavía no hay docentes en el colegio"
-                  />
-                </div>
-              </label>
+              {fixedTeacher ? (
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Docente
+                  </span>
+                  <div className="mt-1.5 rounded-idx border border-input bg-secondary px-3 py-2 text-[13px] font-medium">
+                    {fixedTeacher.name}
+                  </div>
+                  <span className="mt-1.5 block text-xs text-muted-foreground">
+                    El docente de la fila: la materia es la que se elige.
+                  </span>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Docente
+                  </span>
+                  <div className="mt-1.5">
+                    <Select
+                      value={teacherId}
+                      onChange={setTeacherId}
+                      options={teacherOptions}
+                      placeholder={noTeachers ? "No hay docentes" : "Elige un docente"}
+                      emptyLabel="Todavía no hay docentes en el colegio"
+                    />
+                  </div>
+                </label>
+              )}
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Curso · Materia
@@ -285,9 +279,9 @@ function AsignacionesPage() {
               </p>
             )}
 
-            {(createAssignment.error || updateAssignment.error) && (
+            {createAssignment.error && (
               <p role="alert" className="text-[13px] text-destructive">
-                {(createAssignment.error ?? updateAssignment.error)?.message}
+                {createAssignment.error.message}
               </p>
             )}
 
@@ -297,7 +291,7 @@ function AsignacionesPage() {
                 type="button"
                 onClick={() => {
                   setFormOpen(false);
-                  setEditing(null);
+                  setFixedTeacher(null);
                 }}
               >
                 Cancelar
@@ -307,11 +301,7 @@ function AsignacionesPage() {
                 icon={Link2}
                 disabled={pending || !teacherId || !courseSubjectId}
               >
-                {pending
-                  ? "Guardando..."
-                  : editing
-                    ? "Guardar cambios"
-                    : "Asignar docente a la materia"}
+                {pending ? "Guardando..." : "Asignar la materia"}
               </Button>
             </DialogFooter>
           </form>
@@ -384,7 +374,7 @@ function AsignacionesPage() {
             title="Sin asignaciones"
             description="Vincula un docente con un curso y una materia para que tenga acceso al contenido."
             action={
-              <Button icon={Plus} onClick={openCreate}>
+              <Button icon={Plus} onClick={() => openCreate()}>
                 Nueva asignación
               </Button>
             }
@@ -445,10 +435,6 @@ function AsignacionesPage() {
                           setSubjectsDialog({ teacherId: group.teacherId, withActions: false });
                         }}
                         withActions={subjectsDialog?.withActions ?? false}
-                        onEdit={(item) => {
-                          const assignment = group.assignments.find((one) => one.id === item.id);
-                          if (assignment) openEdit(assignment);
-                        }}
                         onRemove={(item) => {
                           const assignment = group.assignments.find((one) => one.id === item.id);
                           if (assignment) askRemoveAssignment(assignment);
@@ -468,23 +454,20 @@ function AsignacionesPage() {
                           variant="ghost"
                           size="sm"
                           icon={Plus}
-                          onClick={() => {
-                            openCreate();
-                            setTeacherId(group.teacherId);
-                          }}
+                          onClick={() => openCreate({ id: group.teacherId, name: group.name })}
                         >
                           Asignar otra
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={ListChecks}
+                          icon={Trash2}
                           onClick={() =>
                             setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
                           }
-                          aria-label={`Gestionar las materias de ${group.name}`}
+                          aria-label={`Quitar las materias de ${group.name}`}
                         >
-                          Gestionar
+                          Quitar
                         </Button>
                       </div>
                     </td>
@@ -506,6 +489,7 @@ function AsignacionesPage() {
             total={assignments.data?.total ?? 0}
             pageSize={assignments.data?.per_page ?? PAGE_SIZE}
             onPageChange={setPage}
+            always
           />
         )}
       </SectionCard>

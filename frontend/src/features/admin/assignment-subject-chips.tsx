@@ -13,7 +13,7 @@
 // removing live together.
 // =============================================================================
 
-import { Pencil, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import {
   Dialog,
@@ -37,7 +37,6 @@ export function AssignmentSubjectChips({
   who,
   open,
   onOpenChange,
-  onEdit,
   onRemove,
   withActions = false,
 }: {
@@ -47,8 +46,6 @@ export function AssignmentSubjectChips({
   /** Whether the list is on screen. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Opens the edit form of the assignment. */
-  onEdit?: (item: AssignmentChipItem) => void;
   /** Asks to remove the assignment. */
   onRemove?: (item: AssignmentChipItem) => void;
   /**
@@ -64,7 +61,7 @@ export function AssignmentSubjectChips({
   const shown = items.slice(0, 1);
   const extra = items.length - shown.length;
   // The actions are shown only when the list is opened to act on it.
-  const canAct = withActions && Boolean(onEdit || onRemove);
+  const canAct = withActions && Boolean(onRemove);
 
   return (
     <>
@@ -107,20 +104,6 @@ export function AssignmentSubjectChips({
                   <span className="font-medium">{item.courseName}</span>
                   <span className="text-muted-foreground"> · {item.subjectName}</span>
                 </span>
-                {canAct && onEdit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenChange(false);
-                      onEdit(item);
-                    }}
-                    aria-label={`Editar la asignación de ${item.subjectName} en ${item.courseName}`}
-                    title="Editar la asignación"
-                    className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Pencil className="size-3.5" strokeWidth={1.9} aria-hidden />
-                  </button>
-                )}
                 {canAct && onRemove && (
                   <button
                     type="button"
