@@ -2,8 +2,9 @@
 // The member edit modal (admin).
 // -----------------------------------------------------------------------------
 // Opens from the drawer of a teacher or a student: the admin changes the
-// name, the email and the courses (of a student) or the course and the
-// subject (of a teacher).
+// name and the email. The courses of a student are part of the form; the
+// courses of a teacher are not: they are changed in Asignaciones, where
+// each one is a row.
 //
 // The list of the community is the truth: what the form sends is what the
 // member ends up having.
@@ -17,7 +18,6 @@ import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 
 import { Button } from "@/components/ui-kit";
-import { useCourseSubjects } from "@/features/academics/hooks";
 import { useSchoolCourseOptions, useUpdateMember } from "@/lib/school/community";
 
 export type EditableMember = {
@@ -33,28 +33,22 @@ export type EditableMember = {
 export function MemberEditDialog({
   member,
   role,
-  schoolId,
   onClose,
   onSaved,
 }: {
   member: EditableMember;
   /** Whether the member is a teacher or a student. */
   role: "teacher" | "student";
-  schoolId: string | null;
   onClose: () => void;
   /** Called when the changes are saved. */
   onSaved: () => void;
 }) {
-  const courseSubjects = useCourseSubjects(schoolId);
   const updateMember = useUpdateMember();
 
   const [fullName, setFullName] = useState(member.full_name ?? "");
   const [email, setEmail] = useState(member.email ?? "");
-  // The course and the subject that the teacher has now. A teacher can
-  // teach many: the list is a set of checkboxes.
-  const [selected, setSelected] = useState<string[]>(
-    role === "teacher" ? (member.course_subject_ids ?? []) : [],
-  );
+  // The course of a student. The courses of a teacher are not here:
+  // they are changed in Asignaciones.
   // A student belongs to **one** course: the school has one grade per
   // student, and a student in two courses has no average and no tasks.
   const [courseId, setCourseId] = useState<string>(
@@ -70,21 +64,16 @@ export function MemberEditDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  function toggle(id: string) {
-    setSelected((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    );
-  }
-
   async function onSave() {
     try {
       await updateMember.mutateAsync({
         membershipId: member.membership_id,
         full_name: fullName.trim(),
         email: email.trim(),
-        ...(role === "student"
-          ? { course_ids: courseId ? [courseId] : [] }
-          : { course_subject_ids: selected }),
+        // The courses of a student are part of the form. The courses
+        // of a teacher are not: they are changed in Asignaciones, where
+        // each one is a row. Not sending them leaves them as they are.
+        ...(role === "student" ? { course_ids: courseId ? [courseId] : [] } : {}),
       });
       onSaved();
       onClose();
@@ -155,52 +144,17 @@ export function MemberEditDialog({
             />
           </label>
 
-          <fieldset>
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {isTeacher ? "Curso y materia" : "Curso"}
-            </legend>
-            {isTeacher ? (
-              courseSubjects.isLoading ? (
-                <div className="mt-2 space-y-2" aria-hidden>
-                  {[0, 1, 2].map((row) => (
-                    <div key={row} className="h-[38px] animate-pulse rounded-idx bg-muted" />
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-2 max-h-[220px] space-y-1.5 overflow-y-auto">
-                  {(courseSubjects.data ?? []).map((courseSubject) => {
-                    const checked = selected.includes(courseSubject.id);
-                    return (
-                      <label
-                        key={courseSubject.id}
-                        className={`flex cursor-pointer items-center gap-2.5 rounded-idx border px-3 py-2 text-[13px] transition-colors ${
-                          checked
-                            ? "border-primary/50 bg-primary-soft text-foreground"
-                            : "border-border bg-card text-muted-foreground hover:border-input"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggle(courseSubject.id)}
-                          className="size-[15px] accent-primary"
-                        />
-                        {courseSubject.course_name} · {courseSubject.subject_name}
-                      </label>
-                    );
-                  })}
-                  {(courseSubjects.data ?? []).length === 0 && (
-                    <p className="text-[13px] text-muted-foreground">
-                      Todavía no hay materias ofrecidas en los cursos. Crea una en «Cursos y
-                      materias».
-                    </p>
-                  )}
-                </div>
-              )
-            ) : (
+          {/* The course of a student is part of the form. The courses
+              of a teacher are not: they are changed in Asignaciones,
+              where each one is a row. */}
+          {!isTeacher && (
+            <fieldset>
+              <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Curso
+              </legend>
               <StudentCourses courseId={courseId} onPick={setCourseId} />
-            )}
-          </fieldset>
+            </fieldset>
+          )}
 
           {updateMember.error && (
             <p role="alert" className="text-[13px] text-destructive">

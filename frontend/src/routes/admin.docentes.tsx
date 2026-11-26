@@ -521,7 +521,6 @@ function DocentesPage() {
             course_subject_ids: editingTeacher.course_subject_ids,
           }}
           role="teacher"
-          schoolId={schoolId}
           onClose={() => setEditingTeacher(null)}
           onSaved={() => setEditingTeacher(null)}
         />

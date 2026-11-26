@@ -513,7 +513,6 @@ function EstudiantesPage() {
             course_ids: editingStudent.course_ids,
           }}
           role="student"
-          schoolId={schoolId}
           onClose={() => setEditingStudent(null)}
           onSaved={() => setEditingStudent(null)}
         />
