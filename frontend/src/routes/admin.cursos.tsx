@@ -356,6 +356,7 @@ function CursosPage() {
               total={courses.data?.total ?? 0}
               pageSize={courses.data?.per_page ?? PAGE_SIZE}
               onPageChange={setPage}
+              always
             />
           </>
         )}
@@ -405,6 +406,7 @@ function CursosPage() {
             total={subjects.data?.total ?? 0}
             pageSize={subjects.data?.per_page ?? PAGE_SIZE}
             onPageChange={setOrphanPage}
+            always
           />
         </SectionCard>
       )}

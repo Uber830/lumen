@@ -359,9 +359,7 @@ async def test_the_courses_and_the_subjects_are_the_ones_of_the_school(
     assert subjects["items"][0]["courses"] == ["7° A"]
 
 
-async def test_the_lists_are_cut_in_pages_by_the_server(
-    client, engine, seeded_school, community
-):
+async def test_the_lists_are_cut_in_pages_by_the_server(client, engine, seeded_school, community):
     """The page comes from the server: the browser asks for it."""
     response = client.get("/v1/school/courses?page=1&per_page=1", headers=await _auth())
     assert response.status_code == 200, response.text
@@ -374,9 +372,7 @@ async def test_the_lists_are_cut_in_pages_by_the_server(
     assert len(courses["items"]) == 1
 
 
-async def test_the_options_bring_the_whole_list(
-    client, engine, seeded_school, community
-):
+async def test_the_options_bring_the_whole_list(client, engine, seeded_school, community):
     """The forms that offer a choice need every course, not a page."""
     response = client.get("/v1/school/courses/options", headers=await _auth())
     assert response.status_code == 200, response.text

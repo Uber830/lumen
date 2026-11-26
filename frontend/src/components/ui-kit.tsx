@@ -532,14 +532,21 @@ export function Pagination({
   total,
   pageSize,
   onPageChange,
+  always = false,
 }: {
   page: number;
   pageCount: number;
   total: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  /**
+   * Shows the foot even when everything fits in one page. The lists
+   * that are cut in the server say so, so the admin sees the cut and
+   * the numbers it has.
+   */
+  always?: boolean;
 }) {
-  if (total === 0 || pageCount <= 1) return null;
+  if (total === 0 || (pageCount <= 1 && !always)) return null;
 
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
