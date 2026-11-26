@@ -1,3 +1,4 @@
+import { audienceLabel } from "@/features/resources/resource-card";
 import { AlertTriangle, Check, FileText, History, Link2, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
@@ -134,9 +135,7 @@ export function MaterialPanel({
                     {detail.grades.length > 0 ? detail.grades.join(" · ") : "Todo el colegio"}
                   </dd>
                   <dt className="text-muted-foreground">Visible para</dt>
-                  <dd>
-                    {detail.visible_to === "all" ? "Docentes y estudiantes" : detail.visible_to}
-                  </dd>
+                  <dd>{audienceLabel(detail.visible_to)}</dd>
                   <dt className="text-muted-foreground">Origen</dt>
                   <dd className="flex items-center gap-1.5">
                     {detail.origin === "upload" ? (

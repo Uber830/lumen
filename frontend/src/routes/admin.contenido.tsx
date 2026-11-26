@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, Eye, Info, Search, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Eye, Info, Search, Trash2, Upload, Users } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -18,11 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
+import { SchoolResourceDialog } from "@/features/admin/school-resource-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { audienceLabel, coverOf, ResourceCard } from "@/features/resources/resource-card";
+import { ResourceViewer } from "@/features/resources/resource-viewer";
 import {
+  fetchSchoolMaterialFile,
   formatFileSize,
   formatShortDate,
   MATERIAL_PAGE_SIZE,
+  useDeleteSchoolMaterial,
   useSchoolMaterial,
   useSchoolMaterialDetail,
   type MaterialListItem,
@@ -68,8 +73,13 @@ function Contenido() {
   const [audience, setAudience] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<MaterialListItem | null>(null);
+  // The form that loads a resource of the school, and the one that
+  // removes it.
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<MaterialListItem | null>(null);
 
   const material = useSchoolMaterial({ q: query, area, audience, page });
+  const deleteMaterial = useDeleteSchoolMaterial();
 
   // A new filter starts again on the first page: the second page of
   // the previous filter is not the second page of this one.
@@ -92,11 +102,22 @@ function Contenido() {
   const areas = material.data?.areas ?? [];
   const audiences = material.data?.audiences ?? [];
 
+  async function onDelete() {
+    if (!toDelete) return;
+    await deleteMaterial.mutateAsync(toDelete.id);
+    setToDelete(null);
+  }
+
   return (
     <>
       <PageHeader
         title="Biblioteca del colegio"
         subtitle="Los recursos que publicó el equipo de Lumen y los que cargó tu colegio. Todos los ven; lo que es solo para docentes o solo para administradores lo define quien lo carga."
+        actions={
+          <Button icon={Upload} onClick={() => setUploadOpen(true)}>
+            Cargar recurso
+          </Button>
+        }
       />
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
@@ -202,15 +223,32 @@ function Contenido() {
                       </>
                     }
                     actions={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        icon={Eye}
-                        onClick={() => setSelected(item)}
-                        aria-label={`Ver ${item.title}`}
-                      >
-                        Ver
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={Eye}
+                          onClick={() => setSelected(item)}
+                          aria-label={`Ver ${item.title}`}
+                        >
+                          Ver
+                        </Button>
+                        {/* Only the resources of the school are its own
+                            to remove: the ones of the editorial team
+                            are not. */}
+                        {item.origin === "colegio" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Trash2}
+                            onClick={() => setToDelete(item)}
+                            aria-label={`Quitar ${item.title}`}
+                            className="ml-1"
+                          >
+                            Quitar
+                          </Button>
+                        ) : null}
+                      </>
                     }
                   />
                 </li>
@@ -247,14 +285,13 @@ function Contenido() {
       </SectionCard>
 
       {/* The resource, as it is: it opens on top of the shelf, without
-          leaving the view. The switches that enable the material belong
-          to the platform team, and the material is not downloaded by
-          anybody: it is consulted inside the platform. */}
+          leaving the view. The file is shown inside the platform: the
+          material is consulted, not downloaded. */}
       <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle className="text-[16px]">
-              {detail.data?.title ?? selected?.title ?? "Material"}
+              {detail.data?.title ?? selected?.title ?? "Recurso"}
             </DialogTitle>
             <DialogDescription className="font-mono text-[12px]">
               {detail.data?.ref ?? selected?.ref} ·{" "}
@@ -262,84 +299,47 @@ function Contenido() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-5 sm:flex-row">
-            <div
-              className={cn(
-                "relative flex h-[220px] w-[152px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-4 text-white",
-                coverOf(detail.data?.area ?? selected?.area ?? ""),
-              )}
+          {/* The data of the piece, in one line: what it is and who it
+              is for. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chip tone="muted">{detail.data?.area ?? selected?.area}</Chip>
+            <Chip tone="muted">{detail.data?.type ?? selected?.type}</Chip>
+            <Chip
+              tone={(detail.data?.visible_to ?? selected?.visible_to) === "all" ? "muted" : "info"}
             >
-              <span
-                className="pointer-events-none absolute inset-0 bg-linear-to-br from-white/18 to-black/25"
-                aria-hidden
-              />
-              <span className="relative text-[11px] font-semibold uppercase tracking-[0.14em] opacity-95">
-                {detail.data?.type ?? selected?.type}
-              </span>
-              <BookOpen
-                className="relative size-9 self-end opacity-90"
-                strokeWidth={1.8}
-                aria-hidden
-              />
-              <span className="relative text-[12px] font-semibold leading-snug opacity-95">
-                {detail.data?.title ?? selected?.title}
-              </span>
-            </div>
-
-            <div className="min-w-0 flex-1">
-              {detail.isLoading ? (
-                <div className="h-24 animate-pulse rounded-xl bg-muted" aria-hidden />
-              ) : detail.data ? (
-                <>
-                  <dl className="grid grid-cols-[112px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
-                    <dt className="text-[12.4px] text-muted-foreground">Área</dt>
-                    <dd>{detail.data.area}</dd>
-                    <dt className="text-[12.4px] text-muted-foreground">Tipo</dt>
-                    <dd>{detail.data.type}</dd>
-                    <dt className="text-[12.4px] text-muted-foreground">Va dirigido a</dt>
-                    <dd>{audienceLabel(detail.data.visible_to)}</dd>
-                    <dt className="text-[12.4px] text-muted-foreground">Formato</dt>
-                    <dd>{KIND_LABELS[detail.data.kind] ?? detail.data.kind}</dd>
-                    <dt className="text-[12.4px] text-muted-foreground">Disponible desde</dt>
-                    <dd className="font-mono">{formatShortDate(detail.data.available_since)}</dd>
-                    <dt className="text-[12.4px] text-muted-foreground">Cursos</dt>
-                    <dd className="flex flex-wrap items-center gap-1.5">
-                      {detail.data.courses.length > 0
-                        ? detail.data.courses.map((course) => (
-                            <Chip key={course.id} tone="muted">
-                              <Users className="size-3" strokeWidth={1.9} aria-hidden />
-                              {course.name}
-                            </Chip>
-                          ))
-                        : "Todo el colegio"}
-                    </dd>
-                    {detail.data.description && (
-                      <>
-                        <dt className="text-[12.4px] text-muted-foreground">Descripción</dt>
-                        <dd className="text-muted-foreground">{detail.data.description}</dd>
-                      </>
-                    )}
-                  </dl>
-
-                  <p className="mt-4 flex items-start gap-2 rounded-xl border border-border bg-secondary p-3 text-[12.5px] text-muted-foreground">
-                    <CheckCircle2
-                      className="mt-px size-4 shrink-0 text-success"
-                      strokeWidth={1.9}
-                      aria-hidden
-                    />
-                    <span>
-                      <b className="font-semibold text-foreground">Acceso confirmado.</b>{" "}
-                      {detail.data.access.note ?? "Este material está habilitado para tu colegio."}
-                    </span>
-                  </p>
-                </>
-              ) : (
-                <p className="text-[13px] text-muted-foreground">No se pudo cargar el material.</p>
-              )}
-            </div>
+              {audienceLabel(detail.data?.visible_to ?? selected?.visible_to ?? "all")}
+            </Chip>
+            {(detail.data?.origin ?? selected?.origin) === "colegio" ? (
+              <Chip tone="teal">Cargado por el colegio</Chip>
+            ) : null}
           </div>
+
+          <ResourceViewer
+            file={detail.data?.file ?? null}
+            materialId={selected?.id ?? null}
+            loadFile={fetchSchoolMaterialFile}
+          />
+
+          {detail.data?.description ? (
+            <p className="text-[13px] text-muted-foreground">{detail.data.description}</p>
+          ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* The form that loads a resource of the school. */}
+      <SchoolResourceDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />
+
+      {/* Removing a resource of the school asks for confirmation: the
+          file leaves the library with it. */}
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={`Quitar ${toDelete?.title ?? "el recurso"}`}
+        description="El recurso sale de la biblioteca del colegio y el archivo que tiene deja de estar disponible."
+        confirmLabel="Quitar el recurso"
+        pending={deleteMaterial.isPending}
+        onCancel={() => setToDelete(null)}
+        onConfirm={() => void onDelete()}
+      />
     </>
   );
 }

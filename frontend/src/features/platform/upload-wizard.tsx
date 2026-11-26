@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/dialog";
 import { StatusPill } from "@/components/ui-kit";
+import { audienceLabel } from "@/features/resources/resource-card";
 import {
   useCatalogOptions,
   useChangeMaterialStatus,
@@ -349,7 +350,7 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
               >
                 {(options.data?.visible_to ?? ["all"]).map((value) => (
                   <option key={value} value={value}>
-                    {value === "all" ? "Docentes y estudiantes" : value}
+                    {audienceLabel(value)}
                   </option>
                 ))}
               </select>
