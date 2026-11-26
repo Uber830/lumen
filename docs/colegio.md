@@ -9,22 +9,29 @@ construido y qué decisiones del producto ya están tomadas.
 
 > El colegio entrega su información; el **equipo de plataforma** carga el material
 > al catálogo editorial y decide qué colegio puede ver cada pieza; el colegio
-> solo consume.
+> consume ese material y, además, carga el suyo propio, deciding a quién va
+> dirigido.
 
 De ahí sale la regla que atraviesa todo el panel:
 
 | Acción | Plataforma | Admin de colegio |
 | --- | --- | --- |
-| Cargar material al catálogo | Sí | **No** |
-| Definir qué colegios ven cada material | Sí | **No** |
-| Publicar, archivar o despublicar | Sí | **No** |
+| Cargar material al catálogo editorial | Sí | **No** |
+| Cargar material propio del colegio | Sí | **Sí** |
+| Definir qué colegios ven cada material del catálogo | Sí | **No** |
+| Decidir a quién va dirigido cada material propio | **No** | **Sí** |
+| Publicar, archivar o despublicar el material editorial | Sí | **No** |
 | Ver el material habilitado para su colegio | Sí | Sí |
 | Administrar docentes, estudiantes y cursos | Sí | **Sí** |
 | Administrar administradores del colegio | Sí | **Sí** |
 | Cambiar la identidad del colegio | Sí | **Sí** |
 
-En la vista **Biblioteca** no hay botón de subir, ni de publicar, ni de editar
-metadatos: el administrador consulta el material habilitado y nada más.
+En la vista **Biblioteca** el administrador consulta el material habilitado y
+también carga el propio: el botón **Cargar recurso** abre un formulario, y la
+tarjeta del recurso queda marcada con **Cargado por el colegio**. Lo que el
+colegio carga no entra al catálogo editorial — eso es de la plataforma — pero
+nace publicado y habilitado para su colegio, y el colegio puede quitarlo
+cuando quiera.
 
 ---
 
@@ -33,8 +40,8 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | Vista | Ruta | Qué hace |
 | --- | --- | --- |
 | Dashboard | `/admin` | KPIs del colegio, material por área, estado del colegio, actividad reciente y acciones rápidas |
-| Biblioteca | `/admin/contenido` | Los recursos habilitados, **solo lectura**, como una estantería: cada recurso es una tarjeta con su portada y se abre en un modal sobre la vista |
-| Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso**. La ficha de **Gestionar** muestra los datos de la persona y su acceso: sus materias se cambian en Asignaciones |
+| Biblioteca | `/admin/contenido` | Los recursos habilitados y los propios del colegio, como una estantería: cada recurso es una tarjeta con su portada y se abre en un modal sobre la vista, donde **se ve el archivo**. El botón **Cargar recurso** sube material propio |
+| Docentes | `/admin/docentes` | Alta, edición, filtro por estado y por curso, y la señal de **Acceso**. La ficha de **Gestionar** muestra los datos de la persona y su acceso: sus materias se cambian en Asignaciones, y **Editar** solo cambia el nombre y el correo |
 | Estudiantes | `/admin/estudiantes` | Alta, matrícula (un estudiante es de **un** curso), filtro por curso, promedio y estado |
 | Cursos y materias | `/admin/cursos` | Los cursos del colegio a lo ancho de la vista; al hacer clic en **Materias** se abre un **modal** con las de ese curso (la tabla no se mueve). La estructura se arma en **un formulario por pasos** (curso → materia → ofrecer) |
 | Asignaciones | `/admin/asignaciones` | Docente ↔ curso ↔ materia, **agrupadas por docente**: una fila por persona, con la primera materia y el contador **+N**; el contador abre un modal con todas, para editarlas o quitarlas |
@@ -42,7 +49,7 @@ metadatos: el administrador consulta el material habilitado y nada más.
 | ICFES | `/admin/icfes-colegio` | Los simulacros del colegio: el módulo se está afinando y el panel lo avisa |
 | Personalización | `/admin/personalizacion` | Nombre visible, escudo y color primario (contraste validado en el backend) |
 | Administradores | `/admin/administradores` | El equipo del colegio, con rango Principal o Secundario |
-| Soporte | `/admin/soporte` | Solicitudes al equipo de Lumen, con adjuntos, y el hilo de respuesta |
+| Soporte | `/admin/soporte` | Solicitudes al equipo de Lumen, con adjuntos, y el hilo de respuesta. La lista se corta en páginas de 10, como la de Asignaciones |
 
 «Mi perfil» vive en el **menú de usuario** (arriba a la derecha), no en el menú
 lateral.
@@ -109,9 +116,7 @@ recursos ya no son filas de una tabla, son **tarjetas**.
 Cada tarjeta lleva la **portada** con el color de su área (la misma área
 tiene siempre el mismo color), el **tipo** del recurso (Libro, Guía,
 Evaluación…), el nombre, la línea de abajo (área · cursos · tamaño) y las
-**etiquetas** que dicen a quién va dirigido y de dónde salió. La acción
-depende del rol: el colegio **ver** el recurso, la plataforma lo
-**gestiona**.
+**etiquetas** que dicen a quién va dirigido y de dónde salió.
 
 Los filtros son los del diseño y corren en el servidor: la búsqueda, el
 área, el destinatario (y en la plataforma, el tipo y el estado).
@@ -121,8 +126,38 @@ Los filtros son los del diseño y corren en el servidor: la búsqueda, el
 | `GET /v1/school/material` | `q`, `area`, `audience` |
 | `GET /v1/platform/catalog` | `q`, `type`, `status`, `visible_to` |
 
-El colegio **no sube** recursos: la biblioteca la carga el equipo de
-plataforma. Por eso su vista no tiene botón de subir.
+La acción depende del rol: el colegio **ve** el recurso (y quita los que él
+mismo cargó); la plataforma lo **gestiona**.
+
+### El colegio también carga recursos
+
+El colegio tiene recursos propios: un manual de la escuela, una guía para
+los docentes, un texto para los estudiantes. El botón **Cargar recurso**
+abre un formulario con el archivo, el título, el tipo, el área y **a quién
+va dirigido** — esa decisión es del colegio.
+
+El recurso nace publicado y habilitado para su colegio, y su tarjeta lo
+distingue con la etiqueta **Cargado por el colegio**. El colegio también
+puede quitar los recursos que cargó (los del equipo de plataforma no son
+suyos).
+
+| Endpoint | Qué hace |
+| --- | --- |
+| `POST /v1/school/material/uploads` | Sube el archivo y devuelve su `file_id` |
+| `POST /v1/school/material` | Crea el recurso y lo habilita para el colegio |
+| `DELETE /v1/school/material/{id}` | Quita un recurso del colegio |
+| `GET /v1/school/material/{id}/file` | Sirve el archivo, para verlo en la plataforma |
+
+### El recurso se ve dentro de la plataforma
+
+Al abrir un recurso, el archivo se muestra ahí mismo: una **imagen** como
+imagen, un **PDF** en el lector del navegador, un **video** con sus
+controles. Un formato que el navegador no puede pintar (un docx, un epub,
+un zip) lo dice en vez de fingir. El archivo lo sirve la API con la sesión
+del colegio: el material se consulta, no se descarga.
+
+Las **audiencias** son cuatro: para todos, solo docentes, solo estudiantes
+y solo administradores.
 
 ### La estructura académica, en un formulario
 
@@ -184,6 +219,14 @@ queda sin principal; la promoción directa está rechazada con `409`
 Después de ceder el rango, la sesión se vuelve a leer: los permisos de quien
 cede cambian en el panel (la acción queda deshabilitada con el motivo).
 
+### La ficha del docente: solo el nombre y el correo
+
+El formulario de **Editar** de un docente cambia **el nombre y el correo**, y
+nada más. Las materias que imparte no se tocan ahí: se cambian en
+**Asignaciones**, donde cada una es una fila con su propio **Asignar otra**
+y su propio **Quitar**. El formulario no manda el campo de las asignaciones,
+así que el backend las deja como estaban.
+
 ### El plan de estudios
 
 La API sabe crear de una vez los cursos de un grado con sus materias
@@ -229,8 +272,13 @@ revela la existencia de material ajeno.
 | --- | --- |
 | `GET /v1/school/me` | Perfil, colegio, rango, `permissions` y periodo vigente |
 | `GET /v1/school/overview` | El dashboard entero en una llamada |
-| `GET /v1/school/material?q=&area=&page=` | Material habilitado (6 por página) |
+| `GET /v1/school/material?q=&area=&audience=&page=` | Material habilitado (6 por página) |
+| `GET /v1/school/material/options` | Los catálogos cerrados del formulario: tipos, áreas y audiencias |
 | `GET /v1/school/material/{id}` | Detalle de un material habilitado |
+| `GET /v1/school/material/{id}/file` | El archivo del recurso, servido para verlo en la plataforma |
+| `POST /v1/school/material/uploads` | Sube el archivo y devuelve su `file_id` |
+| `POST /v1/school/material` | Crea el recurso propio y lo habilita para el colegio |
+| `DELETE /v1/school/material/{id}` | Quita un recurso propio del colegio |
 | `GET /v1/school/teachers|students|courses|subjects|assignments|periods` | La comunidad y el ciclo |
 | `PATCH /v1/school/members/{id}` | Editar a un docente o a un estudiante: nombre, correo y cursos o materias |
 | `GET /v1/academics/study-plans` · `POST /study-plans/import` | El plan de estudios del colegio y su importación |
@@ -238,7 +286,8 @@ revela la existencia de material ajeno.
 | `POST /v1/school/logo` | Escudo: PNG o SVG, máximo 2 MB, tipo real |
 | `GET /v1/school/admins` · `POST /admins/invite` · `PATCH|DELETE /admins/{id}` · `POST /admins/{id}/transfer` | El equipo del colegio |
 | `GET /v1/school/icfes` · `POST /icfes/{id}/activations` · `GET /icfes/{id}/results` | Simulacros del colegio |
-| `GET/POST /v1/school/support/cases` · `GET /cases/{id}` · `POST /cases/{id}/messages` | Canal con el soporte |
+| `GET/POST /v1/school/support/cases` · `GET /cases/{id}` · `POST /cases/{id}/messages` | Canal con el soporte; la lista se corta en páginas de 10 |
+| `GET /v1/school/support/open-count` | Los casos abiertos del colegio, para la campana |
 | `POST /v1/school/support/attachments` | El archivo que se adjunta a una solicitud (10 MB) |
 
 La API responde en inglés; el frontend traduce los mensajes de error.
@@ -392,9 +441,9 @@ npm run test:e2e
 
 El e2e del panel (`tests/e2e/colegio.spec.ts`) recorre la cadena del
 producto: entrar como administrador, ver la biblioteca habilitada del colegio,
-crear un docente, asignarlo a un curso y comprobar que la asignación dice
-cuánto material ve el docente, activar un simulacro y abrir una solicitud de
-soporte.
+cargar un recurso propio y verlo en la biblioteca, crear un docente,
+asignarlo a un curso y comprobar que la asignación dice cuánto material ve el
+docente, activar un simulacro y abrir una solicitud de soporte.
 
 > En una máquina sin las librerías del sistema del navegador, Playwright no
 > arranca. El comando `npx playwright install --with-deps` las instala, y
