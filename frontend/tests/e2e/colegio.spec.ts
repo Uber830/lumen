@@ -47,12 +47,19 @@ test.describe("el panel del colegio", () => {
     await expect(page.getByText("Colegio Sagrado Corazón").first()).toBeVisible(READY);
   });
 
-  test("el contenido solo muestra el material habilitado del colegio", async ({ page }) => {
+  test("la biblioteca solo muestra el material habilitado del colegio", async ({ page }) => {
     await login(page);
     await openPanel(page, "/admin/contenido");
 
-    // The material of the school, with its code in monospaced.
-    await expect(page.getByText(/C-\d{4}/).first()).toBeVisible(READY);
+    // The library is a shelf of resources: each one is a card with its
+    // cover, its name and the button that opens it.
+    const tarjetas = page.locator("ul li article");
+    await expect(tarjetas.first()).toBeVisible(READY);
+    await expect(tarjetas.first().getByRole("button", { name: /^Ver/ })).toBeVisible();
+    // The filters of the shelf: the search, the area and the audience.
+    await expect(page.getByLabel(/Buscar por título/i)).toBeVisible();
+    await expect(page.getByLabel(/Filtrar por área/i)).toBeVisible();
+    await expect(page.getByLabel(/Filtrar por destinatario/i)).toBeVisible();
     // The view is read only: the school does not upload nor publish.
     await expect(page.getByRole("button", { name: /Subir|Publicar/i })).toHaveCount(0);
   });
@@ -126,9 +133,7 @@ test.describe("el panel del colegio", () => {
     const nombreDocente = (await fila.locator("td").first().innerText()).split("\n")[1];
     await fila.getByRole("button", { name: /Asignar otra/i }).click();
     const modal = page.getByRole("dialog").last();
-    await expect(modal.getByRole("heading", { name: /Asignar otra materia a/ })).toBeVisible(
-      READY,
-    );
+    await expect(modal.getByRole("heading", { name: /Asignar otra materia a/ })).toBeVisible(READY);
     // El docente se ve, pero no se elige: el formulario tiene un solo
     // desplegable, el del par curso · materia.
     await expect(modal.getByText(nombreDocente ?? "", { exact: false }).first()).toBeVisible();
