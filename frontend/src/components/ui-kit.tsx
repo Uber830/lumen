@@ -73,7 +73,9 @@ export function Button({
   className,
   ...rest
 }: {
-  children: ReactNode;
+  /** The label of the button. It may be missing: a button of only an
+   * icon carries its name in the `aria-label`. */
+  children?: ReactNode;
   variant?: ButtonVariant;
   icon?: LucideIcon;
   /** The size of the button: the smallest one is for the cards. */

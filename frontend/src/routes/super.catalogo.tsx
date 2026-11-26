@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Eye, Search, Upload } from "lucide-react";
+import { Eye, Pencil, Search, Settings2, Upload } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -13,6 +13,7 @@ import {
   StatusPill,
   Toolbar,
 } from "@/components/ui-kit";
+import { MaterialEditor } from "@/features/platform/material-editor";
 import { MaterialPanel } from "@/features/platform/material-panel";
 import { MaterialPreview } from "@/features/platform/material-preview";
 import { UploadWizard } from "@/features/platform/upload-wizard";
@@ -60,6 +61,7 @@ function Catalogo() {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [editorId, setEditorId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const options = useCatalogOptions();
@@ -233,27 +235,41 @@ function Catalogo() {
                       </>
                     }
                     actions={
-                      <>
+                      /* Los tres controles son solo el icono: la tarjeta
+                         no pierde el espacio con los nombres. */
+                      <div className="flex items-center gap-1.5">
                         {/* El ojo: la pieza se ve antes de decidir nada
                             sobre ella. */}
                         <Button
                           variant="outline"
                           size="xs"
                           icon={Eye}
+                          className="size-[26px] justify-center px-0"
                           onClick={() => setPreviewId(item.id)}
                           aria-label={`Ver ${item.title}`}
-                        >
-                          Ver
-                        </Button>
+                          title="Ver el recurso"
+                        />
+                        {/* El lápiz: los valores del recurso. */}
                         <Button
                           variant="outline"
                           size="xs"
+                          icon={Pencil}
+                          className="size-[26px] justify-center px-0"
+                          onClick={() => setEditorId(item.id)}
+                          aria-label={`Editar ${item.title}`}
+                          title="Editar el recurso"
+                        />
+                        {/* Gestionar: el resumen de la pieza. */}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          icon={Settings2}
+                          className="size-[26px] justify-center px-0"
                           onClick={() => setOpenId(item.id)}
                           aria-label={`Gestionar ${item.title}`}
-                        >
-                          Gestionar
-                        </Button>
-                      </>
+                          title="Gestionar el recurso"
+                        />
+                      </div>
                     }
                   />
                 </li>
@@ -276,6 +292,12 @@ function Catalogo() {
         key={openId ?? "panel-cerrado"}
         materialId={openId}
         onClose={() => setOpenId(null)}
+      />
+
+      <MaterialEditor
+        key={editorId ?? "editor-cerrado"}
+        materialId={editorId}
+        onClose={() => setEditorId(null)}
       />
 
       <MaterialPreview

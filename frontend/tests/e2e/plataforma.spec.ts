@@ -66,12 +66,16 @@ test.describe("el panel de la plataforma", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("la biblioteca muestra el recurso y deja cambiar sus valores", async ({ page }) => {
+  test("la biblioteca muestra el recurso, lo edita y lo resume", async ({ page }) => {
     await login(page);
     await openPanel(page, "/super/catalogo");
 
     const tarjeta = page.locator("ul li article").first();
     await expect(tarjeta).toBeVisible(READY);
+
+    // Los tres controles son solo el icono: la tarjeta no pierde el
+    // espacio con los nombres.
+    await expect(tarjeta.getByRole("button")).toHaveCount(3);
 
     // El ojito: la pieza se ve antes de decidir nada sobre ella.
     await tarjeta.getByRole("button", { name: /^Ver/ }).click();
@@ -82,18 +86,26 @@ test.describe("el panel de la plataforma", () => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(400);
 
-    // Gestionar: un modal en el centro, con los valores editables.
+    // El lápiz: los valores se cambian ahí.
+    await tarjeta.getByRole("button", { name: /^Editar/ }).click();
+    const editor = page.getByRole("dialog").last();
+    await expect(editor.getByLabel(/Título/i)).toBeVisible();
+    await expect(editor.getByLabel(/Tipo/i)).toBeVisible();
+    await expect(editor.getByLabel(/Área/i)).toBeVisible();
+    await expect(editor.getByLabel(/Visible para/i)).toBeVisible();
+    await expect(editor.getByRole("button", { name: /Guardar cambios/i })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+
+    // Gestionar: el resumen de la pieza, sin campos que cambiar.
     await tarjeta.getByRole("button", { name: /^Gestionar/ }).click();
     const panel = page.getByRole("dialog").last();
     // El título del panel es el único encabezado de nivel dos: los
     // demás son las secciones de dentro.
     await expect(panel.getByRole("heading", { level: 2 })).toBeVisible(READY);
-    // Los valores son un formulario, no una lista de texto.
-    await expect(panel.getByLabel(/Título/i)).toBeVisible();
-    await expect(panel.getByLabel(/Tipo/i)).toBeVisible();
-    await expect(panel.getByLabel(/Área/i)).toBeVisible();
-    await expect(panel.getByLabel(/Visible para/i)).toBeVisible();
-    await expect(panel.getByRole("button", { name: /Guardar cambios/i })).toBeVisible();
+    await expect(panel.locator("input, select, textarea")).toHaveCount(0);
+    await expect(panel.getByText(/Estado del material/i)).toBeVisible();
+    await expect(panel.getByText(/Colegios con acceso/i)).toBeVisible();
     await page.keyboard.press("Escape");
   });
 
