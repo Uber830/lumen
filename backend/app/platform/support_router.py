@@ -30,6 +30,7 @@ from app.platform.support_schemas import (
     CaseOptions,
     CasePage,
     CaseSummary,
+    CreateCaseRequest,
     PlatformAttachmentOut,
     ReplyRequest,
     case_options,
@@ -177,6 +178,36 @@ async def list_cases(
         page=page,
         per_page=per_page,
     )
+
+
+@router.post("/cases", response_model=CaseDetail, status_code=status.HTTP_201_CREATED)
+async def create_case(
+    body: CreateCaseRequest,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseDetail:
+    """Open a conversation with a school.
+
+    The platform team does not only answer: it can also start the
+    conversation. The case belongs to the school and appears in its own
+    support desk, with the message of the team at the head of the
+    thread.
+    """
+    case = await support.create_case(
+        session,
+        school_id=body.school_id,
+        author_id=context.user_id,
+        title=body.title,
+        category=body.category,
+        body=body.body,
+        attachment_ids=body.attachment_ids,
+    )
+    await session.commit()
+
+    thread = await support.get_case(session, case.id)
+    if thread is None:
+        raise NotFoundError("The case does not exist.")
+    return await _detail(session, thread)
 
 
 @router.get("/cases/{case_id}", response_model=CaseDetail)

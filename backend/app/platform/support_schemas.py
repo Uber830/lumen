@@ -111,6 +111,36 @@ class PlatformAttachmentOut(BaseModel):
     url: str
 
 
+class CreateCaseRequest(BaseModel):
+    """The body of POST /v1/platform/cases.
+
+    The platform team can open a conversation with a school: the case
+    belongs to the school and the thread starts with the message of
+    the team.
+    """
+
+    school_id: UUID
+    title: str = Field(min_length=1, max_length=240)
+    category: str = "otro"
+    body: str = Field(min_length=1, max_length=4000)
+    attachment_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("title", "body")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("category")
+    @classmethod
+    def _known_category(cls, value: str) -> str:
+        if value not in support.CASE_CATEGORIES:
+            raise ValueError("must be one of the categories of the module")
+        return value
+
+
 def case_options() -> CaseOptions:
     """The closed catalogs of the module."""
     return CaseOptions(
@@ -128,6 +158,7 @@ __all__ = [
     "CaseOptions",
     "CasePage",
     "CaseSummary",
+    "CreateCaseRequest",
     "PlatformAttachmentOut",
     "ReplyRequest",
     "case_options",

@@ -27,6 +27,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError
 from app.db.models import AuditLog, Profile, School, SupportCase, SupportMessage, User
 from app.notifications.service import notify_support_case_replied
 
@@ -228,6 +229,61 @@ async def get_case(session: AsyncSession, case_id: uuid.UUID) -> CaseThread | No
     return CaseThread(case=case, messages=list(messages.scalars().all()))
 
 
+async def create_case(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+    author_id: uuid.UUID | None,
+    title: str,
+    category: str,
+    body: str,
+    attachment_ids: list[str] | None = None,
+) -> SupportCase:
+    """Open a conversation with a school from the platform desk.
+
+    The platform team does not only answer: it can also start the
+    conversation. The case belongs to the school and the thread opens
+    with the message of the team, so the school sees it in its own
+    support desk.
+    """
+    school = await session.get(School, school_id)
+    if school is None:
+        raise NotFoundError("The school does not exist.")
+
+    case = SupportCase(
+        school_id=school_id,
+        code=await next_case_code(session),
+        title=title.strip(),
+        category=category,
+        channel="formulario_web",
+        level="info",
+        status="abierto",
+        opened_by=author_id,
+    )
+    session.add(case)
+    await session.flush()
+
+    session.add(
+        SupportMessage(
+            case_id=case.id,
+            author_id=author_id,
+            author_role="plataforma",
+            body=body.strip(),
+            attachment_ids=list(attachment_ids or []),
+        )
+    )
+
+    # The administrators of the school are the ones waiting for an
+    # answer: the bell of their panel says that the team wrote.
+    await notify_support_case_replied(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, author_id),
+    )
+
+    return case
+
+
 async def answer_case(
     session: AsyncSession,
     *,
@@ -308,6 +364,7 @@ __all__ = [
     "CaseThread",
     "actor_names",
     "answer_case",
+    "create_case",
     "case_state_changed",
     "get_case",
     "list_cases",
