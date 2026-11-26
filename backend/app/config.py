@@ -17,10 +17,21 @@ on its own disk: there is no third-party service in the middle.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+# The `.env` of the project lives next to the package, so it is found
+# wherever the process was started from: `uv run lumen-api` from the root
+# of the repository used to leave the settings empty, and the API answered
+# that the database was not configured.
+#
+# The second file is the one of the working directory. When it exists it
+# wins, so a developer can override a value without touching the file of
+# the project.
+ENV_FILE = (Path(__file__).resolve().parents[1] / ".env", ".env")
 
 # The backend has nowhere to store anything without a database. The
 # message is user-facing (a developer reading the 503), so it says
@@ -42,7 +53,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
