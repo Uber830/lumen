@@ -206,19 +206,23 @@ function SoportePage() {
           fields={
             <>
               <label className="block">
-                <span className="text-xs font-medium">Asunto</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Asunto
+                </span>
                 <input
                   type="text"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   required
                   placeholder="El material de 7° no aparece en el curso"
-                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
                 />
               </label>
 
               <label className="block max-w-[320px]">
-                <span className="text-xs font-medium">Categoría</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Categoría
+                </span>
                 <div className="mt-1.5">
                   <Select
                     value={category}

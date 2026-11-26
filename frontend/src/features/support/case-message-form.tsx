@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
-import { Tag } from "@/components/ui-kit";
+import { Button, Tag } from "@/components/ui-kit";
 import {
   SupportAttachmentField,
   type PickedAttachment,
@@ -87,8 +87,10 @@ export function CaseMessageForm({
       </DialogHeader>
 
       {recipients && recipients.length > 0 && (
-        <div className="grid gap-1.5 text-sm">
-          <span className="text-xs font-medium">Para</span>
+        <div className="grid gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Para
+          </span>
           <div className="flex flex-wrap gap-1.5">
             {recipients.map((name) => (
               <Tag key={name}>{name}</Tag>
@@ -99,14 +101,16 @@ export function CaseMessageForm({
 
       {fields}
 
-      <label className="grid gap-1.5 text-sm">
-        <span className="text-xs font-medium">{messageLabel}</span>
+      <label className="grid gap-1.5">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {messageLabel}
+        </span>
         <textarea
           value={message}
           onChange={(event) => onMessageChange(event.target.value)}
           rows={6}
           placeholder={messagePlaceholder}
-          className="w-full resize-y rounded-idx border border-input bg-card px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+          className="w-full resize-y rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
         />
         {messageHint && <span className="text-xs text-muted-foreground">{messageHint}</span>}
       </label>
@@ -133,23 +137,15 @@ export function CaseMessageForm({
         </p>
       )}
 
+      {/* The foot is the one of the rest of the panel: the same buttons,
+          the same size and the same place. */}
       <DialogFooter>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-idx border border-border px-3.5 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
-        >
+        <Button variant="ghost" type="button" onClick={onCancel}>
           {cancelLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={pending}
-          className="inline-flex items-center gap-2 rounded-idx bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-        >
-          <Icon className="size-4" strokeWidth={1.9} aria-hidden />
+        </Button>
+        <Button type="button" icon={Icon} disabled={pending} onClick={onSubmit}>
           {pending ? "Enviando..." : submitLabel}
-        </button>
+        </Button>
       </DialogFooter>
     </DialogContent>
   );
