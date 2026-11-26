@@ -115,10 +115,17 @@ el panel en la ficha de un docente): el contador abre un modal **solo con la
 lista**, sin acciones.
 
 Las **acciones van juntas en la columna de acción** y son dos: *Asignar otra*
-y *Gestionar*. Gestionar abre el modal de las materias del docente con el
-lápiz y la ✕ de cada una, para que el administrador elija cuál. El contador
+y *Quitar*. *Asignar otra* abre el formulario con **el docente de la fila
+fijo**: solo se elige la materia, porque lo que se agrega es materia a ese
+docente. *Quitar* abre el modal de las materias del docente con la ✕ de cada
+una, para que el administrador elija cuál quita (pide confirmación antes).
+No hay edición: una asignación se quita y se vuelve a hacer. El contador
 **+N** abre el mismo modal, pero solo para leerlo. La barra de arriba dice los
 dos números: docentes y asignaciones.
+
+El **pie de paginación se ve siempre** en esta vista y en la de *Cursos y
+materias*: aunque todo quepa en una página, el administrador ve el corte y los
+números de lo que tiene.
 
 ### La selección múltiple
 
