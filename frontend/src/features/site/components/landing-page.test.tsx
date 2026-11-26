@@ -51,24 +51,29 @@ describe("LandingPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the eight blocks of the index, in order", async () => {
+  it("renders the blocks of the index, in order", async () => {
     const { container, cleanup } = await render();
 
     const sections = Array.from(container.querySelectorAll("main > section")).map(
       (section) => section.id,
     );
 
-    expect(sections).toEqual([
-      "hero",
-      "indice",
-      "proceso",
-      "roles",
-      "cobertura",
-      "preguntas",
-      "contacto",
-    ]);
-    expect(container.textContent).toContain("IDX-001 / Catálogo editorial");
-    expect(container.textContent).toContain("IDX-007 / Contacto");
+    expect(sections).toEqual(["hero", "indice", "proceso", "roles", "preguntas", "contacto"]);
+    expect(container.textContent).toContain("IDX-001 / Solución para colegios");
+    expect(container.textContent).toContain("IDX-006 / Contacto");
+
+    await cleanup();
+  });
+
+  it("does not publish the platform role nor the coverage by size", async () => {
+    // The people who read the landing are the administrators, the
+    // teachers and the students: the platform role is an internal
+    // thing, and the coverage by size is not published for now.
+    const { container, cleanup } = await render();
+
+    expect(container.textContent).not.toContain("PLATAFORMA");
+    expect(container.textContent).not.toContain("Cobertura por tamaño");
+    expect(container.querySelector("#cobertura")).toBeNull();
 
     await cleanup();
   });

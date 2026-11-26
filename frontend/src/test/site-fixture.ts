@@ -43,23 +43,22 @@ export const siteFixture: SitePayload = {
         { id: "indice", label: "Índice", href: "#indice" },
         { id: "proceso", label: "Proceso", href: "#proceso" },
         { id: "roles", label: "Roles", href: "#roles" },
-        { id: "cobertura", label: "Cobertura", href: "#cobertura" },
         { id: "preguntas", label: "Preguntas", href: "#preguntas" },
       ],
       login_label: "Iniciar sesión",
       contact_label: "Hablar con el equipo",
     },
     hero: {
-      kicker: "IDX-001 / Catálogo editorial",
-      title_lead: "El material de la editorial,",
-      title_tail: "indexado por colegio.",
-      lead: "Lumen mantiene un solo catálogo de material.",
+      kicker: "IDX-001 / Solución para colegios",
+      title_lead: "El material de su colegio,",
+      title_tail: "ordenado y listo para usar.",
+      lead: "Lumen es una empresa de software que resuelve la gestión del material académico.",
       cta_primary: { id: "proceso", label: "Ver el proceso", href: "#proceso", variant: "solid" },
       cta_secondary: { id: "panel", label: "Abrir el panel", href: "/login", variant: "outline" },
     },
     catalog: {
       kicker: "IDX-002 / Catálogo",
-      title: "Índice del catálogo",
+      title: "El catálogo de material",
       lead: "Cada pieza se carga una vez y se habilita colegio por colegio.",
       columns: [
         { id: "ref", label: "Ref." },
@@ -73,7 +72,7 @@ export const siteFixture: SitePayload = {
     },
     process: {
       kicker: "IDX-003 / Proceso",
-      title: "Cómo llega el material al colegio",
+      title: "Cómo el colegio pone en marcha su material",
       steps: [
         {
           number: "01",
@@ -83,7 +82,7 @@ export const siteFixture: SitePayload = {
         },
         {
           number: "02",
-          title: "El equipo carga y habilita",
+          title: "Lumen carga y habilita",
           body: "Sube el material y marca los colegios con acceso.",
           owner: "Equipo Lumen",
         },
@@ -99,12 +98,6 @@ export const siteFixture: SitePayload = {
       kicker: "IDX-004 / Roles",
       title: "Quién usa Lumen y hasta dónde",
       items: [
-        {
-          id: "PLATAFORMA",
-          summary: "Carga, habilita y publica.",
-          detail: "Administra el catálogo editorial completo.",
-          scope: "Acceso total al catálogo",
-        },
         {
           id: "ADMIN COLEGIO",
           summary: "Administra su comunidad.",
@@ -125,42 +118,14 @@ export const siteFixture: SitePayload = {
         },
       ],
     },
-    coverage: {
-      kicker: "IDX-005 / Cobertura",
-      title: "Cobertura por tamaño de colegio",
-      lead: "Cada tamaño de colegio recibe el catálogo que le corresponde.",
-      rows: [
-        {
-          id: "pequeno",
-          label: "PEQUEÑO",
-          size: "hasta 300",
-          items: [
-            { label: "Catálogo por grado y área", included: true },
-            { label: "Reportes de uso", included: false },
-          ],
-        },
-        {
-          id: "mediano",
-          label: "MEDIANO",
-          size: "300–1.000",
-          items: [{ label: "Simulacros ICFES", included: true }],
-        },
-        {
-          id: "grande",
-          label: "GRANDE",
-          size: "+1.000",
-          items: [{ label: "Docentes sin límite", included: true }],
-        },
-      ],
-    },
     faq: {
-      kicker: "IDX-006 / Preguntas",
+      kicker: "IDX-005 / Preguntas",
       title: "Preguntas frecuentes",
       items: [
         {
           id: "Q-01",
           question: "¿El colegio tiene que subir el material?",
-          answer: "No. El equipo editorial de Lumen carga el material y lo habilita.",
+          answer: "No. El equipo de Lumen carga el material y lo habilita.",
         },
         {
           id: "Q-02",
@@ -170,7 +135,7 @@ export const siteFixture: SitePayload = {
       ],
     },
     cta: {
-      kicker: "IDX-007 / Contacto",
+      kicker: "IDX-006 / Contacto",
       title: "Veamos su colegio con el material ya cargado.",
       body: "Preparamos una demostración con la información de su institución.",
       buttons: [
@@ -193,11 +158,11 @@ export const siteFixture: SitePayload = {
       location: "LUMEN · BOGOTÁ, COLOMBIA",
       columns: [
         {
-          title: "Producto",
+          title: "Solución",
           links: [{ id: "indice", label: "Índice", href: "#indice" }],
         },
         {
-          title: "Plataforma",
+          title: "Material",
           links: [{ id: "roles", label: "Roles", href: "#roles" }],
         },
         {
@@ -209,7 +174,7 @@ export const siteFixture: SitePayload = {
           links: [{ id: "faq", label: "Preguntas frecuentes", href: "#preguntas" }],
         },
       ],
-      legal: "© 2026 Grupo Editorial Educar. Lumen. Todos los derechos reservados.",
+      legal: "© 2026 Lumen S.A.S. Todos los derechos reservados.",
     },
   },
 };
