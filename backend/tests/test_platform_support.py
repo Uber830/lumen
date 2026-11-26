@@ -340,3 +340,69 @@ async def test_the_support_team_attaches_a_file_to_its_answer(
         assert storage.read_file(attached["id"]) == b"la guia del soporte"
     finally:
         get_settings.cache_clear()
+
+
+async def test_the_platform_opens_a_conversation_with_a_school(
+    client, platform_admin, case_school
+) -> None:
+    """The team does not only answer: it can also start the thread.
+
+    The case belongs to the school and the thread opens with the
+    message of the team.
+    """
+    response = client.post(
+        "/v1/platform/cases",
+        headers=platform_admin,
+        json={
+            "school_id": str(case_school),
+            "title": "Habilitamos la materia de ciencias",
+            "category": "solicitud_material",
+            "body": "Ya está disponible para 7° A. Cuéntale al colegio.",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["title"] == "Habilitamos la materia de ciencias"
+    assert body["category"] == "solicitud_material"
+    assert body["status"] == "abierto"
+    assert body["school_id"] == str(case_school)
+    assert body["code"].startswith("SOL-")
+    # The thread opens with the message of the team.
+    assert len(body["messages"]) == 1
+    assert body["messages"][0]["author_role"] == "plataforma"
+    assert body["messages"][0]["body"] == "Ya está disponible para 7° A. Cuéntale al colegio."
+
+    # The case is in the listing of the desk.
+    listing = client.get("/v1/platform/cases", headers=platform_admin)
+    assert listing.status_code == 200, listing.text
+    assert body["id"] in [case["id"] for case in listing.json()["items"]]
+
+
+async def test_a_conversation_needs_a_school_and_a_message(
+    client, platform_admin, case_school
+) -> None:
+    """The form cannot be sent empty."""
+    without_message = client.post(
+        "/v1/platform/cases",
+        headers=platform_admin,
+        json={
+            "school_id": str(case_school),
+            "title": "Un asunto",
+            "category": "otro",
+            "body": "   ",
+        },
+    )
+    assert without_message.status_code == 422
+
+    without_school = client.post(
+        "/v1/platform/cases",
+        headers=platform_admin,
+        json={
+            "school_id": "00000000-0000-0000-0000-000000000000",
+            "title": "Un asunto",
+            "category": "otro",
+            "body": "Un mensaje",
+        },
+    )
+    assert without_school.status_code == 404
