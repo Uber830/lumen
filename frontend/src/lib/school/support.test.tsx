@@ -3,43 +3,113 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  openCaseCount,
-  useUploadSupportAttachment,
-  type SupportCaseSummary,
-} from "@/lib/school/support";
+import { useSchoolSupportCases, useUploadSupportAttachment } from "@/lib/school/support";
 
 /**
- * The counter of the rail: how many requests of the school are still
- * open.
+ * The list of the requests of the school.
  *
- * A resolved case is not work that is waiting: it leaves the counter.
+ * The list is cut in the server, like the courses and the assignments:
+ * the browser asks for one page, not for everything.
  */
-describe("the counter of the open cases", () => {
-  const caseOf = (status: string): SupportCaseSummary => ({
-    id: "1",
-    code: "SOL-1043",
-    title: "Los docentes no ven el material",
-    category: "problema_tecnico",
-    channel: "formulario_colegio",
-    level: "aviso",
-    status,
-    opened_at: "2026-11-14T09:15:00Z",
-    opened_by: null,
-    opened_by_name: "Ana Restrepo",
-    messages: 2,
+describe("the list of the requests", () => {
+  const requests: string[] = [];
+
+  beforeEach(() => {
+    requests.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(
+          JSON.stringify({
+            items: [],
+            total: 12,
+            page: 2,
+            per_page: 10,
+            pages: 2,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
   });
 
-  it("counts the cases that are not resolved", () => {
-    expect(openCaseCount([caseOf("abierto"), caseOf("en_espera"), caseOf("resuelto")])).toBe(2);
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("is zero when there are no cases", () => {
-    expect(openCaseCount([])).toBe(0);
+  it("asks for the page it shows", async () => {
+    const { apiBaseUrl } = await import("@/lib/api/client");
+    const client = new QueryClient();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    let page: { total: number; pages: number } | null = null;
+
+    function Probe() {
+      const cases = useSchoolSupportCases({ page: 2, per_page: 10 });
+      page = cases.data ?? null;
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={client}>
+          <Probe />
+        </QueryClientProvider>,
+      );
+    });
+
+    // The answer arrives a moment later: the query is in flight.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(requests[0]).toContain(`${apiBaseUrl}/v1/school/support/cases?`);
+    expect(requests[0]).toContain("page=2");
+    expect(requests[0]).toContain("per_page=10");
+    expect(page!.total).toBe(12);
+    expect(page!.pages).toBe(2);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 
-  it("does not fail when the list did not arrive", () => {
-    expect(openCaseCount(undefined)).toBe(0);
+  it("sends the search to the server", async () => {
+    const { apiBaseUrl } = await import("@/lib/api/client");
+    const client = new QueryClient();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    function Probe() {
+      useSchoolSupportCases({ page: 1, per_page: 10, q: "impresora" });
+      return null;
+    }
+
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={client}>
+          <Probe />
+        </QueryClientProvider>,
+      );
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // The search does not run in the browser: it looks for the title or
+    // the code of the request over every case of the school.
+    expect(requests[0]).toContain(`${apiBaseUrl}/v1/school/support/cases?`);
+    expect(requests[0]).toContain("q=impresora");
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 });
 

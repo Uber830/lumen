@@ -109,10 +109,41 @@ test.describe("el panel del colegio", () => {
     await page.getByRole("button", { name: /Asignar la materia/i }).click();
 
     // 3. The assignment is in the list: the teacher, the course and the
-    // subject.
+    // subject. The list is cut in pages, so the teacher is looked for
+    // in all of them: the run does not depend on the page it lands on.
     const fila = page.getByRole("row").filter({ hasText: nombre });
+    const siguiente = page.getByRole("button", { name: "Página siguiente" }).first();
+    for (let intento = 0; intento < 6; intento += 1) {
+      if (await fila.isVisible()) break;
+      if (await siguiente.isDisabled()) break;
+      await siguiente.click();
+      await page.waitForTimeout(500);
+    }
     await expect(fila).toBeVisible(READY);
     await expect(fila).toContainText(/7° A/);
+  });
+
+  test("la ficha del docente se edita con el nombre y el correo", async ({ page }) => {
+    await login(page);
+    await openPanel(page, "/admin/docentes");
+
+    // 1. The administrator opens the card of a teacher.
+    await page
+      .getByRole("button", { name: /Gestionar/i })
+      .first()
+      .click();
+    await expect(page.getByRole("dialog").last()).toBeVisible(READY);
+
+    // 2. The edit form has two fields and nothing else: the name and the
+    // email. The subjects are changed in Asignaciones.
+    await page.getByRole("button", { name: /^Editar$/i }).first().click();
+    const formulario = page.getByRole("dialog").last();
+    await expect(formulario.getByRole("heading", { name: "Editar docente" })).toBeVisible(READY);
+    await expect(formulario.getByLabel(/Nombre completo/i)).toBeVisible();
+    await expect(formulario.getByLabel(/Correo institucional/i)).toBeVisible();
+    // The course of a student is not here, and neither are the subjects.
+    await expect(formulario.locator("input[type=radio]")).toHaveCount(0);
+    await expect(formulario.locator("input")).toHaveCount(2);
   });
 
   test("una fila de asignaciones ofrece agregar y quitar, no editar", async ({ page }) => {
@@ -164,6 +195,10 @@ test.describe("el panel del colegio", () => {
     await openPanel(page, "/admin/soporte");
 
     await expect(page.getByRole("heading", { name: "Soporte" })).toBeVisible(READY);
+    // La lista es grande y se corta en páginas, como la de Asignaciones:
+    // el pie se ve aunque todo quepa en una página.
+    await expect(page.getByText(/Mostrando/)).toBeVisible(READY);
+
     await page
       .getByRole("button", { name: /Enviar solicitud/i })
       .first()
@@ -176,5 +211,54 @@ test.describe("el panel del colegio", () => {
       .click();
 
     await expect(page.getByText("Solicitud de la prueba e2e").first()).toBeVisible(READY);
+  });
+
+  test("el colegio carga un recurso propio y lo ve en la biblioteca", async ({ page }) => {
+    await login(page);
+    await openPanel(page, "/admin/contenido");
+
+    // 1. The administrator loads a resource of the school.
+    await page
+      .getByRole("button", { name: /Cargar recurso/i })
+      .first()
+      .click();
+    const modal = page.getByRole("dialog").last();
+    await expect(modal.getByRole("heading", { name: /Cargar un recurso/i })).toBeVisible(READY);
+    await modal.locator("input[type=file]").setInputFiles({
+      name: "manual-e2e.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 contenido de prueba"),
+    });
+    await modal.getByLabel(/Título/i).fill("Manual de convivencia e2e");
+    await modal.getByLabel(/Tipo/i).selectOption("Documento");
+    await modal.getByLabel(/Área/i).selectOption("Convivencia");
+    // The audience is the decision of the school.
+    await modal.getByLabel(/Va dirigido a/i).selectOption("admins");
+    await modal.getByRole("button", { name: /Cargar el recurso/i }).click();
+    await expect(modal).toBeHidden(READY);
+
+    // 2. The resource is in the library, with its origin and its audience.
+    const tarjeta = page.locator("ul li article").filter({ hasText: "Manual de convivencia e2e" });
+    await expect(tarjeta.first()).toBeVisible(READY);
+    await expect(tarjeta.first()).toContainText("Cargado por el colegio");
+    await expect(tarjeta.first()).toContainText("Solo administradores");
+
+    // 3. The file is seen inside the platform.
+    await tarjeta.first().getByRole("button", { name: /^Ver/ }).click();
+    const visor = page.getByRole("dialog").last();
+    await expect(visor.getByRole("heading", { name: "Manual de convivencia e2e" })).toBeVisible(
+      READY,
+    );
+    await expect(visor.locator("iframe")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    // 4. The school removes its own resource.
+    await tarjeta
+      .first()
+      .getByRole("button", { name: /Quitar/ })
+      .click();
+    const confirmacion = page.getByRole("dialog").last();
+    await confirmacion.getByRole("button", { name: /Quitar el recurso/i }).click();
+    await expect(tarjeta).toHaveCount(0, { timeout: 10_000 });
   });
 });

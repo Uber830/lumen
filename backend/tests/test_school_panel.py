@@ -401,3 +401,143 @@ async def test_the_material_of_the_school_is_not_for_a_teacher(
 
     response = client.get("/v1/school/material", headers=await _auth())
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# The resources of the school
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def school_storage(tmp_path, engine, seeded_school):
+    """The storage of the files, in a folder of the test.
+
+    The files of the tests do not go to the folder of the project. The
+    resources the school uploads in the test are removed at the end:
+    the overview counts the whole catalog, and they are not part of it.
+    """
+    from app.config import get_settings
+    from app.platform import storage as storage_module
+    from app.platform.storage import LocalMaterialStorage
+
+    settings = get_settings().model_copy(update={"platform_storage_dir": str(tmp_path)})
+    previous = storage_module.get_storage()
+    storage_module.set_storage(LocalMaterialStorage(settings))
+    yield tmp_path
+    storage_module.set_storage(previous)
+
+    # The school of the test is its own: the resources it uploaded are
+    # the ones that are not of the catalogue of the seed.
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        await session.execute(
+            delete(Material).where(
+                Material.id.in_(
+                    select(MaterialSchool.material_id).where(
+                        MaterialSchool.school_id == seeded_school
+                    )
+                ),
+                ~Material.ref.like(f"{REF_PREFIX}%"),
+            )
+        )
+        await session.commit()
+
+
+async def test_the_school_uploads_a_resource_of_its_own(
+    client, engine, seeded_school, school_storage
+):
+    """The school loads a resource and says who it is for.
+
+    The piece is born published and enabled for the school: there is no
+    editorial team in the middle.
+    """
+    upload = client.post(
+        "/v1/school/material/uploads",
+        headers=await _auth(),
+        files={"file": ("manual.pdf", b"%PDF-1.4 contenido", "application/pdf")},
+    )
+    assert upload.status_code == 201, upload.text
+    file_id = upload.json()["file_id"]
+
+    response = client.post(
+        "/v1/school/material",
+        headers=await _auth(),
+        json={
+            "title": "Manual de convivencia",
+            "type": "Documento",
+            "area": "Convivencia",
+            "visible_to": "admins",
+            "file_id": file_id,
+        },
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["origin"] == "colegio"
+    assert created["visible_to"] == "admins"
+
+    # The resource is in the library of the school, with its file.
+    listing = client.get("/v1/school/material", headers=await _auth())
+    assert listing.status_code == 200, listing.text
+    item = next(one for one in listing.json()["items"] if one["title"] == "Manual de convivencia")
+    assert item["origin"] == "colegio"
+    assert item["visible_to"] == "admins"
+
+    # And the file is served inside the platform.
+    served = client.get(f"/v1/school/material/{item['id']}/file", headers=await _auth())
+    assert served.status_code == 200, served.text
+    assert served.content == b"%PDF-1.4 contenido"
+    assert served.headers["content-type"].startswith("application/pdf")
+
+
+async def test_the_school_removes_a_resource_of_its_own(
+    client, engine, seeded_school, school_storage, catalog
+):
+    """A resource of the school is its own to remove."""
+    from tests.conftest import TEST_USER_ID
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        material = await catalog(
+            session, "Manual del colegio", seeded_school, created_by=uuid.UUID(TEST_USER_ID)
+        )
+
+    response = client.delete(f"/v1/school/material/{material.id}", headers=await _auth())
+    assert response.status_code == 204, response.text
+
+    listing = client.get("/v1/school/material", headers=await _auth())
+    assert listing.status_code == 200, listing.text
+    assert all(item["id"] != str(material.id) for item in listing.json()["items"])
+
+
+async def test_the_school_does_not_remove_a_resource_of_the_editorial_team(
+    client, engine, seeded_school, catalog
+):
+    """The pieces of the editorial team are not the school's to remove."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        material = await catalog(session, "Algebra de 7", seeded_school)
+
+    response = client.delete(f"/v1/school/material/{material.id}", headers=await _auth())
+    assert response.status_code == 404, response.text
+
+
+async def test_the_upload_refuses_a_format_that_is_not_admitted(
+    client, engine, seeded_school, school_storage
+):
+    """The error says which formats are admitted."""
+    response = client.post(
+        "/v1/school/material/uploads",
+        headers=await _auth(),
+        files={"file": ("nota.txt", b"contenido", "text/plain")},
+    )
+    assert response.status_code == 422
+    assert response.json()["file_name"] == "nota.txt"
+
+
+async def test_the_options_are_the_closed_catalogs(client, engine, seeded_school):
+    """The form of a resource takes its types and areas from the API."""
+    response = client.get("/v1/school/material/options", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert "Libro" in body["types"]
+    assert "Convivencia" in body["areas"]
+    # The audiences are the four of the panel.
+    assert body["audiences"] == ["all", "teachers", "students", "admins"]
