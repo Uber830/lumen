@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Integer, cast, func, select
+from sqlalchemy import Integer, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func as sql_func
 
@@ -30,8 +30,38 @@ from app.notifications.service import (
 CATEGORIES = ("problema_tecnico", "solicitud_material", "duda_acceso", "otro")
 
 
-async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[str, Any]]:
-    """The requests of the school, the open ones first."""
+async def list_cases(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    *,
+    query: str | None = None,
+    page: int = 1,
+    per_page: int = 10,
+) -> dict[str, Any]:
+    """The requests of the school, the open ones first.
+
+    The list is cut in the server, like the courses and the assignments:
+    the browser asks for one page, not for everything. The search runs
+    here too: it looks for the title or the code of the request.
+    """
+    page = max(1, page)
+    per_page = max(1, min(per_page, 50))
+
+    conditions = [SupportCase.school_id == school_id]
+    needle = (query or "").strip()
+    if needle:
+        pattern = f"%{needle}%"
+        conditions.append(or_(SupportCase.title.ilike(pattern), SupportCase.code.ilike(pattern)))
+    ordering = (
+        # The open ones come first, and the newest one is the first of
+        # all.
+        SupportCase.status.asc(),
+        SupportCase.opened_at.desc(),
+    )
+
+    total = await session.execute(select(func.count()).select_from(SupportCase).where(*conditions))
+    count = int(total.scalar_one())
+
     result = await session.execute(
         select(
             SupportCase.id,
@@ -48,13 +78,10 @@ async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[s
         )
         .outerjoin(Profile, Profile.id == SupportCase.opened_by)
         .outerjoin(User, User.id == SupportCase.opened_by)
-        .where(SupportCase.school_id == school_id)
-        .order_by(
-            # The open ones come first, and the newest one is the
-            # first of all.
-            SupportCase.status.asc(),
-            SupportCase.opened_at.desc(),
-        )
+        .where(*conditions)
+        .order_by(*ordering)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
     )
 
     cases = [
@@ -78,7 +105,27 @@ async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[s
     for case in cases:
         case["messages"] = counts.get(uuid.UUID(case["id"]), 0)
 
-    return cases
+    return {
+        "items": cases,
+        "total": count,
+        "page": page,
+        "per_page": per_page,
+        "pages": (count + per_page - 1) // per_page if count else 0,
+    }
+
+
+async def open_case_count(session: AsyncSession, school_id: uuid.UUID) -> int:
+    """How many requests of the school are still open.
+
+    The bell of the panel shows this number: it counts every case of
+    the school, not only the ones of the first page.
+    """
+    result = await session.execute(
+        select(func.count())
+        .select_from(SupportCase)
+        .where(SupportCase.school_id == school_id, SupportCase.status != "resuelto")
+    )
+    return int(result.scalar_one())
 
 
 async def _message_counts(

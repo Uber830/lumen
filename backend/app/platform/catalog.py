@@ -82,7 +82,7 @@ STATE_BY_STATUS: dict[str, str] = {
 
 STATUS_BY_STATE: dict[str, str] = {state: status for status, state in STATE_BY_STATUS.items()}
 
-VISIBLE_TO: tuple[str, ...] = ("all", "teachers")
+VISIBLE_TO: tuple[str, ...] = ("all", "teachers", "students", "admins")
 
 # The first code of the catalog. The numbers keep growing.
 FIRST_CODE_NUMBER = 1041
@@ -746,6 +746,11 @@ ALLOWED_MIME_TYPES: dict[str, int] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": 100 * 1024 * 1024,
     "application/zip": 500 * 1024 * 1024,
     "video/mp4": 1024 * 1024 * 1024,
+    # An image: a manual of a school is often a photo of a page.
+    "image/png": 50 * 1024 * 1024,
+    "image/jpeg": 50 * 1024 * 1024,
+    "image/webp": 50 * 1024 * 1024,
+    "image/gif": 20 * 1024 * 1024,
 }
 
 # The extensions that map to a mime type when the browser sends none.
@@ -755,6 +760,11 @@ EXTENSION_MIME_TYPES: dict[str, str] = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".zip": "application/zip",
     ".mp4": "video/mp4",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
 }
 
 
@@ -765,6 +775,10 @@ KIND_BY_MIME_TYPE: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/zip": "zip",
     "video/mp4": "mp4",
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/webp": "image",
+    "image/gif": "image",
 }
 
 

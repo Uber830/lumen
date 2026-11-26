@@ -23,10 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import storage
 from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
 from app.core.context import Membership, RequestContext
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
+from app.platform import catalog
+from app.platform.storage import get_storage
 from app.school import community, cycles, icfes, identity, operations, support, team
 from app.school.schemas import (
     ActivationCreatedOut,
@@ -43,6 +45,7 @@ from app.school.schemas import (
     CurrentPeriodOut,
     IcfesSimulatorsOut,
     MaterialDetailOut,
+    MaterialOptionsOut,
     MaterialPage,
     MemberEditIn,
     MemberEditOut,
@@ -53,6 +56,7 @@ from app.school.schemas import (
     SchoolAdminMe,
     SchoolIdentityOut,
     SchoolIdentityUpdate,
+    SchoolMaterialCreateIn,
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
@@ -60,7 +64,7 @@ from app.school.schemas import (
     SupportAttachmentOut,
     SupportCaseIn,
     SupportCaseOut,
-    SupportCaseSummaryOut,
+    SupportCasePage,
     SupportMessageIn,
     TeacherAssignmentsOut,
 )
@@ -182,6 +186,23 @@ async def list_school_material(
     return MaterialPage.model_validate(page_data)
 
 
+@router.get("/material/options", response_model=MaterialOptionsOut)
+async def school_material_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+) -> MaterialOptionsOut:
+    """The closed catalogs of the resources: types, areas and audiences.
+
+    The school does not invent a type or an area: it takes them from
+    here, the same way the platform does.
+    """
+    _require_admin(context)
+    return MaterialOptionsOut(
+        types=list(catalog.MATERIAL_TYPES),
+        areas=list(catalog.MATERIAL_AREAS),
+        audiences=list(catalog.VISIBLE_TO),
+    )
+
+
 @router.get("/material/{material_id}", response_model=MaterialDetailOut)
 async def get_school_material(
     material_id: uuid.UUID,
@@ -199,6 +220,146 @@ async def get_school_material(
     if material is None:
         raise NotFoundError("Material not found.")
     return MaterialDetailOut.model_validate(material)
+
+
+@router.get("/material/{material_id}/file")
+async def get_school_material_file(
+    material_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """The file of a resource of the school.
+
+    The file is served by the API and shown inside the platform: the
+    material is consulted, not downloaded.
+    """
+    membership = _require_admin(context)
+    found = await operations.get_material_file(session, membership.school_id, material_id)
+    if found is None:
+        raise NotFoundError("Material not found.")
+    stored, _material = found
+
+    try:
+        content = await get_storage().read(key=stored.storage_key)
+    except FileNotFoundError as error:
+        raise NotFoundError("The file is not in the storage.") from error
+
+    name = stored.file_name.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    return Response(
+        content=content,
+        media_type=stored.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
+    )
+
+
+@router.post("/material/uploads", status_code=status.HTTP_201_CREATED)
+async def upload_school_material_file(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> dict[str, object]:
+    """Upload the file of a resource of the school.
+
+    The file waits in the pending folder until the piece that carries
+    it is created.
+    """
+    _require_admin(context)
+    file_name = file.filename or "archivo"
+    mime_type = catalog.mime_type_of(file_name, file.content_type)
+    if mime_type not in catalog.ALLOWED_MIME_TYPES:
+        raise ValidationError(
+            "Ese formato no está admitido. Usa PDF, EPUB, DOCX, MP4, ZIP o una imagen.",
+            code="invalid_format",
+            extra={"file_name": file_name},
+        )
+
+    limit = catalog.size_limit_for(mime_type)
+    content = await file.read()
+    if len(content) > limit:
+        raise ValidationError(
+            f"El archivo supera el límite de {limit // (1024 * 1024)} MB de {mime_type}.",
+            code="file_too_large",
+            extra={"file_name": file_name, "limit_bytes": limit},
+        )
+
+    uploaded = await operations.upload_school_file(
+        session,
+        context.user_id,
+        file_name=file_name,
+        mime_type=mime_type,
+        content=content,
+    )
+    return {
+        "file_id": str(uploaded.id),
+        "file_name": uploaded.file_name,
+        "size_bytes": uploaded.size_bytes,
+        "size_label": catalog.format_size(uploaded.size_bytes),
+        "mime_type": uploaded.mime_type,
+    }
+
+
+@router.post("/material", response_model=MaterialDetailOut, status_code=status.HTTP_201_CREATED)
+async def create_school_material(
+    body: SchoolMaterialCreateIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetailOut:
+    """Create a resource of the school and enable it for the school.
+
+    The school decides who sees what it loads: everybody, the teachers,
+    the students or the administrators.
+    """
+    membership = _require_admin(context)
+    if body.type not in catalog.MATERIAL_TYPES:
+        raise ValidationError(
+            "Ese tipo de recurso no existe.",
+            code="invalid_material_type",
+            extra={"type": body.type},
+        )
+    if body.area not in catalog.MATERIAL_AREAS:
+        raise ValidationError(
+            "Ese área no existe.",
+            code="invalid_material_area",
+            extra={"area": body.area},
+        )
+    if body.visible_to not in catalog.VISIBLE_TO:
+        raise ValidationError(
+            "Ese destinatario no existe.",
+            code="invalid_visible_to",
+            extra={"visible_to": body.visible_to},
+        )
+
+    material_id = await operations.create_school_material(
+        session,
+        membership.school_id,
+        context.user_id,
+        title=body.title.strip(),
+        material_type=body.type,
+        area=body.area,
+        visible_to=body.visible_to,
+        description=body.description.strip() if body.description else None,
+        file_id=body.file_id,
+    )
+
+    created = await operations.get_material(session, membership.school_id, uuid.UUID(material_id))
+    if created is None:
+        raise NotFoundError("Material not found.")
+    return MaterialDetailOut.model_validate(created)
+
+
+@router.delete("/material/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_school_material(
+    material_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """Remove a resource of the school.
+
+    Only the pieces the school loaded can be removed: the ones of the
+    editorial team are not the school's to delete.
+    """
+    membership = _require_admin(context)
+    await operations.delete_school_material(session, membership.school_id, material_id)
 
 
 @router.get("/overview", response_model=SchoolOverview)
@@ -725,15 +886,38 @@ async def school_simulator_results(
     return SimulatorResultsOut.model_validate(results)
 
 
-@router.get("/support/cases", response_model=list[SupportCaseSummaryOut])
+@router.get("/support/cases", response_model=SupportCasePage)
 async def list_school_support_cases(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[SupportCaseSummaryOut]:
-    """The requests of the school to the support team."""
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50)] = 10,
+    q: Annotated[str | None, Query(description="Título o código de la solicitud")] = None,
+) -> SupportCasePage:
+    """The requests of the school to the support team.
+
+    The list is cut in the server, like the courses and the assignments.
+    """
     membership = _require_admin(context)
-    cases = await support.list_cases(session, membership.school_id)
-    return [SupportCaseSummaryOut.model_validate(case) for case in cases]
+    page_data = await support.list_cases(
+        session, membership.school_id, query=q, page=page, per_page=per_page
+    )
+    return SupportCasePage.model_validate(page_data)
+
+
+@router.get("/support/open-count")
+async def school_support_open_count(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, int]:
+    """How many requests of the school are still open.
+
+    The bell of the panel shows this number, and it counts every case of
+    the school: not only the ones of the first page.
+    """
+    membership = _require_admin(context)
+    count = await support.open_case_count(session, membership.school_id)
+    return {"count": count}
 
 
 @router.get("/support/cases/{case_id}", response_model=SupportCaseOut)

@@ -186,6 +186,40 @@ class MaterialPage(BaseModel):
     audiences: list[str] = Field(default_factory=list)
 
 
+class MaterialFileOut(BaseModel):
+    """The file of a resource, as the viewer needs it."""
+
+    file_name: str
+    mime_type: str
+    size_bytes: int
+    size_label: str
+
+
+class MaterialOptionsOut(BaseModel):
+    """The closed catalogs of the resources of the school."""
+
+    # What a resource is: "Libro", "Guía", "Documento"...
+    types: list[str] = Field(default_factory=list)
+    # The area it belongs to.
+    areas: list[str] = Field(default_factory=list)
+    # Who it is for: "all", "teachers", "students" or "admins".
+    audiences: list[str] = Field(default_factory=list)
+
+
+class SchoolMaterialCreateIn(BaseModel):
+    """What the school writes when it loads a resource."""
+
+    title: str = Field(min_length=1, max_length=240)
+    # What the piece is: "Libro", "Guía", "Documento"...
+    type: str = Field(min_length=1, max_length=32)
+    area: str = Field(min_length=1, max_length=32)
+    # Who the piece is for: "all", "teachers", "students" or "admins".
+    visible_to: str = Field(min_length=1, max_length=16)
+    description: str | None = Field(default=None, max_length=2000)
+    # The file that was uploaded before the piece existed.
+    file_id: uuid.UUID
+
+
 class MaterialAccess(BaseModel):
     """The access of the school to a material.
 
@@ -202,6 +236,8 @@ class MaterialDetailOut(MaterialListItem):
     """One material, with its access confirmed."""
 
     access: MaterialAccess
+    # The file of the piece, when it has one: the viewer shows it.
+    file: MaterialFileOut | None = None
 
 
 class SchoolOverview(BaseModel):
@@ -679,6 +715,20 @@ class SupportCaseSummaryOut(BaseModel):
     opened_by_name: str = "Colegio"
     # How many messages the thread has.
     messages: int = 0
+
+
+class SupportCasePage(BaseModel):
+    """A page of the requests of the school.
+
+    The page comes from the server: the list is cut there, like the
+    courses, the subjects and the assignments.
+    """
+
+    items: list[SupportCaseSummaryOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
 
 
 class SupportCaseOut(BaseModel):
