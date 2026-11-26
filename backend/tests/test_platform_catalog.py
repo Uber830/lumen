@@ -232,6 +232,7 @@ async def _make_material(
     grades: list[str] | None = None,
     status: str = "draft",
     school_ids: list[uuid.UUID] | None = None,
+    visible_to: str = "all",
 ) -> Material:
     """A material straight in the database."""
     material = Material(
@@ -241,7 +242,7 @@ async def _make_material(
         area=area,
         kind="pdf",
         grades=grades if grades is not None else ["7°"],
-        visible_to="all",
+        visible_to=visible_to,
         origin="upload",
         state=catalog.state_of(status),
         created_at=datetime.now(UTC),
@@ -315,6 +316,25 @@ async def test_the_listing_can_be_filtered(
     by_area = client.get("/v1/platform/catalog?type=Evaluación&area=ICFES", headers=platform_admin)
     assert by_area.status_code == 200
     assert by_area.json()["total"] >= 1
+
+
+async def test_the_listing_filters_by_audience(
+    client, platform_admin, engine, created_materials
+) -> None:
+    """The audience filter narrows the listing.
+
+    The library of the platform says who each resource is for, and the
+    administrator can ask for only the ones of one audience.
+    """
+    await _make_material(engine, created_materials, title="Para todos", visible_to="all")
+    await _make_material(engine, created_materials, title="Solo docentes", visible_to="teachers")
+
+    response = client.get("/v1/platform/catalog?visible_to=teachers", headers=platform_admin)
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["visible_to"] == "teachers"
 
 
 async def test_the_listing_counts_the_schools_that_are_not_shown(

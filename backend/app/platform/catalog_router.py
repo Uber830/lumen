@@ -253,6 +253,9 @@ async def list_catalog(
     q: Annotated[str | None, Query(max_length=120)] = None,
     type: Annotated[str | None, Query(max_length=32)] = None,
     status: Annotated[str | None, Query(max_length=16)] = None,
+    visible_to: Annotated[
+        str | None, Query(max_length=16, description="A quién va dirigido: all o teachers")
+    ] = None,
     school_id: Annotated[uuid.UUID | None, Query()] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=catalog.MAX_PER_PAGE)] = catalog.DEFAULT_PER_PAGE,
@@ -267,6 +270,7 @@ async def list_catalog(
         query=q,
         material_type=type,
         status=status,
+        visible_to=visible_to,
         school_id=school_id,
         page=page,
         per_page=per_page,

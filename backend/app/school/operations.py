@@ -374,12 +374,28 @@ async def _material_courses(
     return courses
 
 
+async def _school_creators(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+) -> set[uuid.UUID]:
+    """The people of the school.
+
+    A material created by one of them is a resource of the school; the
+    rest belong to the editorial team of the platform.
+    """
+    result = await session.execute(
+        select(SchoolMembership.user_id).where(SchoolMembership.school_id == school_id)
+    )
+    return {row[0] for row in result.all()}
+
+
 async def list_material(
     session: AsyncSession,
     school_id: uuid.UUID,
     *,
     query: str | None = None,
     area: str | None = None,
+    audience: str | None = None,
     page: int = 1,
     per_page: int = 6,
 ) -> dict[str, Any]:
@@ -404,6 +420,8 @@ async def list_material(
     ]
     if area:
         filters.append(Material.area == area)
+    if audience:
+        filters.append(Material.visible_to == audience)
     if query:
         pattern = f"%{query.strip().lower()}%"
         filters.append(
@@ -431,6 +449,7 @@ async def list_material(
     rows = result.all()
 
     courses = await _material_courses(session, school_id, [row[0].id for row in rows])
+    creators = await _school_creators(session, school_id)
 
     items = [
         {
@@ -439,7 +458,19 @@ async def list_material(
             "title": material.title,
             "description": material.description,
             "area": material.area,
+            # What the piece is pedagogically: "Libro", "Guía",
+            # "Evaluación", "Multimedia" or "Documento".
+            "type": material.type,
             "kind": material.kind,
+            # Who the piece is for: "all" or "teachers".
+            "visible_to": material.visible_to,
+            # "lumen" when the editorial team loaded it, "colegio" when
+            # it was uploaded by the school itself.
+            "origin": (
+                "colegio"
+                if material.created_by is not None and material.created_by in creators
+                else "lumen"
+            ),
             "file_size_bytes": material.file_size_bytes,
             "available_since": enabled_at,
             "courses": [
@@ -479,6 +510,22 @@ async def list_material(
         ),
     )
 
+    # The audiences the school can filter by: the ones it has material
+    # for. The filter never offers an audience with nothing behind it.
+    audiences_result = await session.execute(
+        select(Material.visible_to)
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+            MaterialSchool.archived_at.is_(None),
+            Material.state == PUBLISHED_STATE,
+        )
+        .distinct()
+        .order_by(Material.visible_to)
+    )
+    audiences = [str(value) for value in audiences_result.scalars().all()]
+
     return {
         "items": items,
         "total": total,
@@ -487,6 +534,7 @@ async def list_material(
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if total else 0,
         "areas": areas,
+        "audiences": audiences,
     }
 
 
@@ -519,13 +567,21 @@ async def get_material(
 
     material, enabled_at = row
     courses = await _material_courses(session, school_id, [material.id])
+    creators = await _school_creators(session, school_id)
     return {
         "id": str(material.id),
         "ref": material.ref,
         "title": material.title,
         "description": material.description,
         "area": material.area,
+        "type": material.type,
         "kind": material.kind,
+        "visible_to": material.visible_to,
+        "origin": (
+            "colegio"
+            if material.created_by is not None and material.created_by in creators
+            else "lumen"
+        ),
         "file_size_bytes": material.file_size_bytes,
         "available_since": enabled_at,
         "courses": [

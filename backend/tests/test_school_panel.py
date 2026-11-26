@@ -41,6 +41,9 @@ async def _publish_material(
     kind: str = "pdf",
     state: str = "publicado",
     ref: str | None = None,
+    material_type: str = "Documento",
+    visible_to: str = "all",
+    created_by: uuid.UUID | None = None,
 ) -> Material:
     """Add a piece of material to the catalog."""
     material = Material(
@@ -50,8 +53,11 @@ async def _publish_material(
         description="Material de prueba.",
         area=area,
         kind=kind,
+        type=material_type,
+        visible_to=visible_to,
         state=state,
         file_size_bytes=1024,
+        created_by=created_by,
     )
     session.add(material)
     await session.commit()
@@ -114,9 +120,20 @@ async def catalog(engine):
         kind: str = "pdf",
         state: str = "publicado",
         ref: str | None = None,
+        material_type: str = "Documento",
+        visible_to: str = "all",
+        created_by: uuid.UUID | None = None,
     ) -> Material:
         material = await _publish_material(
-            session, title=title, area=area, kind=kind, state=state, ref=ref
+            session,
+            title=title,
+            area=area,
+            kind=kind,
+            state=state,
+            ref=ref,
+            material_type=material_type,
+            visible_to=visible_to,
+            created_by=created_by,
         )
         if school_id is not None:
             await _enable(session, material, school_id)
@@ -260,6 +277,60 @@ async def test_the_area_filter_runs_in_the_server(client, engine, seeded_school,
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["area"] == "Ciencias"
+
+
+async def test_the_material_says_what_it_is_and_who_it_is_for(
+    client, engine, seeded_school, catalog
+):
+    """Each piece says its type, its audience and where it came from.
+
+    The library of the school is a shelf of cards: the card needs to
+    know what the piece is and who can see it.
+    """
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        await catalog(session, "Algebra de 7", seeded_school, material_type="Libro")
+
+    response = client.get("/v1/school/material", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    item = response.json()["items"][0]
+    assert item["type"] == "Libro"
+    assert item["visible_to"] == "all"
+    # The editorial team of the platform loaded it, so it is not a
+    # resource of the school itself.
+    assert item["origin"] == "lumen"
+
+
+async def test_the_material_uploaded_by_the_school_says_its_origin(
+    client, engine, seeded_school, catalog
+):
+    """A piece uploaded by someone of the school is a resource of the school."""
+    from tests.conftest import TEST_USER_ID
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        await catalog(session, "Algebra de 7", seeded_school, created_by=uuid.UUID(TEST_USER_ID))
+
+    response = client.get("/v1/school/material", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    assert response.json()["items"][0]["origin"] == "colegio"
+
+
+async def test_the_audience_filter_runs_in_the_server(client, engine, seeded_school, catalog):
+    """The audience filter narrows the list, and the page says which
+    audiences have material behind them."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        await catalog(session, "Algebra de 7", seeded_school)
+        await catalog(session, "Guía docente", seeded_school, visible_to="teachers")
+
+    response = client.get("/v1/school/material?audience=teachers", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["visible_to"] == "teachers"
+    # The filter offers only the audiences with material behind them.
+    assert body["audiences"] == ["all", "teachers"]
 
 
 async def test_the_list_paginates_six_rows_by_page(client, engine, seeded_school, catalog):

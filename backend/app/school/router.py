@@ -158,6 +158,9 @@ async def list_school_material(
     session: Annotated[AsyncSession, Depends(get_db)],
     q: Annotated[str | None, Query(description="Título, área o ID del material")] = None,
     area: Annotated[str | None, Query(description="El área del material")] = None,
+    audience: Annotated[
+        str | None, Query(description="A quién va dirigido: all o teachers")
+    ] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=50)] = 6,
 ) -> MaterialPage:
@@ -172,6 +175,7 @@ async def list_school_material(
         membership.school_id,
         query=q,
         area=area,
+        audience=audience,
         page=page,
         per_page=per_page,
     )

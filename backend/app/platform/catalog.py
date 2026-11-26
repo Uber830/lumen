@@ -303,6 +303,7 @@ async def list_materials(
     query: str | None = None,
     material_type: str | None = None,
     status: str | None = None,
+    visible_to: str | None = None,
     school_id: uuid.UUID | None = None,
     page: int = 1,
     per_page: int = DEFAULT_PER_PAGE,
@@ -320,6 +321,8 @@ async def list_materials(
         conditions.append(Material.type == material_type)
     if status:
         conditions.append(Material.state == state_of(status))
+    if visible_to:
+        conditions.append(Material.visible_to == visible_to)
     if school_id:
         conditions.append(
             Material.id.in_(

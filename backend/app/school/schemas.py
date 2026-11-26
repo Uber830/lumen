@@ -151,7 +151,15 @@ class MaterialListItem(BaseModel):
     title: str
     description: str | None = None
     area: str
+    # What the piece is pedagogically: "Libro", "Guía", "Evaluación",
+    # "Multimedia" or "Documento".
+    type: str = "Documento"
     kind: str
+    # Who the piece is for: "all" or "teachers".
+    visible_to: str = "all"
+    # "lumen" when the editorial team loaded it, "colegio" when the
+    # school uploaded it.
+    origin: str = "lumen"
     file_size_bytes: int | None = None
     # When the platform enabled it for this school.
     available_since: datetime
@@ -174,6 +182,8 @@ class MaterialPage(BaseModel):
     pages: int = Field(default=0, ge=0)
     # The areas the school can filter by.
     areas: list[str] = Field(default_factory=list)
+    # The audiences the school can filter by: "all" and "teachers".
+    audiences: list[str] = Field(default_factory=list)
 
 
 class MaterialAccess(BaseModel):
