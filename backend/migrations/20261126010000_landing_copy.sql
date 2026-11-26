@@ -1,12 +1,36 @@
 -- =========================================================================
--- The seed of the public site.
+-- The copy of the landing: Lumen is a company, not an editorial.
 -- -------------------------------------------------------------------------
--- The copy of the landing. The platform team edits the `site_content`
--- row; the site serves whatever is there.
+-- The landing lives in `site_content`, under the key `landing`: the API
+-- validates it and serves it, and the page renders whatever it finds
+-- there. This migration writes the current copy of that row.
 --
--- The catalog the landing shows lives in `materials` and in the schools
--- that have access to each piece. It is seeded in
--- `20261119100000_editorial_catalog_seed.sql`.
+-- Three things changed:
+--
+--   1. Lumen does not present itself as an editorial anymore. It is a
+--      company that solves a problem for schools: the management of
+--      the academic material. The copy says so in the hero, in the
+--      process and in the questions.
+--   2. The platform role is not published. It is an internal thing of
+--      the team that operates the service; the people who read the
+--      landing are administrators, teachers and students.
+--   3. The coverage by school size is not published either, for now.
+--      The block is gone from the copy and the page only draws it when
+--      the copy carries it, so it can come back without a deploy.
+--
+-- The migration is idempotent: it writes the same copy of the same key
+-- every time it runs, so a database that already had it ends up with
+-- the same landing as a fresh one.
+--
+-- Order of the deploy: the API that accepts a copy without the
+-- coverage block (`app/site/schemas.py`, where `coverage` is optional)
+-- goes first, and this migration goes with it. A copy without that
+-- block does not fit the contract of an older API, and the landing
+-- would answer 503 until the new one is up.
+--
+-- Rollback:
+--   the copy of a previous release is not kept: the landing is
+--   edited in the database, so the rollback is to write it back.
 -- =========================================================================
 
 insert into public.site_content (key, content) values
@@ -48,11 +72,6 @@ insert into public.site_content (key, content) values
         "href": "#roles"
       },
       {
-        "id": "cobertura",
-        "label": "Cobertura",
-        "href": "#cobertura"
-      },
-      {
         "id": "preguntas",
         "label": "Preguntas",
         "href": "#preguntas"
@@ -62,10 +81,10 @@ insert into public.site_content (key, content) values
     "contact_label": "Hablar con el equipo"
   },
   "hero": {
-    "kicker": "IDX-001 / Catálogo editorial",
-    "title_lead": "El material de la editorial,",
-    "title_tail": "indexado por colegio.",
-    "lead": "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden. La misma página que el equipo usa para cargar es la que el colegio ve para consumir.",
+    "kicker": "IDX-001 / Solución para colegios",
+    "title_lead": "El material de su colegio,",
+    "title_tail": "ordenado y listo para usar.",
+    "lead": "Lumen es una empresa de software que resuelve la gestión del material académico: el colegio entrega lo que ya tiene, Lumen lo ordena y lo deja disponible para el docente y para el estudiante.",
     "cta_primary": {
       "id": "proceso",
       "label": "Ver el proceso",
@@ -81,7 +100,7 @@ insert into public.site_content (key, content) values
   },
   "catalog": {
     "kicker": "IDX-002 / Catálogo",
-    "title": "Índice del catálogo",
+    "title": "El catálogo de material",
     "lead": "Cada pieza se carga una vez y se habilita colegio por colegio.",
     "columns": [
       {
@@ -110,7 +129,7 @@ insert into public.site_content (key, content) values
   },
   "process": {
     "kicker": "IDX-003 / Proceso",
-    "title": "Cómo llega el material al colegio",
+    "title": "Cómo el colegio pone en marcha su material",
     "steps": [
       {
         "number": "01",
@@ -120,7 +139,7 @@ insert into public.site_content (key, content) values
       },
       {
         "number": "02",
-        "title": "El equipo carga y habilita",
+        "title": "Lumen carga y habilita",
         "body": "Sube el material, completa los metadatos y marca los colegios con acceso. Cambiar ese acceso es un interruptor.",
         "owner": "Equipo Lumen"
       },
@@ -136,12 +155,6 @@ insert into public.site_content (key, content) values
     "kicker": "IDX-004 / Roles",
     "title": "Quién usa Lumen y hasta dónde",
     "items": [
-      {
-        "id": "PLATAFORMA",
-        "summary": "Carga, habilita y publica.",
-        "detail": "Administra el catálogo editorial completo, la cobertura por colegio y el historial de cambios.",
-        "scope": "Acceso total al catálogo"
-      },
       {
         "id": "ADMIN COLEGIO",
         "summary": "Administra su comunidad.",
@@ -162,106 +175,14 @@ insert into public.site_content (key, content) values
       }
     ]
   },
-  "coverage": {
-    "kicker": "IDX-005 / Cobertura",
-    "title": "Cobertura por tamaño de colegio",
-    "lead": "Cada tamaño de colegio recibe el catálogo que le corresponde. Sin precios: esto es lo que incluye cada nivel.",
-    "rows": [
-      {
-        "id": "pequeno",
-        "label": "PEQUEÑO",
-        "size": "hasta 300",
-        "items": [
-          {
-            "label": "Catálogo por grado y área",
-            "included": true
-          },
-          {
-            "label": "3 administradores",
-            "included": true
-          },
-          {
-            "label": "Carga incluida",
-            "included": true
-          },
-          {
-            "label": "Soporte por correo",
-            "included": true
-          },
-          {
-            "label": "Simulacros ICFES",
-            "included": false
-          },
-          {
-            "label": "Reportes de uso",
-            "included": false
-          }
-        ]
-      },
-      {
-        "id": "mediano",
-        "label": "MEDIANO",
-        "size": "300–1.000",
-        "items": [
-          {
-            "label": "Catálogo editorial completo",
-            "included": true
-          },
-          {
-            "label": "10 administradores",
-            "included": true
-          },
-          {
-            "label": "Simulacros ICFES",
-            "included": true
-          },
-          {
-            "label": "Reportes de uso",
-            "included": true
-          },
-          {
-            "label": "Habilitación por grado",
-            "included": true
-          },
-          {
-            "label": "Material propio del colegio",
-            "included": false
-          }
-        ]
-      },
-      {
-        "id": "grande",
-        "label": "GRANDE",
-        "size": "+1.000",
-        "items": [
-          {
-            "label": "Catálogo y material propio",
-            "included": true
-          },
-          {
-            "label": "Docentes sin límite",
-            "included": true
-          },
-          {
-            "label": "Multi-sede y plantillas propias",
-            "included": true
-          },
-          {
-            "label": "Acompañamiento dedicado 24/7",
-            "included": false
-          }
-        ]
-      }
-    ]
-  },
   "faq": {
-    "kicker": "IDX-006 / Preguntas",
+    "kicker": "IDX-005 / Preguntas",
     "title": "Preguntas frecuentes",
     "items": [
       {
         "id": "Q-01",
         "question": "¿El colegio tiene que subir el material?",
-        "answer": "No. El equipo editorial de Lumen carga el material y lo habilita. El colegio solo entrega su información y usa lo que queda disponible."
+        "answer": "No. El equipo de Lumen carga el material y lo habilita. El colegio solo entrega su información y usa lo que queda disponible."
       },
       {
         "id": "Q-02",
@@ -276,12 +197,12 @@ insert into public.site_content (key, content) values
       {
         "id": "Q-04",
         "question": "¿Quién da soporte?",
-        "answer": "El equipo de plataforma, que también carga el material. Puede habilitar una pieza o quitar un acceso desde el panel."
+        "answer": "El equipo de Lumen, que también ayuda a habilitar una pieza o a quitar un acceso desde el panel."
       }
     ]
   },
   "cta": {
-    "kicker": "IDX-007 / Contacto",
+    "kicker": "IDX-006 / Contacto",
     "title": "Veamos su colegio con el material ya cargado.",
     "body": "Preparamos una demostración con la información de su institución: sus cursos, su material y cómo quedaría la habilitación colegio por colegio.",
     "buttons": [
@@ -318,7 +239,7 @@ insert into public.site_content (key, content) values
     "location": "LUMEN · BOGOTÁ, COLOMBIA",
     "columns": [
       {
-        "title": "Producto",
+        "title": "Solución",
         "links": [
           {
             "id": "indice",
@@ -331,20 +252,15 @@ insert into public.site_content (key, content) values
             "href": "#proceso"
           },
           {
-            "id": "cobertura",
-            "label": "Cobertura",
-            "href": "#cobertura"
+            "id": "roles",
+            "label": "Roles",
+            "href": "#roles"
           }
         ]
       },
       {
-        "title": "Plataforma",
+        "title": "Material",
         "links": [
-          {
-            "id": "roles",
-            "label": "Roles",
-            "href": "#roles"
-          },
           {
             "id": "catalogo",
             "label": "Índice del catálogo",
@@ -398,7 +314,7 @@ insert into public.site_content (key, content) values
         ]
       }
     ],
-    "legal": "© 2026 Grupo Editorial Educar. Lumen. Todos los derechos reservados."
+    "legal": "© 2026 Lumen S.A.S. Todos los derechos reservados."
   }
 }$json$::jsonb)
 on conflict (key) do update

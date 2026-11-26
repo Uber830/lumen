@@ -72,13 +72,13 @@ async function svg() {
   <text x="${margin + 78}" y="${margin + 38}" font-family="${font}" font-size="30" font-weight="700" fill="${INK}">Lumen</text>
   <text x="${margin + 78}" y="${margin + 66}" font-family="${mono}" font-size="17" letter-spacing="3" fill="${INK_3}">BOGOTÁ, COLOMBIA</text>
 
-  <text x="${margin}" y="300" font-family="${mono}" font-size="18" letter-spacing="4" fill="${INK_3}">IDX-001 / CATÁLOGO EDITORIAL</text>
+  <text x="${margin}" y="300" font-family="${mono}" font-size="18" letter-spacing="4" fill="${INK_3}">IDX-001 / SOLUCIÓN PARA COLEGIOS</text>
   <line x1="${margin}" y1="330" x2="${WIDTH - margin}" y2="330" stroke="${LINE}" stroke-width="1" />
 
-  <text x="${margin}" y="420" font-family="${font}" font-size="72" font-weight="700" fill="${INK}">El material de la editorial,</text>
-  <text x="${margin}" y="500" font-family="${font}" font-size="72" font-weight="700" fill="${ACCENT}">indexado por colegio.</text>
+  <text x="${margin}" y="420" font-family="${font}" font-size="72" font-weight="700" fill="${INK}">El material de su colegio,</text>
+  <text x="${margin}" y="500" font-family="${font}" font-size="72" font-weight="700" fill="${ACCENT}">ordenado y listo para usar.</text>
 
-  <text x="${margin}" y="570" font-family="${font}" font-size="24" fill="${INK_2}">Un solo catálogo. El acceso se configura colegio por colegio.</text>
+  <text x="${margin}" y="570" font-family="${font}" font-size="24" fill="${INK_2}">Una plataforma para el material académico de los colegios.</text>
 </svg>
 `;
 }

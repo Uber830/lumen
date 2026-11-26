@@ -48,11 +48,11 @@
   <text x="150" y="110" font-family="'Space Grotesk', system-ui, sans-serif" font-size="30" font-weight="700" fill="#0A0D13">Lumen</text>
   <text x="150" y="138" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="17" letter-spacing="3" fill="#8B93A3">BOGOTÁ, COLOMBIA</text>
 
-  <text x="72" y="300" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="18" letter-spacing="4" fill="#8B93A3">IDX-001 / CATÁLOGO EDITORIAL</text>
+  <text x="72" y="300" font-family="'IBM Plex Mono', ui-monospace, monospace" font-size="18" letter-spacing="4" fill="#8B93A3">IDX-001 / SOLUCIÓN PARA COLEGIOS</text>
   <line x1="72" y1="330" x2="1128" y2="330" stroke="#DFE3EA" stroke-width="1" />
 
-  <text x="72" y="420" font-family="'Space Grotesk', system-ui, sans-serif" font-size="72" font-weight="700" fill="#0A0D13">El material de la editorial,</text>
-  <text x="72" y="500" font-family="'Space Grotesk', system-ui, sans-serif" font-size="72" font-weight="700" fill="#1A4CF0">indexado por colegio.</text>
+  <text x="72" y="420" font-family="'Space Grotesk', system-ui, sans-serif" font-size="72" font-weight="700" fill="#0A0D13">El material de su colegio,</text>
+  <text x="72" y="500" font-family="'Space Grotesk', system-ui, sans-serif" font-size="72" font-weight="700" fill="#1A4CF0">ordenado y listo para usar.</text>
 
-  <text x="72" y="570" font-family="'Space Grotesk', system-ui, sans-serif" font-size="24" fill="#565E6E">Un solo catálogo. El acceso se configura colegio por colegio.</text>
+  <text x="72" y="570" font-family="'Space Grotesk', system-ui, sans-serif" font-size="24" fill="#565E6E">Una plataforma para el material académico de los colegios.</text>
 </svg>
