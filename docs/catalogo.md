@@ -38,17 +38,25 @@ colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
 
 ## Los valores se editan
 
-El panel de **Gestionar** de la biblioteca es un **modal en el centro**, no un
-cajón: la pieza se administra en el medio de la pantalla, con el formulario
-completo a la vista. Ahí se cambian el título, el tipo, el área, los grados,
-para quién es la pieza y la descripción, con
-`PATCH /v1/platform/catalog/{id}`. El botón **Guardar cambios** solo se
-enciende cuando algo cambió, y el cambio queda en el historial del material y
-en la traza de auditoría.
+Cada tarjeta de la biblioteca tiene **tres acciones**, y las tres son **solo
+un icono** (26 × 26 px), para que la tarjeta no pierda el espacio:
+
+| Icono | Qué hace |
+| --- | --- |
+| 👁️ **Ver** | Muestra la pieza como es (la imagen, el PDF, el video) |
+| ✏️ **Editar** | Abre el formulario: título, tipo, área, grados, visible para y descripción |
+| ⚙️ **Gestionar** | Abre el **resumen**: qué es la pieza, su estado, los colegios que la ven y su historial |
+
+El formulario de **Editar** es un **modal en el centro**, no un cajón: la pieza
+se administra en el medio de la pantalla, con el formulario completo a la
+vista. Los cambios se guardan con `PATCH /v1/platform/catalog/{id}`: el botón
+**Guardar cambios** solo se enciende cuando algo cambió, y el cambio queda en
+el historial del material y en la traza de auditoría.
+
+**Gestionar** no cambia nada: es la ficha de la pieza. Los valores se cambian
+con el lápiz.
 
 ## El ojo: ver la pieza
-
-Cada tarjeta de la biblioteca tiene dos acciones: el **ojo** y **Gestionar**.
 
 El **ojo** abre la pieza como es: una imagen como imagen, un PDF en el lector
 del navegador, un video con sus controles. Una pieza que solo es un enlace
