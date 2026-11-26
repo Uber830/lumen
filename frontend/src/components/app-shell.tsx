@@ -41,7 +41,7 @@ import type { NavItem } from "@/lib/navigation";
 import { usePlatformMetrics } from "@/lib/platform/hooks";
 import { useSchool } from "@/lib/school/hooks";
 import { useSchoolOverview } from "@/lib/school/overview";
-import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
+import { useOpenSupportCaseCount } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
 import { useCollapsedSidebar } from "@/lib/sidebar";
 import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
@@ -385,7 +385,7 @@ export function AppShell({
   const overview = useSchoolOverview(role === "admin" ? session.primarySchoolId : null);
   // The counter of the support: the cases of the school that are still
   // open. The query is off for the roles that do not have the channel.
-  const supportCases = useSchoolSupportCases(role === "admin");
+  const openCases = useOpenSupportCaseCount(role === "admin");
   // The size of the network, for the rail of the platform role.
   const metrics = usePlatformMetrics(role === "super");
 
@@ -460,7 +460,7 @@ export function AppShell({
   // panel never shows a number that is written by hand.
   const badges: BadgeCounts = {
     material: overview.data?.material.available ?? null,
-    support: supportCases.data ? openCaseCount(supportCases.data) : null,
+    support: openCases.data ?? null,
     schools: metrics.data?.schools ?? null,
     materials: metrics.data?.materials ?? null,
   };

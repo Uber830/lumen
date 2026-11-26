@@ -73,9 +73,27 @@ export const SUPPORT_CATEGORIES = [
   { id: "otro", label: "Otro" },
 ] as const;
 
+/** A page of the requests of the school. */
+export type SupportCasePage = {
+  items: SupportCaseSummary[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+};
+
+/** The filters of the list of requests. */
+export type SupportCaseFilters = {
+  page?: number;
+  per_page?: number;
+  /** The text to look for: the title or the code of the request. */
+  q?: string;
+};
+
 export const supportKeys = {
-  cases: () => ["school", "support", "cases"] as const,
-  case: (caseId: string) => ["school", "support", "cases", caseId] as const,
+  cases: (filters: SupportCaseFilters = {}) => ["school", "support", "cases", filters] as const,
+  case: (caseId: string) => ["school", "support", "case", caseId] as const,
+  openCount: ["school", "support", "open-count"] as const,
 };
 
 /**
@@ -84,26 +102,46 @@ export const supportKeys = {
  * The query can be switched off for the roles that do not have the
  * channel: the rail only counts the open cases of the administrator.
  */
-export function useSchoolSupportCases(enabled = true): UseQueryResult<SupportCaseSummary[], Error> {
+export function useSchoolSupportCases(
+  filters: SupportCaseFilters = {},
+  enabled = true,
+): UseQueryResult<SupportCasePage, Error> {
   const qc = useQueryClient();
 
   // The bell says that there is something new in the thread: the list
   // is asked again, so the answer of the platform shows up without a
   // reload.
   useEvent("notification", () => {
-    qc.invalidateQueries({ queryKey: supportKeys.cases() });
+    qc.invalidateQueries({ queryKey: ["school", "support"] });
   });
 
   return useQuery({
-    queryKey: supportKeys.cases(),
+    queryKey: supportKeys.cases(filters),
     enabled,
-    queryFn: () => api.get<SupportCaseSummary[]>("/v1/school/support/cases"),
+    queryFn: () =>
+      api.get<SupportCasePage>("/v1/school/support/cases", {
+        page: filters.page ?? 1,
+        per_page: filters.per_page ?? 10,
+        ...(filters.q ? { q: filters.q } : {}),
+      }),
   });
 }
 
-/** How many cases of the school are still open. */
-export function openCaseCount(cases: SupportCaseSummary[] | undefined): number {
-  return (cases ?? []).filter((item) => item.status !== "resuelto").length;
+/**
+ * How many requests of the school are still open.
+ *
+ * The number is its own call: the list is cut in pages and the badge
+ * counts every case of the school, not only the ones of the first page.
+ */
+export function useOpenSupportCaseCount(enabled = true): UseQueryResult<number, Error> {
+  return useQuery({
+    queryKey: supportKeys.openCount,
+    enabled,
+    queryFn: async () => {
+      const body = await api.get<{ count: number }>("/v1/school/support/open-count");
+      return body.count;
+    },
+  });
 }
 
 /** One request of the school, with its thread. */

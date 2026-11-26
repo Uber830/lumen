@@ -8,12 +8,14 @@ import {
   Chip,
   EmptyState,
   PageHeader,
+  Pagination,
   SectionCard,
   TableShell,
   Toolbar,
   tableCellClass,
   tableHeadClass,
 } from "@/components/ui-kit";
+import { MemberAvatar } from "@/components/member-avatar";
 import {
   Drawer,
   DrawerClose,
@@ -76,6 +78,9 @@ function statusTone(status: string): "info" | "warn" | "ok" {
   return "ok";
 }
 
+/** How many requests the list shows at once. */
+const PER_PAGE = 10;
+
 /** The date, the way the panel writes them: 14/11/2026. */
 function shortDate(value: string): string {
   const date = new Date(value);
@@ -88,11 +93,12 @@ function shortDate(value: string): string {
 function SoportePage() {
   const { session } = useRouteContext({ from: "/admin" });
 
-  const cases = useSchoolSupportCases();
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const cases = useSchoolSupportCases({ page, per_page: PER_PAGE, q: query.trim() });
   const openCase = useOpenSupportCase();
   const addMessage = useAddSupportMessage();
 
-  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<SupportCaseSummary | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -110,11 +116,10 @@ function SoportePage() {
   // list from the API.
   const canWrite = session.permissions.includes("support.write");
 
-  const filtered = (cases.data ?? []).filter((item) => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return item.title.toLowerCase().includes(needle) || item.code.toLowerCase().includes(needle);
-  });
+  // The search runs in the server: it looks for the title or the code of
+  // the request, over every case of the school and not only over the
+  // ones of the page.
+  const filtered = cases.data?.items ?? [];
 
   async function onOpenCase() {
     if (!title.trim() || !body.trim()) {
@@ -280,7 +285,11 @@ function SoportePage() {
             <input
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                // A new search starts again in the first page.
+                setPage(1);
+              }}
               placeholder="Buscar en tus solicitudes"
               aria-label="Buscar en tus solicitudes"
               className="w-full rounded-idx border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
@@ -288,7 +297,13 @@ function SoportePage() {
           </div>
 
           <div className="ml-auto">
-            <Chip tone="muted">{cases.data ? `${cases.data.length} solicitudes` : "—"}</Chip>
+            <Chip tone="muted">
+              {cases.data
+                ? query.trim()
+                  ? `${cases.data.total} resultados`
+                  : `${cases.data.total} solicitudes`
+                : "—"}
+            </Chip>
           </div>
         </Toolbar>
 
@@ -309,9 +324,9 @@ function SoportePage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Inbox}
-            title={cases.data && cases.data.length > 0 ? "Sin resultados" : "Sin solicitudes"}
+            title={query.trim() ? "Sin resultados" : "Sin solicitudes"}
             description={
-              cases.data && cases.data.length > 0
+              query.trim()
                 ? "Ninguna solicitud coincide con la búsqueda."
                 : "Envía una solicitud al equipo de Lumen y sigue aquí la respuesta."
             }
@@ -351,9 +366,14 @@ function SoportePage() {
                 {filtered.map((item) => (
                   <tr key={item.id} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
-                      <div className="font-medium">{item.title}</div>
-                      <div className="mt-px font-mono text-[12px] text-muted-foreground">
-                        {item.code}
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <MemberAvatar name={item.opened_by_name} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">{item.title}</p>
+                          <p className="mt-px truncate font-mono text-[12px] text-muted-foreground">
+                            {item.code}
+                          </p>
+                        </div>
                       </div>
                     </td>
                     <td className={tableCellClass}>
@@ -389,6 +409,15 @@ function SoportePage() {
             </PanelTable>
           </TableShell>
         )}
+
+        <Pagination
+          page={cases.data?.page ?? 1}
+          pageCount={cases.data?.pages ?? 0}
+          total={cases.data?.total ?? 0}
+          pageSize={PER_PAGE}
+          onPageChange={setPage}
+          always
+        />
 
         <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
           <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
