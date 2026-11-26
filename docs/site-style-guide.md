@@ -77,8 +77,15 @@ pide y no debe pagar por ella.
 
 Todo el texto visible de la landing sale de `GET /v1/public/site`. La fila de
 `site_content` con la clave `landing` guarda el copy y las cifras; el
-catálogo editorial vive en `materials` y `material_schools`, y lo administra el
-rol de plataforma desde `/super/catalogo`.
+catálogo de material vive en `materials` y `material_schools`, y lo administra
+el rol de plataforma desde `/super/catalogo`.
+
+El copy de la landing lo escribe una migración
+(`backend/migrations/20261126010000_landing_copy.sql`), no la semilla: así
+una base nueva y una base que ya existe muestran la misma página. Los
+bloques que no se publican **no están en el copy**: la página dibuja la
+cobertura por tamaño de colegio solo cuando el copy la trae, de modo que
+volver a publicarla no necesita un redespliegue.
 
 El frontend no tiene constantes de contenido: `src/features/site/types.ts`
 describe el contrato y los componentes renderizan lo que llega. Cuando el
