@@ -356,6 +356,26 @@ campos, mismo bloque de adjuntos, mismos botones y el mismo bloque «Para»,
 que dice a quién va el mensaje. La respuesta del colegio sale en un modal,
 como la de la plataforma, y no dentro del cajón del caso.
 
+El modal de **Enviar solicitud** y el de **Nueva asignación** tienen el mismo
+ancho (`max-w-xl`), las mismas etiquetas y el mismo pie de botones: el
+`Cancelar` y la acción principal.
+
+### La mesa de la plataforma
+
+**Soporte y auditoría** (`/super/soporte`) tiene el mismo formato que el
+**Soporte** del colegio: la lista al ancho, el corte en páginas de diez y el
+pie con los números. La diferencia es que la plataforma **responde**:
+
+| Acción | Dónde |
+| --- | --- |
+| **Responder** | En cada fila: escribe en el hilo sin abrir el caso |
+| **Enviar solicitud** | Arriba a la derecha: abre una conversación con un colegio |
+
+La plataforma puede, por tanto, **empezar** la conversación: el caso se crea
+en nombre del colegio (`POST /v1/platform/cases`), el hilo arranca con el
+mensaje del equipo y el colegio lo ve en su propio Soporte, con su campana
+avisando.
+
 ### Los chips son cuadrados
 
 El panel es rectangular: los chips, las etiquetas y los contadores también

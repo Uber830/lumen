@@ -27,11 +27,34 @@ que es el vocabulario que ya usaba.
 
 **Las transiciones válidas las decide el backend** (`available_transitions` en
 la respuesta del detalle): el frontend las muestra, no las adivina. Publicar
-exige título, tipo, área, grados y al menos un colegio; si falta algo, la
+exige título, tipo, área y al menos un colegio; si falta algo, la
 respuesta es un `422` con la lista de lo que falta en `missing`.
+
+Los **grados son opcionales**: una pieza sin grados es una pieza para todos los
+grados del colegio, así que nunca son un motivo para bloquear la publicación.
 
 Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
 colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
+
+## Los valores se editan
+
+El panel de **Gestionar** de la biblioteca es un formulario: el título, el tipo,
+el área, los grados, para quién es la pieza y la descripción se cambian ahí, con
+`PATCH /v1/platform/catalog/{id}`. El botón **Guardar cambios** solo se enciende
+cuando algo cambió, y el cambio queda en el historial del material y en la
+traza de auditoría.
+
+## A qué colegios va la pieza
+
+Antes de la lista de colegios hay una **decisión**:
+
+| Decisión | Qué pasa |
+| --- | --- |
+| **Todos los colegios** | La pieza se habilita para toda la red (`all_schools: true`) y la lista de colegios no se muestra |
+| **Ciertos colegios** | Aparece la lista y solo ven la pieza los que se elijan |
+
+Así nadie deja la lista en blanco por descuido: lo que no se elige es una
+decisión, no un olvido.
 
 ## La cobertura
 
