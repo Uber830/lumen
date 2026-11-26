@@ -308,9 +308,6 @@ function Soporte() {
                       <th scope="col" className={`${tableHeadClass} text-right`}>
                         Recibido
                       </th>
-                      <th scope="col" className={`${tableHeadClass} text-right`}>
-                        Acción
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -370,19 +367,6 @@ function Soporte() {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
-                        </td>
-                        {/* The answer to the school, from the list: the
-                            platform does not have to open the case first. */}
-                        <td className={`${tableCellClass} text-right`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            icon={Send}
-                            onClick={() => setReplyTo([item])}
-                            aria-label={`Responder ${item.code}`}
-                          >
-                            Responder
-                          </Button>
                         </td>
                       </tr>
                     ))}
