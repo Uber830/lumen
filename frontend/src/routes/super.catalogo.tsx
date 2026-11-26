@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Search, Upload } from "lucide-react";
+import { Eye, Search, Upload } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -14,6 +14,7 @@ import {
   Toolbar,
 } from "@/components/ui-kit";
 import { MaterialPanel } from "@/features/platform/material-panel";
+import { MaterialPreview } from "@/features/platform/material-preview";
 import { UploadWizard } from "@/features/platform/upload-wizard";
 import { audienceLabel, ResourceCard } from "@/features/resources/resource-card";
 import { useCatalog, useCatalogOptions, usePlatformMetrics } from "@/lib/platform/hooks";
@@ -22,7 +23,6 @@ import {
   MATERIAL_STATUS_TONE,
   type MaterialSummary,
 } from "@/lib/platform/types";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/super/catalogo")({
   head: () => ({
@@ -59,6 +59,7 @@ function Catalogo() {
   const [visibleTo, setVisibleTo] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const options = useCatalogOptions();
@@ -232,14 +233,27 @@ function Catalogo() {
                       </>
                     }
                     actions={
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => setOpenId(item.id)}
-                        aria-label={`Gestionar ${item.title}`}
-                      >
-                        Gestionar
-                      </Button>
+                      <>
+                        {/* El ojo: la pieza se ve antes de decidir nada
+                            sobre ella. */}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          icon={Eye}
+                          onClick={() => setPreviewId(item.id)}
+                          aria-label={`Ver ${item.title}`}
+                        >
+                          Ver
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => setOpenId(item.id)}
+                          aria-label={`Gestionar ${item.title}`}
+                        >
+                          Gestionar
+                        </Button>
+                      </>
                     }
                   />
                 </li>
@@ -259,10 +273,15 @@ function Catalogo() {
       </SectionCard>
 
       <MaterialPanel
-        key={openId ?? "none"}
+        key={openId ?? "panel-cerrado"}
         materialId={openId}
         onClose={() => setOpenId(null)}
-        className={cn("w-full sm:max-w-lg")}
+      />
+
+      <MaterialPreview
+        key={previewId ?? "vista-cerrada"}
+        materialId={previewId}
+        onClose={() => setPreviewId(null)}
       />
 
       {/* The assistant is mounted only while it is open, so it always

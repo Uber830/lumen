@@ -384,6 +384,23 @@ export function useCaseOptions(): UseQueryResult<CaseOptions, Error> {
   });
 }
 
+/**
+ * The content of the file of a piece.
+ *
+ * The file is served by the API and shown inside the platform: the
+ * material is consulted, not downloaded. The blob is fetched with the
+ * session cookie, so the browser can show it without a public address.
+ */
+export async function fetchPlatformMaterialFile(fileId: string): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/platform/files/${fileId}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el archivo del recurso.");
+  }
+  return await response.blob();
+}
+
 /** The cases of the desk, filtered and paginated. */
 export function useCases(filters: CaseFilters): UseQueryResult<Page<CaseSummary>, Error> {
   const qc = useQueryClient();

@@ -82,9 +82,11 @@ export function MaterialPanel({
       <DialogContent
         showClose={false}
         className={cn(
-          // The panel is a drawer on the right, not a centered dialog:
-          // the list stays visible behind it.
-          "fixed right-0 top-0 left-auto flex h-dvh max-h-none w-full max-w-lg translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-l border-border bg-card p-0 shadow-lift sm:rounded-none",
+          // A centered modal, not a drawer: the piece is managed in the
+          // middle of the screen, where the form can be read at once.
+          // The head and the foot stay put; the form in the middle
+          // scrolls.
+          "max-h-[88vh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
           className,
         )}
       >
@@ -107,7 +109,7 @@ export function MaterialPanel({
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-5">
           {problem && (
             <p
               role="alert"
