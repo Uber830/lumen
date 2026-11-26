@@ -368,7 +368,7 @@ pie con los números. La diferencia es que la plataforma **responde**:
 
 | Acción | Dónde |
 | --- | --- |
-| **Responder** | En cada fila: escribe en el hilo sin abrir el caso |
+| **Responder** | En el caso: se abre desde el título de la fila y se responde en su panel |
 | **Enviar solicitud** | Arriba a la derecha: abre una conversación con un colegio |
 
 La plataforma puede, por tanto, **empezar** la conversación: el caso se crea

@@ -38,11 +38,23 @@ colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
 
 ## Los valores se editan
 
-El panel de **Gestionar** de la biblioteca es un formulario: el título, el tipo,
-el área, los grados, para quién es la pieza y la descripción se cambian ahí, con
-`PATCH /v1/platform/catalog/{id}`. El botón **Guardar cambios** solo se enciende
-cuando algo cambió, y el cambio queda en el historial del material y en la
-traza de auditoría.
+El panel de **Gestionar** de la biblioteca es un **modal en el centro**, no un
+cajón: la pieza se administra en el medio de la pantalla, con el formulario
+completo a la vista. Ahí se cambian el título, el tipo, el área, los grados,
+para quién es la pieza y la descripción, con
+`PATCH /v1/platform/catalog/{id}`. El botón **Guardar cambios** solo se
+enciende cuando algo cambió, y el cambio queda en el historial del material y
+en la traza de auditoría.
+
+## El ojo: ver la pieza
+
+Cada tarjeta de la biblioteca tiene dos acciones: el **ojo** y **Gestionar**.
+
+El **ojo** abre la pieza como es: una imagen como imagen, un PDF en el lector
+del navegador, un video con sus controles. Una pieza que solo es un enlace
+externo lo dice y ofrece el enlace. El archivo lo sirve la API
+(`GET /v1/platform/files/{id}`) **en línea**: el material se consulta, no se
+descarga, como en el resto del producto.
 
 ## A qué colegios va la pieza
 
