@@ -214,6 +214,18 @@ harte falta:
 LD_LIBRARY_PATH=/ruta/a/las/librerias npx playwright test
 ```
 
+En Ubuntu 26.04 las que faltan son `libnss3`, `libnspr4` y `libasound2`. Si
+no hay sudo, se descargan y se desempaquetan en una carpeta propia, y esa
+carpeta es la que va en el `LD_LIBRARY_PATH`:
+
+```sh
+mkdir -p /tmp/chromelibs && cd /tmp/chromelibs
+apt-get download libnspr4 libnss3 libasound2t64
+for deb in *.deb; do dpkg-deb -x "$deb" extracted/; done
+export LD_LIBRARY_PATH=/tmp/chromelibs/extracted/usr/lib/x86_64-linux-gnu
+npx playwright test
+```
+
 ---
 
 ## Convenciones
