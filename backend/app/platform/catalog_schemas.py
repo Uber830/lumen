@@ -135,6 +135,10 @@ class CreateMaterialRequest(BaseModel):
     external_url: str | None = Field(default=None, max_length=1000)
     # The schools that will have access from the start.
     school_ids: list[UUID] = Field(default_factory=list)
+    # When it is true, the piece goes to every school of the network:
+    # the list of schools stays empty on purpose. It is the decision
+    # of the platform team, and it is written in the history.
+    all_schools: bool = False
     # The file that was uploaded before. Required when the origin is an
     # upload.
     file_id: UUID | None = None

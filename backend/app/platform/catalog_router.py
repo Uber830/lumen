@@ -328,7 +328,12 @@ async def create_material(
 
     # The schools that will have access must exist.
     known_schools: list[School] = []
-    if body.school_ids:
+    if body.all_schools:
+        # The decision of the platform team: the piece goes to every
+        # school of the network.
+        result = await session.execute(select(School).order_by(School.name))
+        known_schools = list(result.scalars().all())
+    elif body.school_ids:
         result = await session.execute(select(School).where(School.id.in_(body.school_ids)))
         known_schools = list(result.scalars().all())
         known_ids = {school.id for school in known_schools}
@@ -409,6 +414,7 @@ async def create_material(
             "type": material.type,
             "area": material.area,
             "schools": [str(school.id) for school in known_schools],
+            "all_schools": body.all_schools,
         },
     )
     await catalog.record_audit(

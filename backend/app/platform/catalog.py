@@ -188,6 +188,9 @@ def publication_gaps(material: Material, school_count: int) -> list[str]:
 
     An empty list means it can go to "published". The names are the ones
     the frontend shows as the reason why the button is blocked.
+
+    The grades are not needed: a piece without grades is a piece for
+    every grade of the school.
     """
     gaps: list[str] = []
     if not material.title.strip():
@@ -196,8 +199,6 @@ def publication_gaps(material: Material, school_count: int) -> list[str]:
         gaps.append("type")
     if not material.area.strip():
         gaps.append("area")
-    if not material.grades:
-        gaps.append("grades")
     if school_count == 0:
         gaps.append("schools")
     return gaps
