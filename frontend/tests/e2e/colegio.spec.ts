@@ -99,13 +99,49 @@ test.describe("el panel del colegio", () => {
     await form.getByRole("combobox").nth(1).click();
     await page.getByRole("listbox").last().getByRole("option", { name: /7° A/ }).first().click();
 
-    await page.getByRole("button", { name: /Asignar docente a la materia/i }).click();
+    await page.getByRole("button", { name: /Asignar la materia/i }).click();
 
     // 3. The assignment is in the list: the teacher, the course and the
     // subject.
     const fila = page.getByRole("row").filter({ hasText: nombre });
     await expect(fila).toBeVisible(READY);
     await expect(fila).toContainText(/7° A/);
+  });
+
+  test("una fila de asignaciones ofrece agregar y quitar, no editar", async ({ page }) => {
+    await login(page);
+    await openPanel(page, "/admin/asignaciones");
+
+    // La fila del primer docente: el de la primera fila de la tabla.
+    const fila = page.locator("tbody tr").first();
+    await expect(fila).toBeVisible(READY);
+
+    // Las dos acciones de la fila, y solo dos: agregar materia y quitarla.
+    await expect(fila.getByRole("button", { name: /Asignar otra/i })).toBeVisible();
+    await expect(fila.getByRole("button", { name: /Quitar/i })).toBeVisible();
+    await expect(fila.getByRole("button", { name: /Editar|Gestionar/i })).toHaveCount(0);
+
+    // «Asignar otra» deja el docente de la fila fijo: solo se elige la
+    // materia, y el título lo dice.
+    const nombreDocente = (await fila.locator("td").first().innerText()).split("\n")[1];
+    await fila.getByRole("button", { name: /Asignar otra/i }).click();
+    const modal = page.getByRole("dialog").last();
+    await expect(modal.getByRole("heading", { name: /Asignar otra materia a/ })).toBeVisible(
+      READY,
+    );
+    // El docente se ve, pero no se elige: el formulario tiene un solo
+    // desplegable, el del par curso · materia.
+    await expect(modal.getByText(nombreDocente ?? "", { exact: false }).first()).toBeVisible();
+    await expect(modal.getByRole("combobox")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    // «Quitar» abre la lista de materias de esa fila, con la ✕ para
+    // quitar cada una.
+    await fila.getByRole("button", { name: /Quitar/i }).click();
+    const lista = page.getByRole("dialog").last();
+    await expect(lista.getByRole("heading", { name: /Materias de/ })).toBeVisible(READY);
+    await expect(lista.getByRole("listitem")).not.toHaveCount(0);
+    await page.keyboard.press("Escape");
   });
 
   test("el módulo de ICFES avisa que viene en camino", async ({ page }) => {
