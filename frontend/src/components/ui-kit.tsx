@@ -76,7 +76,8 @@ export function Button({
   children: ReactNode;
   variant?: ButtonVariant;
   icon?: LucideIcon;
-  size?: "sm" | "md";
+  /** The size of the button: the smallest one is for the cards. */
+  size?: "xs" | "sm" | "md";
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   // A control that cannot be used stays in the tab order when it is
   // marked with `aria-disabled`: the reader can reach it and hear the
@@ -89,14 +90,24 @@ export function Button({
       type="button"
       className={cn(
         "inline-flex items-center justify-center gap-[7px] whitespace-nowrap rounded-idx border border-transparent font-medium transition-[background,border-color,transform] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45",
-        size === "sm" ? "px-[11px] py-1.5 text-[12.4px]" : "px-[15px] py-2 text-[13.2px]",
+        size === "xs"
+          ? "gap-[5px] px-[9px] py-1 text-[11.6px]"
+          : size === "sm"
+            ? "px-[11px] py-1.5 text-[12.4px]"
+            : "px-[15px] py-2 text-[13.2px]",
         buttonVariants[variant],
         unavailable && "cursor-not-allowed opacity-45",
         className,
       )}
       {...rest}
     >
-      {Icon && <Icon className="size-[15.5px] shrink-0" strokeWidth={1.9} aria-hidden />}
+      {Icon && (
+        <Icon
+          className={size === "xs" ? "size-[13.5px] shrink-0" : "size-[15.5px] shrink-0"}
+          strokeWidth={1.9}
+          aria-hidden
+        />
+      )}
       {children}
     </button>
   );

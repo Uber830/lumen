@@ -234,7 +234,7 @@ function Catalogo() {
                     actions={
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="xs"
                         onClick={() => setOpenId(item.id)}
                         aria-label={`Gestionar ${item.title}`}
                       >

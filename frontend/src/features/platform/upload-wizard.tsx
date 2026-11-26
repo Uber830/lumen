@@ -52,6 +52,10 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
   const [visibleTo, setVisibleTo] = useState("all");
   const [description, setDescription] = useState("");
   const [selectedSchools, setSelectedSchools] = useState<string[]>([]);
+  // The decision about the schools comes before the list of them:
+  // the piece goes to the whole network or to the schools that are
+  // picked. The list only shows up when it is needed.
+  const [schoolScope, setSchoolScope] = useState<"all" | "some">("all");
   const [problem, setProblem] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,9 +100,11 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
   const metadataReady = Boolean(title.trim() && type && area);
   const canContinue =
     step === 1 ? (origin === "upload" ? Boolean(fileId) : externalUrl) : metadataReady;
-  // The backend only publishes a piece with title, type, area, grades
-  // and at least one school: the assistant asks for the same.
-  const canPublish = metadataReady && grades.length > 0 && selectedSchools.length > 0;
+  // The backend publishes a piece with title, type and area. The grades
+  // are optional: without them the piece is for every grade. The
+  // schools are optional too: the decision "todos" takes them all.
+  const schoolsReady = schoolScope === "all" || selectedSchools.length > 0;
+  const canPublish = metadataReady && schoolsReady;
 
   async function publish() {
     setProblem(null);
@@ -112,7 +118,8 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
         description: description.trim() || null,
         origin,
         external_url: origin === "link" ? externalUrl.trim() : null,
-        school_ids: selectedSchools,
+        school_ids: schoolScope === "some" ? selectedSchools : [],
+        all_schools: schoolScope === "all",
         file_id: origin === "upload" ? fileId : null,
       });
       // The material is born as a draft: publishing it is another call,
@@ -356,44 +363,104 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
               </select>
             </label>
 
+            {/* The decision comes before the list: the piece goes to the
+                whole network or to the schools that are picked. The list
+                only shows up when the team chooses the schools. */}
             <div>
               <span className="mb-1.5 block text-sm font-medium">Colegios que pueden verlo *</span>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {(schools.data?.items ?? []).map((school) => {
-                  const on = selectedSchools.includes(school.id);
+                {(
+                  [
+                    {
+                      value: "all" as const,
+                      label: "Todos los colegios",
+                      hint: "La pieza queda disponible para toda la red.",
+                    },
+                    {
+                      value: "some" as const,
+                      label: "Ciertos colegios",
+                      hint: "Solo ven la pieza los que se elijan.",
+                    },
+                  ] as const
+                ).map((choice) => {
+                  const on = schoolScope === choice.value;
                   return (
                     <button
-                      key={school.id}
+                      key={choice.value}
                       type="button"
-                      onClick={() => toggleSchool(school.id)}
+                      onClick={() => setSchoolScope(choice.value)}
                       aria-pressed={on}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                        "rounded-idx border px-3 py-2 text-left transition-colors",
                         on ? "border-primary bg-primary-soft" : "border-border hover:border-line-2",
                       )}
                     >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "grid size-4 shrink-0 place-items-center rounded border text-[10px] text-primary-foreground",
-                          on ? "border-primary bg-primary" : "border-line-2",
-                        )}
-                      >
-                        {on ? "✓" : ""}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{school.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {school.short_code} · {school.students} estudiantes
+                      <span className="flex items-center gap-2.5">
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "grid size-4 shrink-0 place-items-center rounded border text-[10px] text-primary-foreground",
+                            on ? "border-primary bg-primary" : "border-line-2",
+                          )}
+                        >
+                          {on ? "✓" : ""}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[13px] font-medium">{choice.label}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {choice.hint}
+                          </span>
                         </span>
                       </span>
                     </button>
                   );
                 })}
               </div>
+
+              {schoolScope === "some" && (
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {(schools.data?.items ?? []).map((school) => {
+                    const on = selectedSchools.includes(school.id);
+                    return (
+                      <button
+                        key={school.id}
+                        type="button"
+                        onClick={() => toggleSchool(school.id)}
+                        aria-pressed={on}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-idx border px-3 py-2 text-left transition-colors",
+                          on
+                            ? "border-primary bg-primary-soft"
+                            : "border-border hover:border-line-2",
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "grid size-4 shrink-0 place-items-center rounded border text-[10px] text-primary-foreground",
+                            on ? "border-primary bg-primary" : "border-line-2",
+                          )}
+                        >
+                          {on ? "✓" : ""}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-medium">
+                            {school.name}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {school.short_code} · {school.students} estudiantes
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Solo estos colegios verán el material. Puedes cambiarlo más adelante sin volver a
-                cargar el archivo.
+                {schoolScope === "all"
+                  ? "El material queda para todos los colegios de la red. Puedes cambiarlo más adelante."
+                  : "Solo estos colegios verán el material. Puedes cambiarlo más adelante sin volver a cargar el archivo."}
               </p>
             </div>
 
@@ -417,9 +484,16 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
             <p className="flex items-start gap-2 rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-sm text-success">
               <Check className="mt-0.5 size-4 shrink-0" strokeWidth={1.9} aria-hidden />
               <span>
-                Al publicar, el material queda disponible para {selectedSchools.length}{" "}
-                {selectedSchools.length === 1 ? "colegio" : "colegios"}:{" "}
-                {selectedSchools.map(schoolName).join(", ")}.
+                Al publicar, el material queda disponible para{" "}
+                {schoolScope === "all" ? (
+                  "todos los colegios de la red"
+                ) : (
+                  <>
+                    {selectedSchools.length} {selectedSchools.length === 1 ? "colegio" : "colegios"}
+                    : {selectedSchools.map(schoolName).join(", ")}
+                  </>
+                )}
+                .
               </span>
             </p>
 
@@ -433,7 +507,13 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
               <dt className="text-muted-foreground">Grados</dt>
               <dd>{grades.length > 0 ? grades.join(" · ") : "Todo el colegio"}</dd>
               <dt className="text-muted-foreground">Visible para</dt>
-              <dd>{visibleTo === "all" ? "Docentes y estudiantes" : visibleTo}</dd>
+              <dd>{audienceLabel(visibleTo)}</dd>
+              <dt className="text-muted-foreground">Colegios</dt>
+              <dd>
+                {schoolScope === "all"
+                  ? "Todos los colegios de la red"
+                  : selectedSchools.map(schoolName).join(" · ")}
+              </dd>
               <dt className="text-muted-foreground">Origen</dt>
               <dd>
                 {origin === "upload" ? `Carga manual · ${file?.name ?? ""}` : "Enlace externo"}
@@ -446,8 +526,8 @@ export function UploadWizard({ open, onClose }: { open: boolean; onClose: () => 
 
             {!canPublish && (
               <p className="rounded-lg border border-warning/40 bg-warning-soft px-3 py-2 text-xs text-warning">
-                Falta el título, el tipo, el área, al menos un grado o al menos un colegio con
-                acceso.
+                Falta el título, el tipo o el área. Si el material es para ciertos colegios, elige
+                al menos uno.
               </p>
             )}
           </div>
