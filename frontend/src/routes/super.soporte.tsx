@@ -50,7 +50,7 @@ export const Route = createFileRoute("/super/soporte")({
       { property: "og:title", content: "Soporte y auditoría — Lumen Platform" },
       {
         property: "og:description",
-        content: "Auditoría de la operación del catálogo editorial.",
+        content: "Auditoría de la operación de la biblioteca de recursos.",
       },
     ],
   }),

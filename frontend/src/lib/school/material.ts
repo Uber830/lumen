@@ -28,7 +28,13 @@ export type MaterialListItem = {
   title: string;
   description: string | null;
   area: string;
+  /** What the piece is: "Libro", "Guía", "Evaluación"... */
+  type: string;
   kind: string;
+  /** Who the piece is for: "all" or "teachers". */
+  visible_to: string;
+  /** "lumen" when the editorial team loaded it, "colegio" when the school did. */
+  origin: string;
   file_size_bytes: number | null;
   /** When the platform enabled it for this school. */
   available_since: string;
@@ -57,12 +63,15 @@ export type MaterialPage = {
   pages: number;
   /** The areas the school can filter by. */
   areas: string[];
+  /** The audiences the school can filter by. */
+  audiences: string[];
 };
 
 /** The filters of the list, as the URL sends them. */
 export type MaterialFilters = {
   q?: string;
   area?: string;
+  audience?: string;
   page?: number;
 };
 
@@ -70,6 +79,9 @@ export const materialKeys = {
   list: (filters: MaterialFilters) => ["school", "material", filters] as const,
   detail: (id: string) => ["school", "material", "detail", id] as const,
 };
+
+/** How many resources the shelf shows at once. */
+export const MATERIAL_PAGE_SIZE = 12;
 
 /** The material of the school, filtered and paginated in the server. */
 export function useSchoolMaterial(filters: MaterialFilters): UseQueryResult<MaterialPage, Error> {
@@ -79,8 +91,11 @@ export function useSchoolMaterial(filters: MaterialFilters): UseQueryResult<Mate
       const params = new URLSearchParams();
       if (filters.q) params.set("q", filters.q);
       if (filters.area && filters.area !== "all") params.set("area", filters.area);
+      if (filters.audience && filters.audience !== "all") {
+        params.set("audience", filters.audience);
+      }
       params.set("page", String(filters.page ?? 1));
-      params.set("per_page", "6");
+      params.set("per_page", String(MATERIAL_PAGE_SIZE));
       return api.get<MaterialPage>(`/v1/school/material?${params.toString()}`);
     },
   });

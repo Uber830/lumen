@@ -192,7 +192,7 @@ export function SchoolPanel({
                   ))}
                   {detail.catalog.length === 0 && (
                     <li className="py-2.5 text-sm text-muted-foreground">
-                      El catálogo editorial está vacío.
+                      La biblioteca de recursos está vacía.
                     </li>
                   )}
                 </ul>

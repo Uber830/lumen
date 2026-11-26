@@ -47,7 +47,7 @@ const ALLOWED_TYPES = ["image/png", "image/svg+xml", "image/jpeg"];
 /** The sections the preview shows: the top of the sidebar of the school. */
 const PREVIEW_NAV = [
   { label: "Dashboard", icon: LayoutGrid },
-  { label: "Contenido", icon: BookOpen },
+  { label: "Biblioteca", icon: BookOpen },
   { label: "Docentes", icon: Users },
   { label: "Estudiantes", icon: GraduationCap },
 ] as const;

@@ -200,12 +200,12 @@ function AdminDashboard() {
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
-          title="Material habilitado para tu colegio"
-          description="Lo que el equipo de plataforma cargó y dejó visible para tu institución"
+          title="La biblioteca de tu colegio"
+          description="Los recursos que el equipo de plataforma cargó y dejó visibles para tu institución"
           actions={
             <Link to="/admin/contenido">
               <Button variant="ghost" size="sm">
-                Ver todo
+                Ver la biblioteca
                 <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
               </Button>
             </Link>
@@ -302,7 +302,7 @@ function AdminDashboard() {
           actions={
             <Link to="/admin/contenido">
               <Button variant="ghost" size="sm">
-                Ver catálogo
+                Ver la biblioteca
                 <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
               </Button>
             </Link>

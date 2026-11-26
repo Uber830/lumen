@@ -475,7 +475,7 @@ export function AppShell({
         title: "Panel de plataforma",
         detail:
           schools !== undefined && materials !== undefined
-            ? `${schools} colegios · ${materials} materiales en catálogo`
+            ? `${schools} colegios · ${materials} recursos en la biblioteca`
             : "Cargando la red…",
       };
     }

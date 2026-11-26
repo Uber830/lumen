@@ -74,7 +74,7 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
       label: "Contenido",
       items: [
         {
-          label: "Catálogo editorial",
+          label: "Biblioteca de recursos",
           to: "/super/catalogo",
           icon: BookOpen,
           badgeSource: "materials",
@@ -92,7 +92,7 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
       items: [
         { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
         {
-          label: "Contenido",
+          label: "Biblioteca",
           to: "/admin/contenido",
           icon: BookOpen,
           badgeSource: "material",
@@ -170,9 +170,9 @@ export const NAV: Record<AppShellRole, NavGroup[]> = {
 
 /** The note at the foot of the menu: what this role can and cannot do. */
 export const ROLE_NOTE: Record<AppShellRole, string> = {
-  super: "Cargas el material de la editorial y decides qué colegio puede ver cada pieza.",
+  super: "Cargas los recursos de la biblioteca y decides qué colegio puede ver cada pieza.",
   admin:
-    "Administras la comunidad del colegio. El material lo carga el equipo de plataforma y tú ves lo que quedó habilitado.",
+    "Administras la comunidad del colegio. La biblioteca la carga el equipo de plataforma y tú ves lo que quedó habilitado.",
   docente: "Consultas el material habilitado para tus cursos.",
   estudiante: "Accedes al material publicado para tus cursos, tareas y calificaciones.",
 };

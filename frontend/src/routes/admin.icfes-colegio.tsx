@@ -107,7 +107,7 @@ function IcfesProximamente() {
           <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
           <span>
             Mientras tanto, el material y las tareas de tus cursos siguen en{" "}
-            <strong>Contenido</strong> y en <strong>Cursos y materias</strong>.
+            <strong>Biblioteca</strong> y en <strong>Cursos y materias</strong>.
           </span>
         </p>
       </SectionCard>

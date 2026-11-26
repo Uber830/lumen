@@ -18,7 +18,7 @@ export const Route = createFileRoute("/super/")({
       { title: "Panel de plataforma — Lumen" },
       {
         name: "description",
-        content: "Estado de la red: colegios, comunidad y catálogo editorial.",
+        content: "Estado de la red: colegios, comunidad y biblioteca de recursos.",
       },
       { property: "og:title", content: "Panel de plataforma — Lumen" },
       {
@@ -49,7 +49,7 @@ function SuperDashboard() {
       <>
         <PageHeader
           title="Panel global"
-          subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+          subtitle="Estado de la red: colegios, comunidad y biblioteca de recursos."
         />
         <SkeletonCards />
       </>
@@ -68,7 +68,7 @@ function SuperDashboard() {
     <>
       <PageHeader
         title="Panel global"
-        subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+        subtitle="Estado de la red: colegios, comunidad y biblioteca de recursos."
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -104,15 +104,15 @@ function SuperDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
           className="flex h-[39.5rem] flex-col"
-          title="Catálogo editorial"
-          description="El material por estado y por área"
+          title="Biblioteca de recursos"
+          description="Los recursos por estado y por área"
           bodyClassName="min-h-0 flex-1 overflow-hidden"
           leading={
             <Link
               to="/super/catalogo"
               className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
-              Abrir catálogo
+              Abrir biblioteca
             </Link>
           }
         >

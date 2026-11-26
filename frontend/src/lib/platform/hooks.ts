@@ -54,6 +54,7 @@ export interface CatalogFilters {
   q?: string;
   type?: string;
   status?: string;
+  visible_to?: string;
   school_id?: string;
   page?: number;
   per_page?: number;
@@ -117,6 +118,7 @@ export function useCatalog(
         q: filters.q || undefined,
         type: filters.type || undefined,
         status: filters.status || undefined,
+        visible_to: filters.visible_to || undefined,
         school_id: filters.school_id || undefined,
         page: filters.page ?? 1,
         per_page: filters.per_page ?? 8,

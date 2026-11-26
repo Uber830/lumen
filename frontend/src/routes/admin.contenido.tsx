@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Archive, BookOpen, CheckCircle2, FileText, Film, Info, Search, Users } from "lucide-react";
+import { BookOpen, CheckCircle2, Eye, Info, Search, Users } from "lucide-react";
 import { useState } from "react";
 
 import {
+  Button,
   Chip,
   EmptyState,
   PageHeader,
@@ -17,9 +18,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
+import { audienceLabel, coverOf, ResourceCard } from "@/features/resources/resource-card";
 import {
   formatFileSize,
   formatShortDate,
+  MATERIAL_PAGE_SIZE,
   useSchoolMaterial,
   useSchoolMaterialDetail,
   type MaterialListItem,
@@ -29,10 +32,10 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/admin/contenido")({
   head: () => ({
     meta: [
-      { title: "Contenido — Lumen" },
+      { title: "Biblioteca — Lumen" },
       {
         name: "description",
-        content: "Material habilitado para tu colegio, cargado por el equipo editorial de Lumen.",
+        content: "La biblioteca del colegio: los recursos que publicó el equipo de Lumen.",
       },
     ],
   }),
@@ -48,34 +51,13 @@ const KIND_LABELS: Record<string, string> = {
   zip: "Comprimido",
 };
 
-/** The cover of a book is the color of its area. */
-const COVER_TONES = [
-  "bg-chart-1/12 text-chart-1",
-  "bg-chart-2/12 text-chart-2",
-  "bg-chart-3/12 text-chart-3",
-  "bg-chart-4/14 text-chart-4",
-  "bg-chart-5/12 text-chart-5",
-] as const;
-
-/** The color of a cover: the same area always has the same one. */
-function toneOf(area: string): string {
-  let sum = 0;
-  for (const letter of area) sum += letter.charCodeAt(0);
-  return COVER_TONES[sum % COVER_TONES.length];
-}
-
-function IconOf({ kind, className }: { kind: string; className?: string }) {
-  const strokeWidth = 1.8;
-  if (kind === "mp4") {
-    return <Film className={className} strokeWidth={strokeWidth} aria-hidden />;
-  }
-  if (kind === "zip") {
-    return <Archive className={className} strokeWidth={strokeWidth} aria-hidden />;
-  }
-  if (kind === "epub") {
-    return <BookOpen className={className} strokeWidth={strokeWidth} aria-hidden />;
-  }
-  return <FileText className={className} strokeWidth={strokeWidth} aria-hidden />;
+/** The line under the name of a resource: area, courses and size. */
+function metaOf(item: MaterialListItem): string {
+  const courses =
+    item.courses.length > 0
+      ? item.courses.map((course) => course.name).join(" · ")
+      : "Todo el colegio";
+  return `${item.area} · ${courses} · ${formatFileSize(item.file_size_bytes)}`;
 }
 
 function Contenido() {
@@ -83,10 +65,11 @@ function Contenido() {
   // back and the page keeps them.
   const [query, setQuery] = useState("");
   const [area, setArea] = useState("all");
+  const [audience, setAudience] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<MaterialListItem | null>(null);
 
-  const material = useSchoolMaterial({ q: query, area, page });
+  const material = useSchoolMaterial({ q: query, area, audience, page });
 
   // A new filter starts again on the first page: the second page of
   // the previous filter is not the second page of this one.
@@ -100,14 +83,20 @@ function Contenido() {
     setPage(1);
   };
 
+  const applyAudience = (value: string) => {
+    setAudience(value);
+    setPage(1);
+  };
+
   const detail = useSchoolMaterialDetail(selected?.id ?? null);
   const areas = material.data?.areas ?? [];
+  const audiences = material.data?.audiences ?? [];
 
   return (
     <>
       <PageHeader
-        title="Contenido"
-        subtitle="Material habilitado para tu colegio, cargado por el equipo editorial de Lumen."
+        title="Biblioteca del colegio"
+        subtitle="Los recursos que publicó el equipo de Lumen y los que cargó tu colegio. Todos los ven; lo que es solo para docentes o solo para administradores lo define quien lo carga."
       />
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
@@ -142,10 +131,22 @@ function Contenido() {
             ))}
           </select>
 
+          <select
+            value={audience}
+            onChange={(event) => applyAudience(event.target.value)}
+            aria-label="Filtrar por destinatario"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los destinatarios</option>
+            {audiences.map((item) => (
+              <option key={item} value={item}>
+                {audienceLabel(item)}
+              </option>
+            ))}
+          </select>
+
           <div className="ml-auto">
-            <Chip tone="muted">
-              {material.data ? `${material.data.available_total} materiales` : "—"}
-            </Chip>
+            <Chip tone="muted">{material.data ? `${material.data.total} recursos` : "—"}</Chip>
           </div>
         </Toolbar>
 
@@ -154,14 +155,18 @@ function Contenido() {
             {material.error.message}
           </p>
         ) : material.isLoading ? (
-          <div className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="flex gap-3.5">
-                <div
-                  className="h-[132px] w-[96px] shrink-0 animate-pulse rounded-sm bg-muted"
-                  style={{ animationDelay: `${index * 70}ms` }}
-                />
-                <div className="flex-1 space-y-2 py-1">
+          <div
+            className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            aria-hidden
+          >
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-idx border border-border"
+                style={{ animationDelay: `${index * 70}ms` }}
+              >
+                <div className="h-[104px] animate-pulse bg-muted" />
+                <div className="space-y-2 p-3">
                   <div
                     className="h-[13px] w-full animate-pulse rounded bg-muted"
                     style={{ animationDelay: `${index * 70}ms` }}
@@ -173,50 +178,41 @@ function Contenido() {
           </div>
         ) : material.data && material.data.items.length > 0 ? (
           <>
-            {/* The shelf: the material as the books it is. Each one opens
-                in place, without leaving the view. */}
-            <ul className="grid gap-5 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3">
+            {/* The shelf: every resource as a card, with its cover. */}
+            <ul className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {material.data.items.map((item) => (
                 <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(item)}
-                    className="group flex w-full gap-3.5 text-left"
-                  >
-                    <span
-                      className={cn(
-                        "relative flex h-[132px] w-[96px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-2.5 transition-colors group-hover:border-primary/40",
-                        toneOf(item.area),
-                      )}
-                    >
-                      {/* The spine of the book. */}
-                      <span
-                        className="absolute inset-y-0 left-0 w-[5px] bg-current opacity-25"
-                        aria-hidden
-                      />
-                      <span className="pl-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] opacity-90">
-                        {item.area}
-                      </span>
-                      <IconOf kind={item.kind} className="size-6 self-end opacity-80" />
-                    </span>
-
-                    <span className="flex min-w-0 flex-1 flex-col py-0.5">
-                      <span className="line-clamp-2 text-[13.5px] font-semibold leading-snug text-foreground">
-                        {item.title}
-                      </span>
-                      <span className="mt-1 font-mono text-[11.5px] text-muted-foreground">
-                        {item.ref} · {formatFileSize(item.file_size_bytes)}
-                      </span>
-                      <span className="mt-1.5 text-[12px] text-muted-foreground">
-                        {item.courses.length > 0
-                          ? item.courses.map((course) => course.name).join(" · ")
-                          : "Todo el colegio"}
-                      </span>
-                      <span className="mt-auto pt-2 text-[11.5px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                        Ver el material
-                      </span>
-                    </span>
-                  </button>
+                  <ResourceCard
+                    data={{
+                      title: item.title,
+                      type: item.type,
+                      area: item.area,
+                      meta: metaOf(item),
+                      audience: audienceLabel(item.visible_to),
+                      fromSchool: item.origin === "colegio",
+                    }}
+                    chips={
+                      <>
+                        <Chip tone={item.visible_to === "all" ? "muted" : "info"}>
+                          {audienceLabel(item.visible_to)}
+                        </Chip>
+                        {item.origin === "colegio" ? (
+                          <Chip tone="teal">Cargado por el colegio</Chip>
+                        ) : null}
+                      </>
+                    }
+                    actions={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={Eye}
+                        onClick={() => setSelected(item)}
+                        aria-label={`Ver ${item.title}`}
+                      >
+                        Ver
+                      </Button>
+                    }
+                  />
                 </li>
               ))}
             </ul>
@@ -225,30 +221,32 @@ function Contenido() {
               page={material.data.page}
               pageCount={material.data.pages}
               total={material.data.total}
-              pageSize={material.data.per_page}
+              pageSize={material.data.per_page || MATERIAL_PAGE_SIZE}
               onPageChange={setPage}
+              always
             />
           </>
         ) : (
           <EmptyState
             icon={BookOpen}
             title="Sin resultados"
-            description="Ajusta los filtros o revisa con el equipo de plataforma los materiales que te faltan."
+            description="Ajusta los filtros o revisa con el equipo de plataforma los recursos que te faltan."
           />
         )}
 
-        {/* The contact is always visible: it is the way to ask for the
-            material that is missing. */}
+        {/* The library belongs to everybody: the rules of the access are
+            written down, not guessed. */}
         <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
           <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
           <span>
-            ¿Falta material o una versión nueva? La carga y la habilitación las hace el equipo de
-            plataforma de Lumen. Escríbele a tu coordinador para que lo agregue al catálogo.
+            <b className="font-semibold text-foreground">La biblioteca es de todos.</b> Todo lo que
+            el equipo de Lumen publica queda disponible para todos los colegios. Cada recurso define
+            a quién va dirigido: a todos, solo a docentes o solo a administradores.
           </span>
         </p>
       </SectionCard>
 
-      {/* The material, as it is: it opens on top of the shelf, without
+      {/* The resource, as it is: it opens on top of the shelf, without
           leaving the view. The switches that enable the material belong
           to the platform team, and the material is not downloaded by
           anybody: it is consulted inside the platform. */}
@@ -267,22 +265,23 @@ function Contenido() {
           <div className="flex flex-col gap-5 sm:flex-row">
             <div
               className={cn(
-                "relative flex h-[220px] w-[152px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-4",
-                toneOf(detail.data?.area ?? selected?.area ?? ""),
+                "relative flex h-[220px] w-[152px] shrink-0 flex-col justify-between overflow-hidden rounded-sm border border-border p-4 text-white",
+                coverOf(detail.data?.area ?? selected?.area ?? ""),
               )}
             >
               <span
-                className="absolute inset-y-0 left-0 w-[7px] bg-current opacity-25"
+                className="pointer-events-none absolute inset-0 bg-linear-to-br from-white/18 to-black/25"
                 aria-hidden
               />
-              <span className="pl-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] opacity-90">
-                {detail.data?.area ?? selected?.area}
+              <span className="relative text-[11px] font-semibold uppercase tracking-[0.14em] opacity-95">
+                {detail.data?.type ?? selected?.type}
               </span>
-              <IconOf
-                kind={detail.data?.kind ?? selected?.kind ?? ""}
-                className="size-9 self-end opacity-80"
+              <BookOpen
+                className="relative size-9 self-end opacity-90"
+                strokeWidth={1.8}
+                aria-hidden
               />
-              <span className="pl-1.5 text-[12px] font-semibold leading-snug opacity-95">
+              <span className="relative text-[12px] font-semibold leading-snug opacity-95">
                 {detail.data?.title ?? selected?.title}
               </span>
             </div>
@@ -296,6 +295,10 @@ function Contenido() {
                     <dt className="text-[12.4px] text-muted-foreground">Área</dt>
                     <dd>{detail.data.area}</dd>
                     <dt className="text-[12.4px] text-muted-foreground">Tipo</dt>
+                    <dd>{detail.data.type}</dd>
+                    <dt className="text-[12.4px] text-muted-foreground">Va dirigido a</dt>
+                    <dd>{audienceLabel(detail.data.visible_to)}</dd>
+                    <dt className="text-[12.4px] text-muted-foreground">Formato</dt>
                     <dd>{KIND_LABELS[detail.data.kind] ?? detail.data.kind}</dd>
                     <dt className="text-[12.4px] text-muted-foreground">Disponible desde</dt>
                     <dd className="font-mono">{formatShortDate(detail.data.available_since)}</dd>

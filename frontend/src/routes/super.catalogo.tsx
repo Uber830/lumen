@@ -1,22 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Search, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
+  Button,
+  Chip,
   EmptyState,
-  ExtraCount,
   PageHeader,
   Pagination,
   SearchField,
-  SkeletonRows,
+  SectionCard,
   StatusPill,
-  Tag,
   Toolbar,
 } from "@/components/ui-kit";
 import { MaterialPanel } from "@/features/platform/material-panel";
-import { SchoolsOfMaterial } from "@/features/platform/schools-of-material";
 import { UploadWizard } from "@/features/platform/upload-wizard";
-import { useCatalog, useCatalogOptions, usePlatformSchools } from "@/lib/platform/hooks";
+import { audienceLabel, ResourceCard } from "@/features/resources/resource-card";
+import { useCatalog, useCatalogOptions, usePlatformMetrics } from "@/lib/platform/hooks";
 import {
   MATERIAL_STATUS_LABEL,
   MATERIAL_STATUS_TONE,
@@ -27,40 +27,47 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/super/catalogo")({
   head: () => ({
     meta: [
-      { title: "Catálogo editorial — Lumen Platform" },
+      { title: "Biblioteca de recursos — Lumen Platform" },
       {
         name: "description",
-        content: "Material de la editorial: decide qué colegio ve cada pieza y publícala.",
+        content:
+          "La biblioteca de la plataforma: decide a quién va dirigido cada recurso y publícalo.",
       },
-      { property: "og:title", content: "Catálogo editorial — Lumen Platform" },
+      { property: "og:title", content: "Biblioteca de recursos — Lumen Platform" },
       {
         property: "og:description",
-        content: "Administración del material de la editorial y de su acceso por colegio.",
+        content: "Administración de la biblioteca de recursos y de su acceso por colegio.",
       },
     ],
   }),
   component: Catalogo,
 });
 
-const PER_PAGE = 8;
+/** How many resources the shelf shows at once. */
+const PER_PAGE = 12;
+
+/** The line under the name of a resource: area, grades and size. */
+function metaOf(item: MaterialSummary): string {
+  const grades = item.grades.length > 0 ? item.grades.join(" · ") : "Todos los grados";
+  return `${item.area} · ${grades} · ${item.size_label}`;
+}
 
 function Catalogo() {
   const [q, setQ] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
-  const [schoolId, setSchoolId] = useState("");
+  const [visibleTo, setVisibleTo] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [accessOf, setAccessOf] = useState<MaterialSummary | null>(null);
 
   const options = useCatalogOptions();
-  const schools = usePlatformSchools({ per_page: 50 });
+  const metrics = usePlatformMetrics();
   const catalog = useCatalog({
     q,
     type,
     status,
-    school_id: schoolId,
+    visible_to: visibleTo,
     page,
     per_page: PER_PAGE,
   });
@@ -75,38 +82,30 @@ function Catalogo() {
   const total = catalog.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PER_PAGE));
   const items = catalog.data?.items ?? [];
+  // How much the library holds, with no filters: the counter of the
+  // toolbar talks about the whole library, not about the search.
+  const libraryTotal = metrics.data?.materials ?? 0;
 
-  const schoolNames = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const school of schools.data?.items ?? []) map.set(school.id, school.name);
-    return map;
-  }, [schools.data]);
-
-  const filtersActive = Boolean(q || type || status || schoolId);
+  const filtersActive = Boolean(q || type || status || visibleTo);
 
   return (
     <>
       <PageHeader
-        title="Catálogo editorial"
-        subtitle="Material de la editorial. Decide qué colegio puede ver cada pieza y publícala."
+        title="Biblioteca de recursos"
+        subtitle="Todo lo que el equipo de Lumen carga para los colegios: libros, guías, videos y simuladores. Define a quién va dirigido cada recurso y publícalo."
         actions={
-          <button
-            type="button"
-            onClick={() => setWizardOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            <Upload className="size-4" strokeWidth={1.9} aria-hidden />
-            Cargar contenido
-          </button>
+          <Button icon={Upload} onClick={() => setWizardOpen(true)}>
+            Cargar recurso
+          </Button>
         }
       />
 
-      <section className="surface-card overflow-hidden">
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
         <Toolbar>
           <SearchField
             value={q}
             onChange={filter(setQ)}
-            placeholder="Buscar en el catálogo"
+            placeholder="Buscar en la biblioteca"
             className="h-9 w-full border border-input sm:w-72"
           />
 
@@ -114,7 +113,7 @@ function Catalogo() {
             value={type}
             onChange={(event) => filter(setType)(event.target.value)}
             aria-label="Filtrar por tipo"
-            className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
+            className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
           >
             <option value="">Todos los tipos</option>
             {(options.data?.types ?? []).map((value) => (
@@ -128,7 +127,7 @@ function Catalogo() {
             value={status}
             onChange={(event) => filter(setStatus)(event.target.value)}
             aria-label="Filtrar por estado"
-            className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
+            className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
           >
             <option value="">Todos los estados</option>
             {(options.data?.statuses ?? []).map((value) => (
@@ -139,162 +138,125 @@ function Catalogo() {
           </select>
 
           <select
-            value={schoolId}
-            onChange={(event) => filter(setSchoolId)(event.target.value)}
-            aria-label="Filtrar por colegio"
-            className="h-9 max-w-56 rounded-lg border border-input bg-card px-2.5 text-sm"
+            value={visibleTo}
+            onChange={(event) => filter(setVisibleTo)(event.target.value)}
+            aria-label="Filtrar por destinatario"
+            className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
           >
-            <option value="">Todos los colegios</option>
-            {(schools.data?.items ?? []).map((school) => (
-              <option key={school.id} value={school.id}>
-                {school.name}
+            <option value="">Todos los destinatarios</option>
+            {(options.data?.visible_to ?? []).map((value) => (
+              <option key={value} value={value}>
+                {audienceLabel(value)}
               </option>
             ))}
           </select>
 
-          <p className="ml-auto text-xs text-muted-foreground">
-            {catalog.isLoading ? "Cargando…" : `${total} material(es)`}
-          </p>
+          <div className="ml-auto">
+            <Chip tone="muted">
+              {libraryTotal > 0 ? `${total} de ${libraryTotal}` : `${total} recursos`}
+            </Chip>
+          </div>
         </Toolbar>
 
         {catalog.isLoading ? (
-          <SkeletonRows rows={6} columns={6} />
+          <div
+            className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            aria-hidden
+          >
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="overflow-hidden rounded-idx border border-border">
+                <div className="h-[104px] animate-pulse bg-muted" />
+                <div className="space-y-2 p-3">
+                  <div
+                    className="h-[13px] w-full animate-pulse rounded bg-muted"
+                    style={{ animationDelay: `${index * 70}ms` }}
+                  />
+                  <div className="h-[11px] w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <EmptyState
-            title="Sin material en el catálogo"
+            title="Sin recursos en la biblioteca"
             description={
               filtersActive
-                ? "Los filtros no encontraron nada. Quítalos o carga el primer material de esta colección."
-                : "El catálogo editorial está vacío. Carga el primer material de la editorial."
+                ? "Los filtros no encontraron nada. Quítalos o carga el primer recurso de la biblioteca."
+                : "La biblioteca de la plataforma está vacía. Carga el primer recurso."
             }
             icon={Search}
             action={
               filtersActive ? (
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setQ("");
                     setType("");
                     setStatus("");
-                    setSchoolId("");
+                    setVisibleTo("");
                     setPage(1);
                   }}
-                  className="rounded-lg border border-border px-3.5 py-2 text-sm font-semibold hover:bg-muted"
                 >
                   Quitar los filtros
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setWizardOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                >
-                  <Upload className="size-4" strokeWidth={1.9} aria-hidden />
-                  Cargar contenido
-                </button>
+                <Button icon={Upload} onClick={() => setWizardOpen(true)}>
+                  Cargar recurso
+                </Button>
               )
             }
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <caption className="sr-only">
-                  Material del catálogo editorial con los colegios que pueden verlo.
-                </caption>
-                <thead className="table-head-band">
-                  <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                    <th scope="col" className="px-5 py-3 font-semibold">
-                      Material
-                    </th>
-                    <th scope="col" className="px-5 py-3 font-semibold">
-                      Tipo
-                    </th>
-                    <th scope="col" className="px-5 py-3 font-semibold">
-                      Área
-                    </th>
-                    <th scope="col" className="px-5 py-3 font-semibold">
-                      Colegios con acceso
-                    </th>
-                    <th scope="col" className="px-5 py-3 font-semibold">
-                      Estado
-                    </th>
-                    <th scope="col" className="px-5 py-3 text-right font-semibold">
-                      Actualizado
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-t border-border hover:bg-muted/40">
-                      <td className="px-5 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setOpenId(item.id)}
-                          className="text-left font-medium hover:text-primary"
-                        >
-                          {item.title}
-                        </button>
-                        <span className="code-cell mt-0.5 block text-ink-3">
-                          {item.code} · {item.size_label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <Tag>{item.type}</Tag>
-                      </td>
-                      <td className="px-5 py-3">{item.area}</td>
-                      <td className="px-5 py-3">
-                        {item.schools.length === 0 ? (
-                          <span className="text-muted-foreground">Ninguno</span>
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {item.schools.slice(0, 2).map((school) => (
-                              <button
-                                key={school.id}
-                                type="button"
-                                onClick={() => setAccessOf(item)}
-                                title="Ver todos los colegios con acceso"
-                                className="inline-flex items-center whitespace-nowrap rounded-idx bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2 transition-opacity hover:opacity-80"
-                              >
-                                {schoolNames.get(school.id) ?? school.name}
-                              </button>
-                            ))}
-                            <ExtraCount
-                              count={item.schools_extra}
-                              onClick={() => setAccessOf(item)}
-                            />
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
+            {/* The shelf: every resource as a card, with its cover. */}
+            <ul className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((item) => (
+                <li key={item.id}>
+                  <ResourceCard
+                    data={{
+                      title: item.title,
+                      type: item.type,
+                      area: item.area,
+                      meta: metaOf(item),
+                      audience: audienceLabel(item.visible_to),
+                    }}
+                    chips={
+                      <>
                         <StatusPill
                           label={MATERIAL_STATUS_LABEL[item.status]}
                           tone={MATERIAL_STATUS_TONE[item.status]}
                         />
-                      </td>
-                      <td className="px-5 py-3 text-right text-xs text-muted-foreground">
-                        {new Date(item.updated_at).toLocaleDateString("es-CO", {
-                          day: "2-digit",
-                          month: "short",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <Chip tone={item.visible_to === "all" ? "muted" : "info"}>
+                          {audienceLabel(item.visible_to)}
+                        </Chip>
+                      </>
+                    }
+                    actions={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOpenId(item.id)}
+                        aria-label={`Gestionar ${item.title}`}
+                      >
+                        Gestionar
+                      </Button>
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+
             <Pagination
               page={catalog.data?.page ?? 1}
               pageCount={pageCount}
               total={total}
               pageSize={PER_PAGE}
               onPageChange={setPage}
+              always
             />
           </>
         )}
-      </section>
-
-      <SchoolsOfMaterial materialId={accessOf?.id ?? null} onClose={() => setAccessOf(null)} />
+      </SectionCard>
 
       <MaterialPanel
         key={openId ?? "none"}
