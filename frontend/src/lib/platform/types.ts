@@ -192,6 +192,8 @@ export interface CreateMaterialInput {
   origin: MaterialOrigin;
   external_url?: string | null;
   school_ids?: string[];
+  /** When it is true, the piece goes to every school of the network. */
+  all_schools?: boolean;
   file_id?: string | null;
 }
 

@@ -418,6 +418,27 @@ export function useCase(id: string | null): UseQueryResult<CaseDetail, Error> {
   });
 }
 
+/**
+ * Open a conversation with a school.
+ *
+ * The case belongs to the school: it appears in its own support desk,
+ * with the message of the team at the head of the thread.
+ */
+export function useCreateCase(): UseMutationResult<
+  CaseDetail,
+  Error,
+  { school_id: string; title: string; category: string; body: string; attachment_ids?: string[] }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post<CaseDetail>("/v1/platform/cases", body),
+    onSuccess: (created) => {
+      qc.setQueryData(platformKeys.case(created.id), created);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
 /** Answer a case. The case goes back to "en_espera". */
 export function useAnswerCase(): UseMutationResult<
   CaseDetail,

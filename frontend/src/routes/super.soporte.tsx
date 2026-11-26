@@ -3,18 +3,25 @@ import { Check, Send } from "lucide-react";
 import { useState } from "react";
 
 import {
+  Button,
+  Chip,
   EmptyState,
   PageHeader,
   Pagination,
   SearchField,
+  SectionCard,
   SkeletonRows,
   StatusPill,
+  TableShell,
   Tag,
   Toolbar,
+  tableCellClass,
+  tableHeadClass,
 } from "@/components/ui-kit";
 import { AuditEventPanel } from "@/features/platform/audit-event-panel";
 import { CaseComposer } from "@/features/platform/case-composer";
 import { CasePanel } from "@/features/platform/case-panel";
+import { NewCaseDialog } from "@/features/platform/new-case-dialog";
 import {
   useAudit,
   useCaseOptions,
@@ -57,7 +64,7 @@ export const Route = createFileRoute("/super/soporte")({
   component: Soporte,
 });
 
-const PER_PAGE = 8;
+const PER_PAGE = 10;
 
 const LEVEL_TONE = {
   info: "info",
@@ -90,6 +97,8 @@ function Soporte() {
   const [auditPage, setAuditPage] = useState(1);
   // The event whose detail is open, if any.
   const [auditEvent, setAuditEvent] = useState<AuditEntry | null>(null);
+  // The form that opens a conversation with a school.
+  const [newCaseOpen, setNewCaseOpen] = useState(false);
 
   const schools = usePlatformSchools({ per_page: 50 });
   const caseOptions = useCaseOptions();
@@ -125,6 +134,11 @@ function Soporte() {
       <PageHeader
         title="Soporte y auditoría"
         subtitle="Casos que llegan de los colegios, con su conversación y el registro de cada respuesta."
+        actions={
+          <Button icon={Send} onClick={() => setNewCaseOpen(true)}>
+            Enviar solicitud
+          </Button>
+        }
       />
 
       <div className="mb-4 flex gap-1 border-b border-border">
@@ -151,7 +165,7 @@ function Soporte() {
       </div>
 
       {tab === "casos" ? (
-        <section className="surface-card overflow-hidden">
+        <SectionCard className="overflow-hidden" bodyClassName="p-0">
           <Toolbar>
             <SearchField
               value={q}
@@ -160,7 +174,7 @@ function Soporte() {
                 setPage(1);
               }}
               placeholder="Buscar caso"
-              className="h-9 w-full border border-input sm:w-72"
+              className="h-9 w-full rounded-idx border border-input sm:w-72"
             />
 
             <select
@@ -170,7 +184,7 @@ function Soporte() {
                 setPage(1);
               }}
               aria-label="Filtrar por estado del caso"
-              className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
+              className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
             >
               <option value="">Todos los estados</option>
               {(caseOptions.data?.statuses ?? []).map((value) => (
@@ -187,7 +201,7 @@ function Soporte() {
                 setPage(1);
               }}
               aria-label="Filtrar por nivel del caso"
-              className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
+              className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
             >
               <option value="">Todos los niveles</option>
               {(caseOptions.data?.levels ?? []).map((value) => (
@@ -204,7 +218,7 @@ function Soporte() {
                 setPage(1);
               }}
               aria-label="Filtrar por colegio"
-              className="h-9 max-w-64 rounded-lg border border-input bg-card px-2.5 text-sm"
+              className="h-9 max-w-64 rounded-idx border border-input bg-card px-2.5 text-sm"
             >
               <option value="">Todos los colegios</option>
               {(schools.data?.items ?? []).map((school) => (
@@ -214,10 +228,8 @@ function Soporte() {
               ))}
             </select>
 
-            <div className="ml-auto flex items-center gap-3">
-              <p className="text-xs text-muted-foreground">
-                {cases.isLoading ? "Cargando…" : `${total} caso(s)`}
-              </p>
+            <div className="ml-auto">
+              <Chip tone="muted">{cases.isLoading ? "—" : `${total} caso(s)`}</Chip>
             </div>
           </Toolbar>
 
@@ -265,39 +277,46 @@ function Soporte() {
             <EmptyState title="Sin casos" description="No hay casos que coincidan con el filtro." />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <TableShell>
+                <table className="w-full text-[13.4px]">
                   <caption className="sr-only">Casos que abriron los colegios.</caption>
                   <thead className="table-head-band">
-                    <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                      <th scope="col" aria-label="Seleccionar" className="w-10 px-5 py-3" />
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                    <tr>
+                      <th
+                        scope="col"
+                        aria-label="Seleccionar"
+                        className={`${tableHeadClass} w-10`}
+                      />
+                      <th scope="col" className={tableHeadClass}>
                         Caso
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Colegio
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Solicita
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Canal
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Nivel
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Estado
                       </th>
-                      <th scope="col" className="px-5 py-3 text-right font-semibold">
+                      <th scope="col" className={`${tableHeadClass} text-right`}>
                         Recibido
+                      </th>
+                      <th scope="col" className={`${tableHeadClass} text-right`}>
+                        Acción
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item) => (
-                      <tr key={item.id} className="border-t border-border hover:bg-muted/40">
-                        <td className="px-5 py-3">
+                      <tr key={item.id} className="transition-colors hover:bg-muted">
+                        <td className={tableCellClass}>
                           <input
                             type="checkbox"
                             className="size-3.5 accent-primary"
@@ -306,43 +325,45 @@ function Soporte() {
                             aria-label={`Seleccionar ${item.code}`}
                           />
                         </td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>
                           <button
                             type="button"
                             onClick={() => setOpenId(item.id)}
-                            className="text-left font-medium hover:text-primary"
+                            className="text-left font-medium text-foreground hover:text-primary"
                           >
                             {item.title}
                           </button>
-                          <span className="code-cell mt-0.5 block text-ink-3">
+                          <span className="mt-px block font-mono text-[12px] text-muted-foreground">
                             {item.code} · {item.message_count} mensaje(s)
                           </span>
                         </td>
-                        <td className="px-5 py-3">{item.school_name ?? "—"}</td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>{item.school_name ?? "—"}</td>
+                        <td className={tableCellClass}>
                           <span className="block">{item.opened_by_name}</span>
-                          <span className="block text-xs text-muted-foreground">
+                          <span className="block text-[12px] text-muted-foreground">
                             {CASE_CATEGORY_LABEL[item.category as CaseCategory] ?? item.category}
                           </span>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>
                           <Tag>
                             {CASE_CHANNEL_LABEL[item.channel as CaseChannel] ?? item.channel}
                           </Tag>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>
                           <StatusPill
                             label={CASE_LEVEL_LABEL[item.level as CaseLevel] ?? item.level}
                             tone={CASE_LEVEL_TONE[item.level as CaseLevel] ?? "muted"}
                           />
                         </td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>
                           <StatusPill
                             label={CASE_STATUS_LABEL[item.status as CaseStatus] ?? item.status}
                             tone={CASE_STATUS_TONE[item.status as CaseStatus] ?? "muted"}
                           />
                         </td>
-                        <td className="px-5 py-3 text-right text-xs text-muted-foreground">
+                        <td
+                          className={`${tableCellClass} text-right text-[12.5px] text-muted-foreground`}
+                        >
                           {new Date(item.opened_at).toLocaleString("es-CO", {
                             day: "2-digit",
                             month: "short",
@@ -350,23 +371,37 @@ function Soporte() {
                             minute: "2-digit",
                           })}
                         </td>
+                        {/* The answer to the school, from the list: the
+                            platform does not have to open the case first. */}
+                        <td className={`${tableCellClass} text-right`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            icon={Send}
+                            onClick={() => setReplyTo([item])}
+                            aria-label={`Responder ${item.code}`}
+                          >
+                            Responder
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableShell>
               <Pagination
                 page={cases.data?.page ?? 1}
                 pageCount={pageCount}
                 total={total}
                 pageSize={PER_PAGE}
                 onPageChange={setPage}
+                always
               />
             </>
           )}
-        </section>
+        </SectionCard>
       ) : (
-        <section className="surface-card overflow-hidden">
+        <SectionCard className="overflow-hidden" bodyClassName="p-0">
           <Toolbar>
             <select
               value={auditSchool}
@@ -375,7 +410,7 @@ function Soporte() {
                 setAuditPage(1);
               }}
               aria-label="Filtrar por colegio"
-              className="h-9 max-w-64 rounded-lg border border-input bg-card px-2.5 text-sm"
+              className="h-9 max-w-64 rounded-idx border border-input bg-card px-2.5 text-sm"
             >
               <option value="">Todos los colegios</option>
               {(schools.data?.items ?? []).map((school) => (
@@ -392,7 +427,7 @@ function Soporte() {
                 setAuditPage(1);
               }}
               aria-label="Filtrar por nivel"
-              className="h-9 rounded-lg border border-input bg-card px-2.5 text-sm"
+              className="h-9 rounded-idx border border-input bg-card px-2.5 text-sm"
             >
               <option value="">Todos los niveles</option>
               <option value="info">Info</option>
@@ -400,9 +435,11 @@ function Soporte() {
               <option value="error">Error</option>
             </select>
 
-            <p className="ml-auto text-xs text-muted-foreground">
-              {audit.isLoading ? "Cargando…" : `${audit.data?.total ?? 0} evento(s)`}
-            </p>
+            <div className="ml-auto">
+              <Chip tone="muted">
+                {audit.isLoading ? "—" : `${audit.data?.total ?? 0} evento(s)`}
+              </Chip>
+            </div>
           </Toolbar>
 
           <p className="border-b border-border px-5 py-2.5 text-xs text-muted-foreground">
@@ -419,21 +456,21 @@ function Soporte() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <TableShell>
+                <table className="w-full text-[13.4px]">
                   <caption className="sr-only">Eventos de la auditoría de la plataforma.</caption>
                   <thead className="table-head-band">
-                    <tr className="text-left text-[11px] uppercase tracking-[0.09em]">
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                    <tr>
+                      <th scope="col" className={tableHeadClass}>
                         Evento
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Actor
                       </th>
-                      <th scope="col" className="px-5 py-3 font-semibold">
+                      <th scope="col" className={tableHeadClass}>
                         Nivel
                       </th>
-                      <th scope="col" className="px-5 py-3 text-right font-semibold">
+                      <th scope="col" className={`${tableHeadClass} text-right`}>
                         Fecha
                       </th>
                     </tr>
@@ -442,31 +479,33 @@ function Soporte() {
                     {audit.data?.items.map((entry) => (
                       <tr
                         key={entry.id}
-                        className="cursor-pointer border-t border-border hover:bg-muted/40"
+                        className="cursor-pointer transition-colors hover:bg-muted"
                         onClick={() => setAuditEvent(entry)}
                       >
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>
                           <button
                             type="button"
                             onClick={() => setAuditEvent(entry)}
-                            className="text-left font-medium hover:text-primary"
+                            className="text-left font-medium text-foreground hover:text-primary"
                           >
                             {auditEventLabel(entry.event_type)}
                           </button>
-                          <span className="code-cell mt-0.5 block text-ink-3">
+                          <span className="mt-px block font-mono text-[12px] text-muted-foreground">
                             {Object.entries(entry.detail)
                               .map(([key, value]) => `${key}: ${String(value)}`)
                               .join(" · ")}
                           </span>
                         </td>
-                        <td className="px-5 py-3">{entry.actor_name ?? "Sistema"}</td>
-                        <td className="px-5 py-3">
+                        <td className={tableCellClass}>{entry.actor_name ?? "Sistema"}</td>
+                        <td className={tableCellClass}>
                           <StatusPill
                             label={LEVEL_LABEL[entry.level] ?? entry.level}
                             tone={LEVEL_TONE[entry.level] ?? "muted"}
                           />
                         </td>
-                        <td className="px-5 py-3 text-right text-xs text-muted-foreground">
+                        <td
+                          className={`${tableCellClass} text-right text-[12.5px] text-muted-foreground`}
+                        >
                           {new Date(entry.created_at).toLocaleString("es-CO", {
                             day: "2-digit",
                             month: "short",
@@ -478,17 +517,18 @@ function Soporte() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableShell>
               <Pagination
                 page={audit.data?.page ?? 1}
                 pageCount={Math.max(1, Math.ceil((audit.data?.total ?? 0) / PER_PAGE))}
                 total={audit.data?.total ?? 0}
                 pageSize={PER_PAGE}
                 onPageChange={setAuditPage}
+                always
               />
             </>
           )}
-        </section>
+        </SectionCard>
       )}
 
       <CasePanel
@@ -518,6 +558,8 @@ function Soporte() {
         cases={replyTo ?? []}
         onClose={() => setReplyTo(null)}
       />
+
+      <NewCaseDialog open={newCaseOpen} onClose={() => setNewCaseOpen(false)} />
     </>
   );
 }
