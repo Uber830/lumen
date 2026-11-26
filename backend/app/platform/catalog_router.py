@@ -886,10 +886,12 @@ async def download_file(
         raise NotFoundError("The file is not in the storage.") from error
 
     name = stored.file_name.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    # The file is consulted inside the platform, not downloaded: the
+    # browser can show it (a cover, a PDF, a video).
     return Response(
         content=content,
         media_type=stored.mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
     )
 
 

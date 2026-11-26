@@ -112,6 +112,9 @@ async def test_the_upload_writes_the_file_and_the_download_serves_it(
         assert downloaded.status_code == 200
         assert downloaded.content == content
         assert downloaded.headers["content-type"] == "application/pdf"
+        # The file is consulted inside the platform, not downloaded: the
+        # browser can show it (a cover, a pdf, a video).
+        assert downloaded.headers["content-disposition"].startswith("inline")
     finally:
         set_storage(None)
 
