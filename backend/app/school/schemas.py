@@ -220,6 +220,24 @@ class SchoolMaterialCreateIn(BaseModel):
     file_id: uuid.UUID
 
 
+class SchoolMaterialUpdateIn(BaseModel):
+    """What the school writes when it changes a resource of its own.
+
+    Every field is optional: the one that arrives is the one that
+    changes. The file never changes —to replace it, the school loads
+    the resource again.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    # What the piece is: "Libro", "Guía", "Documento"...
+    type: str | None = Field(default=None, min_length=1, max_length=32)
+    area: str | None = Field(default=None, min_length=1, max_length=32)
+    # Who the piece is for: "all", "teachers", "students" or "admins".
+    visible_to: str | None = Field(default=None, min_length=1, max_length=16)
+    # An empty description clears it.
+    description: str | None = Field(default=None, max_length=2000)
+
+
 class MaterialAccess(BaseModel):
     """The access of the school to a material.
 

@@ -741,6 +741,81 @@ async def create_school_material(
     return str(material.id)
 
 
+async def update_school_material(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    material_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID,
+    changes: dict[str, Any],
+) -> None:
+    """Change a resource of the school.
+
+    Only the pieces the school loaded can be changed: the ones of the
+    editorial team are not the school's to edit. The file never
+    changes: the piece keeps the file it was loaded with.
+
+    Only the values that arrive are written, so an empty description
+    clears it and an absent one leaves it as it was.
+    """
+    creators = await _school_creators(session, school_id)
+    result = await session.execute(
+        select(Material)
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            Material.id == material_id,
+            Material.created_by.is_not(None),
+            Material.created_by.in_(creators),
+            MaterialSchool.school_id == school_id,
+        )
+        .limit(1)
+    )
+    material = result.scalar_one_or_none()
+    if material is None:
+        raise NotFoundError("The resource does not exist.")
+
+    written: dict[str, Any] = {}
+    if "title" in changes:
+        material.title = str(changes["title"]).strip()
+        written["title"] = material.title
+    if "type" in changes:
+        material.type = str(changes["type"])
+        written["type"] = material.type
+    if "area" in changes:
+        material.area = str(changes["area"])
+        written["area"] = material.area
+    if "visible_to" in changes:
+        material.visible_to = str(changes["visible_to"])
+        written["visible_to"] = material.visible_to
+    if "description" in changes:
+        description = changes["description"]
+        material.description = str(description).strip() if description else None
+        written["description"] = material.description
+
+    if not written:
+        return
+
+    await catalog.record_history(
+        session,
+        material=material,
+        action="metadata_changed",
+        actor_id=actor_id,
+        detail=written,
+    )
+    await catalog.record_audit(
+        session,
+        event_type="school.material.updated",
+        actor_id=actor_id,
+        actor_name=None,
+        subject_type="material",
+        subject_id=material.id,
+        school_id=school_id,
+        detail=written,
+    )
+
+    await session.commit()
+
+
 async def delete_school_material(
     session: AsyncSession,
     school_id: uuid.UUID,
@@ -807,6 +882,7 @@ async def get_material_file(
 __all__ = [
     "create_school_material",
     "delete_school_material",
+    "update_school_material",
     "get_current_period",
     "get_material",
     "get_material_file",

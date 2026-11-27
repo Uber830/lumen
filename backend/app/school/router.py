@@ -57,6 +57,7 @@ from app.school.schemas import (
     SchoolIdentityOut,
     SchoolIdentityUpdate,
     SchoolMaterialCreateIn,
+    SchoolMaterialUpdateIn,
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
@@ -345,6 +346,61 @@ async def create_school_material(
     if created is None:
         raise NotFoundError("Material not found.")
     return MaterialDetailOut.model_validate(created)
+
+
+@router.patch("/material/{material_id}", response_model=MaterialDetailOut)
+async def update_school_material(
+    material_id: uuid.UUID,
+    body: SchoolMaterialUpdateIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetailOut:
+    """Change a resource of the school.
+
+    Only the pieces the school loaded can be changed: the ones of the
+    editorial team are not the school's to edit. The file stays the one
+    the school uploaded.
+    """
+    membership = _require_admin(context)
+
+    changes = body.model_dump(exclude_unset=True)
+    if "title" in changes and not str(changes["title"]).strip():
+        raise ValidationError(
+            "El recurso necesita un título.",
+            code="invalid_material_title",
+            extra={"field": "title"},
+        )
+    if "type" in changes and changes["type"] not in catalog.MATERIAL_TYPES:
+        raise ValidationError(
+            "Ese tipo de recurso no existe.",
+            code="invalid_material_type",
+            extra={"type": changes["type"]},
+        )
+    if "area" in changes and changes["area"] not in catalog.MATERIAL_AREAS:
+        raise ValidationError(
+            "Ese área no existe.",
+            code="invalid_material_area",
+            extra={"area": changes["area"]},
+        )
+    if "visible_to" in changes and changes["visible_to"] not in catalog.VISIBLE_TO:
+        raise ValidationError(
+            "Ese destinatario no existe.",
+            code="invalid_visible_to",
+            extra={"visible_to": changes["visible_to"]},
+        )
+
+    await operations.update_school_material(
+        session,
+        membership.school_id,
+        material_id,
+        actor_id=context.user_id,
+        changes=changes,
+    )
+
+    updated = await operations.get_material(session, membership.school_id, material_id)
+    if updated is None:
+        raise NotFoundError("Material not found.")
+    return MaterialDetailOut.model_validate(updated)
 
 
 @router.delete("/material/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
