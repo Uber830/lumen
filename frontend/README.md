@@ -214,6 +214,17 @@ harte falta:
 LD_LIBRARY_PATH=/ruta/a/las/librerias npx playwright test
 ```
 
+Las e2e entran con las cuentas de la semilla, y su contraseña **no está en
+el código**: viene del entorno, en `LUMEN_SEED_PASSWORD`. En el CI es el
+secreto `LUMEN_SEED_PASSWORD` del repositorio; en local va en el `.env` del
+frontend (copia de `.env.example`, que no se versiona), y la configuración de
+Playwright lo carga antes de empezar:
+
+```sh
+# frontend/.env
+LUMEN_SEED_PASSWORD=<la contraseña de las cuentas semilla>
+```
+
 En Ubuntu 26.04 las que faltan son `libnss3`, `libnspr4` y `libasound2`. Si
 no hay sudo, se descargan y se desempaquetan en una carpeta propia, y esa
 carpeta es la que va en el `LD_LIBRARY_PATH`:

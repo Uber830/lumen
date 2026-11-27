@@ -1,4 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
+import { fileURLToPath } from "node:url";
+
+// The local environment keeps the password of the seeded accounts in the
+// .env of the frontend: the file is not in the repository, and the CI
+// puts the variable in the environment. The file may not be there.
+try {
+  process.loadEnvFile(fileURLToPath(new URL(".env", import.meta.url)));
+} catch {
+  // No hay .env: el entorno trae la variable.
+}
 
 // The same port the dev server uses (see vite.config.ts). The e2e
 // job of the continuous integration waits for this one.

@@ -137,6 +137,9 @@ jobs:
       # treats `127.0.0.1` and `localhost` as two different sites, and
       # the cookie of the session would not travel with the request.
       VITE_API_URL: http://localhost:8011
+      # The password of the seeded accounts: it is a secret of the
+      # repository, and the tests read it from the environment.
+      LUMEN_SEED_PASSWORD: ${{ secrets.LUMEN_SEED_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4

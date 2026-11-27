@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { TEAM } from "./credentials";
+
 /**
  * The panel of the platform:
  *
@@ -9,11 +11,6 @@ import { expect, test, type Page } from "@playwright/test";
  *     the eye and managed from a centered modal;
  *   - the upload assistant asks who is going to see the piece.
  */
-
-const TEAM = {
-  email: "super@lumen.co",
-  password: process.env.LUMEN_SEED_PASSWORD ?? "",
-};
 
 /** The wait of the panel: the pages are hydrated and the data arrives. */
 const READY = { timeout: 20_000 };

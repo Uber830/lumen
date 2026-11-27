@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { SCHOOL_ADMIN as ADMIN } from "./credentials";
+
 /**
  * The chain of the panel of the school:
  *
@@ -10,11 +12,6 @@ import { expect, test, type Page } from "@playwright/test";
  * the teacher has no course, and without a course there is nothing to
  * see.
  */
-
-const ADMIN = {
-  email: "ana.restrepo@sagcor.edu.co",
-  password: process.env.LUMEN_SEED_PASSWORD ?? "",
-};
 
 /** The wait of the panel: the pages are hydrated and the data arrives. */
 const READY = { timeout: 20_000 };
