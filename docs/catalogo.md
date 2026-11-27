@@ -44,17 +44,18 @@ un icono** (26 × 26 px), para que la tarjeta no pierda el espacio:
 | Icono | Qué hace |
 | --- | --- |
 | 👁️ **Ver** | Muestra la pieza como es (la imagen, el PDF, el video) |
-| ✏️ **Editar** | Abre el formulario: título, tipo, área, grados, visible para y descripción |
-| ⚙️ **Gestionar** | Abre el **resumen**: qué es la pieza, su estado, los colegios que la ven y su historial |
+| ✏️ **Editar** | Abre el formulario: título, tipo, área, grados, visible para, descripción y **a qué colegios va la pieza** |
+| ⚙️ **Gestionar** | Abre el **resumen**: qué es la pieza, su estado y los colegios que la ven |
 
 El formulario de **Editar** es un **modal en el centro**, no un cajón: la pieza
 se administra en el medio de la pantalla, con el formulario completo a la
-vista. Los cambios se guardan con `PATCH /v1/platform/catalog/{id}`: el botón
-**Guardar cambios** solo se enciende cuando algo cambió, y el cambio queda en
-el historial del material y en la traza de auditoría.
+vista. En la esquina está la **X de cerrar**, no el lápiz. Los cambios se
+guardan con `PATCH /v1/platform/catalog/{id}`: el botón **Guardar cambios** solo
+se enciende cuando algo cambió, y el cambio queda en el historial del material
+y en la traza de auditoría.
 
-**Gestionar** no cambia nada: es la ficha de la pieza. Los valores se cambian
-con el lápiz.
+**Gestionar** no cambia nada: es la ficha de la pieza, y es solo lectura —tampoco
+muestra el historial. Los valores se cambian con el lápiz.
 
 ## El ojo: ver la pieza
 
@@ -75,6 +76,17 @@ Antes de la lista de colegios hay una **decisión**:
 
 Así nadie deja la lista en blanco por descuido: lo que no se elige es una
 decisión, no un olvido.
+
+La misma decisión está en el formulario de **Editar**, para cambiar el acceso
+de una pieza que ya existe. El estado inicial se deriva de los datos: si la
+pieza llega a todos los colegios de la red, aparece **Todos los colegios**; si
+no, **Ciertos colegios** con la lista marcada. Al guardar, el acceso se
+escribe con `PUT /v1/platform/catalog/{id}/schools`, que acepta `all_schools`
+igual que la creación.
+
+Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
+colegios afectados, y el formulario pide la confirmación con **Sí, cambiar el
+acceso** antes de reenviarlo con `{"confirm": true}`.
 
 ## La cobertura
 
