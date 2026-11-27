@@ -35,6 +35,53 @@ async function openPanel(page: Page, path: string) {
   await page.waitForLoadState("networkidle");
 }
 
+/**
+ * A piece of the platform with a file of its own.
+ *
+ * The catalog of the seed carries the rows of the files, but not the
+ * files themselves: the preview of a seeded piece has nothing to show.
+ * The piece is created through the API of the session and is removed at
+ * the end, so the test does not leave anything behind.
+ */
+async function crearPiezaConArchivo(page: Page, titulo: string): Promise<string> {
+  const api = process.env.VITE_API_URL ?? "http://localhost:8010";
+  const id = await page.evaluate(
+    async ({ api, titulo }) => {
+      const cuerpo = new FormData();
+      cuerpo.append(
+        "file",
+        new File([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52])], "guia-plataforma.pdf", {
+          type: "application/pdf",
+        }),
+      );
+      const subido = await fetch(`${api}/v1/platform/uploads`, {
+        method: "POST",
+        body: cuerpo,
+        credentials: "include",
+      });
+      const archivo = await subido.json();
+
+      const creado = await fetch(`${api}/v1/platform/catalog`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: titulo,
+          type: "Guía",
+          area: "Convivencia",
+          grades: [],
+          origin: "upload",
+          file_id: archivo.file_id,
+          all_schools: true,
+        }),
+      });
+      return (await creado.json()).id as string;
+    },
+    { api, titulo },
+  );
+  return id;
+}
+
 test.describe("el panel de la plataforma", () => {
   test("la mesa de soporte responde desde el caso y abre conversaciones", async ({ page }) => {
     await login(page);
@@ -71,9 +118,15 @@ test.describe("el panel de la plataforma", () => {
 
   test("la biblioteca muestra el recurso, lo edita y lo resume", async ({ page }) => {
     await login(page);
+
+    // La pieza del test tiene un archivo de verdad: la de la semilla
+    // no lo tiene, y su vista previa no podría mostrarlo.
+    const titulo = `Pieza de la biblioteca e2e ${Date.now()}`;
+    const id = await crearPiezaConArchivo(page, titulo);
+
     await openPanel(page, "/super/catalogo");
 
-    const tarjeta = page.locator("ul li article").first();
+    const tarjeta = page.locator("ul li article").filter({ hasText: titulo }).first();
     await expect(tarjeta).toBeVisible(READY);
 
     // Los tres controles son solo el icono: la tarjeta no pierde el
@@ -110,6 +163,19 @@ test.describe("el panel de la plataforma", () => {
     await expect(panel.getByText(/Estado del material/i)).toBeVisible();
     await expect(panel.getByText(/Colegios con acceso/i)).toBeVisible();
     await page.keyboard.press("Escape");
+
+    // La pieza del test es un borrador: se puede borrar.
+    const borrada = await page.evaluate(
+      async ({ api, id }) => {
+        const respuesta = await fetch(`${api}/v1/platform/catalog/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        return respuesta.status;
+      },
+      { api: process.env.VITE_API_URL ?? "http://localhost:8010", id },
+    );
+    expect(borrada).toBe(204);
   });
 
   test("el asistente pregunta a qué colegios va el recurso", async ({ page }) => {
