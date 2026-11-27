@@ -1,5 +1,5 @@
 import { audienceLabel } from "@/features/resources/resource-card";
-import { AlertTriangle, Check, FileText, History, Link2, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, FileText, Link2, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
@@ -205,32 +205,6 @@ export function MaterialPanel({
                   El acceso se modifica en Colegios → Gestionar: allí está el interruptor de cada
                   pieza.
                 </p>
-              </section>
-
-              <section>
-                <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-                  <History className="size-3.5" strokeWidth={1.9} aria-hidden />
-                  Historial
-                </h3>
-                <ul className="flex flex-col divide-y divide-border">
-                  {detail.history.map((entry) => (
-                    <li key={entry.id} className="py-2.5">
-                      <p className="text-sm">{entry.action}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.actor_name ?? "Sistema"} ·{" "}
-                        {new Date(entry.created_at).toLocaleString("es-CO", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </li>
-                  ))}
-                  {detail.history.length === 0 && (
-                    <li className="py-2.5 text-sm text-muted-foreground">Sin movimientos.</li>
-                  )}
-                </ul>
               </section>
             </>
           )}
