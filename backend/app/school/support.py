@@ -15,19 +15,53 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Integer, cast, func, select
+from sqlalchemy import Integer, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func as sql_func
 
 from app.core.errors import NotFoundError, ValidationError
 from app.db.models import Profile, SupportCase, SupportMessage, User
+from app.notifications.service import (
+    notify_support_case_answered,
+    notify_support_case_opened,
+)
 
 # The categories a school can pick when it opens a request.
 CATEGORIES = ("problema_tecnico", "solicitud_material", "duda_acceso", "otro")
 
 
-async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[str, Any]]:
-    """The requests of the school, the open ones first."""
+async def list_cases(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    *,
+    query: str | None = None,
+    page: int = 1,
+    per_page: int = 10,
+) -> dict[str, Any]:
+    """The requests of the school, the open ones first.
+
+    The list is cut in the server, like the courses and the assignments:
+    the browser asks for one page, not for everything. The search runs
+    here too: it looks for the title or the code of the request.
+    """
+    page = max(1, page)
+    per_page = max(1, min(per_page, 50))
+
+    conditions = [SupportCase.school_id == school_id]
+    needle = (query or "").strip()
+    if needle:
+        pattern = f"%{needle}%"
+        conditions.append(or_(SupportCase.title.ilike(pattern), SupportCase.code.ilike(pattern)))
+    ordering = (
+        # The open ones come first, and the newest one is the first of
+        # all.
+        SupportCase.status.asc(),
+        SupportCase.opened_at.desc(),
+    )
+
+    total = await session.execute(select(func.count()).select_from(SupportCase).where(*conditions))
+    count = int(total.scalar_one())
+
     result = await session.execute(
         select(
             SupportCase.id,
@@ -44,13 +78,10 @@ async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[s
         )
         .outerjoin(Profile, Profile.id == SupportCase.opened_by)
         .outerjoin(User, User.id == SupportCase.opened_by)
-        .where(SupportCase.school_id == school_id)
-        .order_by(
-            # The open ones come first, and the newest one is the
-            # first of all.
-            SupportCase.status.asc(),
-            SupportCase.opened_at.desc(),
-        )
+        .where(*conditions)
+        .order_by(*ordering)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
     )
 
     cases = [
@@ -74,7 +105,27 @@ async def list_cases(session: AsyncSession, school_id: uuid.UUID) -> list[dict[s
     for case in cases:
         case["messages"] = counts.get(uuid.UUID(case["id"]), 0)
 
-    return cases
+    return {
+        "items": cases,
+        "total": count,
+        "page": page,
+        "per_page": per_page,
+        "pages": (count + per_page - 1) // per_page if count else 0,
+    }
+
+
+async def open_case_count(session: AsyncSession, school_id: uuid.UUID) -> int:
+    """How many requests of the school are still open.
+
+    The bell of the panel shows this number: it counts every case of
+    the school, not only the ones of the first page.
+    """
+    result = await session.execute(
+        select(func.count())
+        .select_from(SupportCase)
+        .where(SupportCase.school_id == school_id, SupportCase.status != "resuelto")
+    )
+    return int(result.scalar_one())
 
 
 async def _message_counts(
@@ -172,6 +223,7 @@ async def _messages_of(session: AsyncSession, case_id: uuid.UUID) -> list[dict[s
             SupportMessage.created_at,
             Profile.full_name,
             User.email,
+            SupportMessage.attachment_ids,
         )
         .outerjoin(Profile, Profile.id == SupportMessage.author_id)
         .outerjoin(User, User.id == SupportMessage.author_id)
@@ -190,6 +242,7 @@ async def _messages_of(session: AsyncSession, case_id: uuid.UUID) -> list[dict[s
             or row[6]
             or ("Equipo Lumen" if row[2] == "plataforma" else "Colegio"),
             "body": row[3],
+            "attachment_ids": list(row[7] or []),
             "created_at": row[4],
         }
         for row in result.all()
@@ -204,6 +257,7 @@ async def create_case(
     title: str,
     category: str,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Open a request to the support team.
 
@@ -239,12 +293,34 @@ async def create_case(
             author_id=user_id,
             author_role="colegio",
             body=body,
+            attachment_ids=list(attachment_ids or []),
         )
+    )
+
+    # The desk has to know that a case arrived: it is the bell of the
+    # platform team that says it.
+    await notify_support_case_opened(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, user_id=user_id),
     )
 
     await session.commit()
 
     return await get_case(session, school_id, case.id)
+
+
+async def _actor_name(session: AsyncSession, *, user_id: uuid.UUID) -> str:
+    """The name of the person who wrote, for the notification."""
+    result = await session.execute(
+        select(Profile.full_name, User.email)
+        .join(Profile, Profile.id == User.id, isouter=True)
+        .where(User.id == user_id)
+    )
+    row = result.first()
+    if row is None:
+        return "El colegio"
+    return row[0] or row[1] or "El colegio"
 
 
 async def _next_code(session: AsyncSession) -> str:
@@ -269,6 +345,7 @@ async def add_message(
     case_id: uuid.UUID,
     user_id: uuid.UUID,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Add information to the thread of a case.
 
@@ -294,8 +371,19 @@ async def add_message(
             author_id=user_id,
             author_role="colegio",
             body=body,
+            attachment_ids=list(attachment_ids or []),
         )
     )
+
+    # The school wrote in the thread: the desk has to know it.
+    case = await session.get(SupportCase, case_id)
+    if case is not None:
+        await notify_support_case_answered(
+            session,
+            case=case,
+            actor_name=await _actor_name(session, user_id=user_id),
+        )
+
     await session.commit()
 
     return await get_case(session, school_id, case_id)

@@ -7,9 +7,10 @@ in the interface and not only in the backend:
   invites the rest of the team and changes the identity of the school.
 - **secundario**: helps with the community and the academic structure.
 
-The school always keeps **one principal**: the team cannot demote or
-remove the last one, because then nobody would be able to close a
-period, invite a colleague or change the identity.
+The school always keeps **one principal**: the rank is handed over from
+one person to another, and the team cannot demote or remove the last
+one, because then nobody would be able to close a period, invite a
+colleague or change the identity.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_permissions import PERMISSION_LABELS, SchoolPermission, permissions_for
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.models import Profile, SchoolMembership, User
 
@@ -112,13 +113,26 @@ async def set_rank(
 ) -> dict[str, Any]:
     """Change the rank of an administrator.
 
-    The last principal cannot be demoted: the school would be left
-    without anyone able to close a period or invite a colleague.
+    The school has **one** principal: the rank is handed over, never
+    duplicated, so promoting somebody while there is already a
+    principal is refused. The last principal cannot be demoted either:
+    the school would be left without anyone able to close a period or
+    invite a colleague.
     """
     membership = await _membership_of(session, school_id, membership_id)
 
     if membership.admin_role == admin_role:
         return {"membership_id": str(membership.id), "admin_role": admin_role.value}
+
+    if admin_role == SchoolAdminRole.PRINCIPAL:
+        principals = await count_principals(session, school_id)
+        if principals > 0:
+            raise ConflictError(
+                "El colegio tiene un solo administrador principal. "
+                "Para pasárselo a esta persona, cede el tuyo: "
+                "ella quedará como principal y tú como secundario.",
+                code="only_one_principal",
+            )
 
     if membership.admin_role == SchoolAdminRole.PRINCIPAL:
         principals = await count_principals(session, school_id)
@@ -131,6 +145,43 @@ async def set_rank(
     membership.admin_role = admin_role
     await session.commit()
     return {"membership_id": str(membership.id), "admin_role": admin_role.value}
+
+
+async def transfer_principal(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    giver_membership_id: uuid.UUID,
+    target_membership_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Hand the principal rank over to another administrator.
+
+    The rank moves from one person to another in a single step, so the
+    school is never left without a principal. The administrator who
+    gives it away stays in the team, as a secondary.
+    """
+    giver = await _membership_of(session, school_id, giver_membership_id)
+    target = await _membership_of(session, school_id, target_membership_id)
+
+    if giver.id == target.id:
+        raise ValidationError(
+            "El rango principal no se cede a uno mismo.",
+            code="invalid_transfer",
+        )
+
+    if target.revoked_at is not None:
+        raise ValidationError(
+            "Esa persona ya no está en el equipo del colegio.",
+            code="not_in_team",
+        )
+
+    if target.admin_role == SchoolAdminRole.PRINCIPAL:
+        # Nothing to move: the school already has its single principal.
+        return {"membership_id": str(target.id), "admin_role": target.admin_role.value}
+
+    target.admin_role = SchoolAdminRole.PRINCIPAL
+    giver.admin_role = SchoolAdminRole.SECUNDARIO
+    await session.commit()
+    return {"membership_id": str(target.id), "admin_role": target.admin_role.value}
 
 
 async def remove(
@@ -176,4 +227,4 @@ async def _membership_of(
     return membership
 
 
-__all__ = ["count_principals", "list_admins", "remove", "set_rank"]
+__all__ = ["count_principals", "list_admins", "remove", "set_rank", "transfer_principal"]

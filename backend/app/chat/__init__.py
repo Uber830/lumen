@@ -4,7 +4,7 @@
 - `router`    — the HTTP endpoints.
 - `schemas`   — the request and response models.
 
-The Realtime delivery stays on Supabase's Realtime service; these
+The live delivery is a periodic query on the API; these
 endpoints are the durable record it is built on.
 """
 

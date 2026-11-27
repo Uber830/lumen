@@ -25,6 +25,8 @@ import { api } from "@/lib/api/client";
 export type SchoolAssignment = {
   id: string;
   teacher_id: string;
+  /** The course subject this assignment points to. */
+  course_subject_id: string;
   teacher_name: string | null;
   teacher_email: string | null;
   teacher_avatar_url: string | null;
@@ -35,6 +37,25 @@ export type SchoolAssignment = {
   subject_area: string | null;
   /** How many pieces of material the teacher sees through it. */
   visible_materials_count: number;
+};
+
+/** The assignments of one teacher: the row is the person. */
+export type TeacherAssignments = {
+  teacher_id: string;
+  teacher_name: string | null;
+  teacher_email: string | null;
+  teacher_avatar_url: string | null;
+  assignments: SchoolAssignment[];
+  visible_materials_count: number;
+};
+
+/** One page of the teachers that have assignments. */
+export type AssignmentPage = {
+  items: TeacherAssignments[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
 };
 
 /** One academic period of the school. */
@@ -60,27 +81,31 @@ export type PeriodClosed = {
 };
 
 export const cycleKeys = {
-  assignments: (teacherId?: string, courseId?: string) =>
-    ["school", "assignments", teacherId ?? "all", courseId ?? "all"] as const,
+  assignments: (teacherId?: string, courseId?: string, page = 1) =>
+    ["school", "assignments", teacherId ?? "all", courseId ?? "all", page] as const,
   periods: () => ["school", "periods"] as const,
 };
 
-/** The assignments of the school, with the material each one sees. */
+/**
+ * The assignments of the school, with the material each one sees.
+ *
+ * The rows are the teachers, and the page is cut in the server: the
+ * browser asks for the page it is going to show.
+ */
 export function useSchoolAssignments(
   teacherId?: string,
   courseId?: string,
-): UseQueryResult<SchoolAssignment[], Error> {
+  page = 1,
+): UseQueryResult<AssignmentPage, Error> {
   return useQuery({
-    queryKey: cycleKeys.assignments(teacherId, courseId),
+    queryKey: cycleKeys.assignments(teacherId, courseId, page),
     queryFn: () => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page), per_page: "10" });
       if (teacherId && teacherId !== "all") params.set("teacher_id", teacherId);
       if (courseId && courseId !== "all") params.set("course_id", courseId);
-      const query = params.toString();
-      return api.get<SchoolAssignment[]>(
-        query ? `/v1/school/assignments?${query}` : "/v1/school/assignments",
-      );
+      return api.get<AssignmentPage>(`/v1/school/assignments?${params}`);
     },
+    placeholderData: (previous) => previous,
   });
 }
 

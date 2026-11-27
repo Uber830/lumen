@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class AdminUserOut(BaseModel):
@@ -151,7 +151,15 @@ class MaterialListItem(BaseModel):
     title: str
     description: str | None = None
     area: str
+    # What the piece is pedagogically: "Libro", "Guía", "Evaluación",
+    # "Multimedia" or "Documento".
+    type: str = "Documento"
     kind: str
+    # Who the piece is for: "all" or "teachers".
+    visible_to: str = "all"
+    # "lumen" when the editorial team loaded it, "colegio" when the
+    # school uploaded it.
+    origin: str = "lumen"
     file_size_bytes: int | None = None
     # When the platform enabled it for this school.
     available_since: datetime
@@ -167,11 +175,67 @@ class MaterialPage(BaseModel):
 
     items: list[MaterialListItem] = Field(default_factory=list)
     total: int = 0
+    # How much material the school has with no filters applied.
+    available_total: int = 0
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=6, ge=1)
     pages: int = Field(default=0, ge=0)
     # The areas the school can filter by.
     areas: list[str] = Field(default_factory=list)
+    # The audiences the school can filter by: "all" and "teachers".
+    audiences: list[str] = Field(default_factory=list)
+
+
+class MaterialFileOut(BaseModel):
+    """The file of a resource, as the viewer needs it."""
+
+    file_name: str
+    mime_type: str
+    size_bytes: int
+    size_label: str
+
+
+class MaterialOptionsOut(BaseModel):
+    """The closed catalogs of the resources of the school."""
+
+    # What a resource is: "Libro", "Guía", "Documento"...
+    types: list[str] = Field(default_factory=list)
+    # The area it belongs to.
+    areas: list[str] = Field(default_factory=list)
+    # Who it is for: "all", "teachers", "students" or "admins".
+    audiences: list[str] = Field(default_factory=list)
+
+
+class SchoolMaterialCreateIn(BaseModel):
+    """What the school writes when it loads a resource."""
+
+    title: str = Field(min_length=1, max_length=240)
+    # What the piece is: "Libro", "Guía", "Documento"...
+    type: str = Field(min_length=1, max_length=32)
+    area: str = Field(min_length=1, max_length=32)
+    # Who the piece is for: "all", "teachers", "students" or "admins".
+    visible_to: str = Field(min_length=1, max_length=16)
+    description: str | None = Field(default=None, max_length=2000)
+    # The file that was uploaded before the piece existed.
+    file_id: uuid.UUID
+
+
+class SchoolMaterialUpdateIn(BaseModel):
+    """What the school writes when it changes a resource of its own.
+
+    Every field is optional: the one that arrives is the one that
+    changes. The file never changes —to replace it, the school loads
+    the resource again.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    # What the piece is: "Libro", "Guía", "Documento"...
+    type: str | None = Field(default=None, min_length=1, max_length=32)
+    area: str | None = Field(default=None, min_length=1, max_length=32)
+    # Who the piece is for: "all", "teachers", "students" or "admins".
+    visible_to: str | None = Field(default=None, min_length=1, max_length=16)
+    # An empty description clears it.
+    description: str | None = Field(default=None, max_length=2000)
 
 
 class MaterialAccess(BaseModel):
@@ -190,6 +254,8 @@ class MaterialDetailOut(MaterialListItem):
     """One material, with its access confirmed."""
 
     access: MaterialAccess
+    # The file of the piece, when it has one: the viewer shows it.
+    file: MaterialFileOut | None = None
 
 
 class SchoolOverview(BaseModel):
@@ -242,6 +308,9 @@ class TeacherListItem(BaseModel):
     # The courses the teacher teaches and the subjects of each one.
     courses: list[str] = Field(default_factory=list)
     subjects: list[str] = Field(default_factory=list)
+    # The course subjects of the teacher, by id: the edit form works
+    # with ids, not with names.
+    course_subject_ids: list[str] = Field(default_factory=list)
     # `activado` or `pendiente`: one signal, not two loose badges.
     access: str = "pendiente"
     # Why the access is pending, in the words of the panel.
@@ -261,6 +330,9 @@ class StudentListItem(BaseModel):
     revoked_at: datetime | None = None
     account_activated: bool = False
     courses: list[str] = Field(default_factory=list)
+    # The courses of the student, by id: the edit form works with ids,
+    # not with names.
+    course_ids: list[str] = Field(default_factory=list)
     # `null` when the student has no grades: it is not a zero.
     average: float | None = None
     access: str = "pendiente"
@@ -280,6 +352,34 @@ class MemberPage(BaseModel):
     page: int = Field(default=1, ge=1)
     per_page: int = Field(default=10, ge=1)
     pages: int = Field(default=0, ge=0)
+
+
+class MemberEditIn(BaseModel):
+    """What the admin can change of a member of the community.
+
+    What is not sent is left alone: the form of the admin sends the
+    name, the email and the courses (of a student) or the course
+    subjects (of a teacher).
+    """
+
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
+    # The courses a student is enrolled in.
+    course_ids: list[uuid.UUID] | None = None
+    # The course subjects a teacher is assigned to.
+    course_subject_ids: list[uuid.UUID] | None = None
+
+
+class MemberEditOut(BaseModel):
+    """The member, after the edit."""
+
+    membership_id: str
+    user_id: str
+    role: str
+    full_name: str | None = None
+    email: str | None = None
+    course_ids: list[str] = Field(default_factory=list)
+    course_subject_ids: list[str] = Field(default_factory=list)
 
 
 class CourseOut(BaseModel):
@@ -304,6 +404,30 @@ class SubjectOut(BaseModel):
     courses: list[str] = Field(default_factory=list)
 
 
+class CoursePageOut(BaseModel):
+    """A page of the courses of the school.
+
+    The page comes from the server: the list is never pulled into the
+    browser to be cut there.
+    """
+
+    items: list[CourseOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
+
+
+class SubjectPageOut(BaseModel):
+    """A page of the subjects of the school."""
+
+    items: list[SubjectOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
+
+
 class AssignmentOut(BaseModel):
     """One assignment: a teacher, a course and a subject.
 
@@ -315,6 +439,9 @@ class AssignmentOut(BaseModel):
 
     id: str
     teacher_id: str
+    # The course subject the assignment points to: the edit form needs it
+    # to change the row without losing the link.
+    course_subject_id: str
     teacher_name: str | None = None
     teacher_email: str | None = None
     teacher_avatar_url: str | None = None
@@ -324,6 +451,31 @@ class AssignmentOut(BaseModel):
     subject_name: str
     subject_area: str | None = None
     visible_materials_count: int = 0
+
+
+class TeacherAssignmentsOut(BaseModel):
+    """The assignments of one teacher, with what each one shows.
+
+    The person is the one that repeats, so the row is the teacher and
+    the subjects it teaches live inside it.
+    """
+
+    teacher_id: str
+    teacher_name: str | None = None
+    teacher_email: str | None = None
+    teacher_avatar_url: str | None = None
+    assignments: list[AssignmentOut] = Field(default_factory=list)
+    visible_materials_count: int = 0
+
+
+class AssignmentPageOut(BaseModel):
+    """A page of the teachers that have assignments."""
+
+    items: list[TeacherAssignmentsOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
 
 
 class PeriodOut(BaseModel):
@@ -422,7 +574,9 @@ class AdminInviteIn(BaseModel):
 
     email: str
     full_name: str
-    # principal or secundario. The school keeps one principal.
+    # principal or secundario. The school has a single principal, so
+    # the invitation creates a secondary: the rank is handed over
+    # later, from the file of the team.
     admin_role: str = "secundario"
 
 
@@ -480,6 +634,12 @@ class GradeAverageOut(BaseModel):
 
     grade: str
     average_score: float
+    # The score of the last cut of the grade.
+    latest_average: float = 0
+    # The score of the cut before it, when there is one.
+    previous_average: float | None = None
+    # How many points the last cut gained over the previous one.
+    delta: float | None = None
 
 
 class IcfesKpisOut(BaseModel):
@@ -552,6 +712,8 @@ class SupportMessageOut(BaseModel):
     author_role: str = "colegio"
     author_name: str = ""
     body: str
+    # The files the author attached to the message.
+    attachment_ids: list[str] = Field(default_factory=list)
     created_at: datetime
 
 
@@ -571,6 +733,20 @@ class SupportCaseSummaryOut(BaseModel):
     opened_by_name: str = "Colegio"
     # How many messages the thread has.
     messages: int = 0
+
+
+class SupportCasePage(BaseModel):
+    """A page of the requests of the school.
+
+    The page comes from the server: the list is cut there, like the
+    courses, the subjects and the assignments.
+    """
+
+    items: list[SupportCaseSummaryOut] = Field(default_factory=list)
+    total: int = 0
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=10, ge=1)
+    pages: int = Field(default=0, ge=0)
 
 
 class SupportCaseOut(BaseModel):
@@ -597,9 +773,23 @@ class SupportCaseIn(BaseModel):
     # problema_tecnico, solicitud_material, duda_acceso or otro.
     category: str = "otro"
     body: str
+    # The files the admin attached to the request.
+    attachment_ids: list[str] = Field(default_factory=list)
 
 
 class SupportMessageIn(BaseModel):
     """What the school adds to the thread of a case."""
 
     body: str
+    # The files the admin attached to the message.
+    attachment_ids: list[str] = Field(default_factory=list)
+
+
+class SupportAttachmentOut(BaseModel):
+    """A file uploaded to attach to a request."""
+
+    # The path of the file in the store: it is what the thread keeps.
+    id: str
+    name: str
+    size: int = 0
+    url: str = ""

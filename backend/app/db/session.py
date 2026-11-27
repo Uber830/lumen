@@ -1,14 +1,14 @@
 """Async engine and session factory.
 
-The database is Postgres hosted by Supabase. The backend connects
+The database is Postgres. The backend connects
 directly with asyncpg through SQLAlchemy's async engine — the
 PostgREST SDK is gone as of Phase 0.
 
-Two important details for Supabase-hosted Postgres:
+Two important details for a hosted Postgres:
 
-1. Prefer the *pooler* host (aws-0-<ref>.pooler.supabase.com) over
-   the direct host. The direct host only accepts a handful of
-   concurrent connections and, in some projects, is IPv6-only. The
+1. Prefer the *pooler* host over the direct host. The direct host
+   usually accepts a handful of concurrent connections and is, in some
+   projects, IPv6-only. The
    pooler runs in transaction mode, which suits a request/response
    backend: each request takes a connection, uses it for one
    transaction, and returns it.
@@ -25,14 +25,29 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from functools import lru_cache
 
+from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+
+
+@sa_event.listens_for(Session, "after_commit")
+def _publish_pending_events(session: Session) -> None:
+    """Publish the events the session was holding, once it committed.
+
+    An event says that something happened: a notification was written, a
+    message was sent. It only leaves when the data behind it is on disk,
+    so the client never refetches a row that is not there yet.
+    """
+    from app.core.events import publish_pending
+
+    publish_pending(session)
 
 
 def _build_engine(settings: Settings) -> AsyncEngine:
@@ -46,7 +61,7 @@ def _build_engine(settings: Settings) -> AsyncEngine:
         pool_timeout=settings.database_pool_timeout,
         pool_pre_ping=True,
         connect_args={
-            # Required for the Supabase transaction-mode pooler.
+            # Required for the transaction-mode pooler.
             "statement_cache_size": 0,
             "server_settings": {
                 "application_name": "lumen-api",

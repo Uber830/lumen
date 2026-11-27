@@ -2,7 +2,7 @@
 
 This module covers the platform side of the schema:
 
-- `users`          — the identity table. Phase 1 replaces Supabase
+- `users`          — the identity table. It replaced the identity
                      Auth, so `auth.users` is no longer the source of
                      truth; `public.users` takes its place.
 - `profiles`       — domain profile data, 1:1 with a user.
@@ -39,7 +39,7 @@ from app.db.enums import (
 class User(Base):
     """An authenticated identity.
 
-    Phase 1 replaces Supabase Auth: this table is the new home of the
+    This table is the home of the
     identity data that used to live in `auth.users`. The UUIDs are
     preserved when migrating existing rows so that the foreign keys on
     `profiles`, `school_memberships`, `teacher_assignments`, etc. keep

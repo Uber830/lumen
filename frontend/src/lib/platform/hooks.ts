@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-query";
 
 import { ApiError, api, apiBaseUrl } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 import type {
   AuditEntry,
   CaseDetail,
@@ -53,6 +54,7 @@ export interface CatalogFilters {
   q?: string;
   type?: string;
   status?: string;
+  visible_to?: string;
   school_id?: string;
   page?: number;
   per_page?: number;
@@ -116,6 +118,7 @@ export function useCatalog(
         q: filters.q || undefined,
         type: filters.type || undefined,
         status: filters.status || undefined,
+        visible_to: filters.visible_to || undefined,
         school_id: filters.school_id || undefined,
         page: filters.page ?? 1,
         per_page: filters.per_page ?? 8,
@@ -220,13 +223,14 @@ export function useChangeMaterialStatus(): UseMutationResult<
 export function useSetMaterialSchools(): UseMutationResult<
   MaterialDetail,
   ApiError,
-  { id: string; school_ids: string[]; confirm?: boolean }
+  { id: string; school_ids: string[]; all_schools?: boolean; confirm?: boolean }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, school_ids, confirm }) =>
+    mutationFn: ({ id, school_ids, all_schools, confirm }) =>
       api.put<MaterialDetail>(`/v1/platform/catalog/${id}/schools`, {
         school_ids,
+        ...(all_schools ? { all_schools: true } : {}),
         confirm: confirm ?? false,
       }),
     onSuccess: (material) => {
@@ -381,8 +385,33 @@ export function useCaseOptions(): UseQueryResult<CaseOptions, Error> {
   });
 }
 
+/**
+ * The content of the file of a piece.
+ *
+ * The file is served by the API and shown inside the platform: the
+ * material is consulted, not downloaded. The blob is fetched with the
+ * session cookie, so the browser can show it without a public address.
+ */
+export async function fetchPlatformMaterialFile(fileId: string): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/platform/files/${fileId}`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el archivo del recurso.");
+  }
+  return await response.blob();
+}
+
 /** The cases of the desk, filtered and paginated. */
 export function useCases(filters: CaseFilters): UseQueryResult<Page<CaseSummary>, Error> {
+  const qc = useQueryClient();
+
+  // The bell says that a case arrived or that the school wrote in one:
+  // the list is asked again, so the new case shows up without a reload.
+  useEvent("notification", () => {
+    qc.invalidateQueries({ queryKey: platformKeys.cases(filters) });
+  });
+
   return useQuery({
     queryKey: platformKeys.cases(filters),
     queryFn: () =>
@@ -407,19 +436,75 @@ export function useCase(id: string | null): UseQueryResult<CaseDetail, Error> {
   });
 }
 
+/**
+ * Open a conversation with a school.
+ *
+ * The case belongs to the school: it appears in its own support desk,
+ * with the message of the team at the head of the thread.
+ */
+export function useCreateCase(): UseMutationResult<
+  CaseDetail,
+  Error,
+  { school_id: string; title: string; category: string; body: string; attachment_ids?: string[] }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => api.post<CaseDetail>("/v1/platform/cases", body),
+    onSuccess: (created) => {
+      qc.setQueryData(platformKeys.case(created.id), created);
+      qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
 /** Answer a case. The case goes back to "en_espera". */
 export function useAnswerCase(): UseMutationResult<
   CaseDetail,
   Error,
-  { id: string; body: string }
+  { id: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }) =>
-      api.post<CaseDetail>(`/v1/platform/cases/${id}/messages`, { body }),
+    mutationFn: ({ id, body, attachment_ids }) =>
+      api.post<CaseDetail>(`/v1/platform/cases/${id}/messages`, { body, attachment_ids }),
     onSuccess: (updated) => {
       qc.setQueryData(platformKeys.case(updated.id), updated);
       qc.invalidateQueries({ queryKey: ["platform"] });
+    },
+  });
+}
+
+/**
+ * Upload a file to attach to the answer of a case.
+ *
+ * The file goes to the store of the school of the case: the school
+ * and the support team read the same copy.
+ */
+export function useUploadCaseAttachment(): UseMutationResult<
+  { id: string; name: string; size: number },
+  Error,
+  { caseId: string; file: File }
+> {
+  return useMutation({
+    mutationFn: async ({ caseId, file }) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const response = await fetch(`${apiBaseUrl}/v1/platform/cases/${caseId}/attachments`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) {
+        let detail = `No se pudo adjuntar el archivo (${response.status}).`;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? detail;
+        } catch {
+          // The answer was not JSON: the message above is enough.
+        }
+        throw new Error(detail);
+      }
+      return (await response.json()) as { id: string; name: string; size: number };
     },
   });
 }

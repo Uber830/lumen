@@ -14,7 +14,13 @@
 //            without an assignment has no content to see.
 // =============================================================================
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
 
@@ -31,6 +37,10 @@ export type SchoolMemberRow = {
   courses: string[];
   /** The subjects of the teacher. */
   subjects?: string[];
+  /** The courses of the student, by id: the edit form works with ids. */
+  course_ids?: string[];
+  /** The course subjects of the teacher, by id: the edit form works with ids. */
+  course_subject_ids?: string[];
   /** The average of the student. `null` when it has no grades. */
   average?: number | null;
   /** `activado` or `pendiente`: one signal, not two loose badges. */
@@ -44,6 +54,15 @@ export type SchoolMemberRow = {
 /** A page of the community. */
 export type MemberPage = {
   items: SchoolMemberRow[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+};
+
+/** One page of a list the server cuts. */
+export type Page<T> = {
+  items: T[];
   total: number;
   page: number;
   per_page: number;
@@ -81,8 +100,11 @@ export type MemberFilters = {
 export const communityKeys = {
   teachers: (filters: MemberFilters) => ["school", "teachers", filters] as const,
   students: (filters: MemberFilters) => ["school", "students", filters] as const,
-  courses: () => ["school", "courses"] as const,
-  subjects: () => ["school", "subjects"] as const,
+  coursesPage: (page: number) => ["school", "courses", "page", page] as const,
+  courseOptions: () => ["school", "courses", "options"] as const,
+  subjectsPage: (offered: boolean | undefined, page: number) =>
+    ["school", "subjects", "page", offered ?? "all", page] as const,
+  subjectOptions: () => ["school", "subjects", "options"] as const,
 };
 
 /**
@@ -117,18 +139,94 @@ export function useSchoolStudents(filters: MemberFilters): UseQueryResult<Member
   });
 }
 
-/** The courses of the school, with the structure they hold. */
-export function useSchoolCourses(): UseQueryResult<SchoolCourse[], Error> {
+/** One page of the courses of the school, cut in the server. */
+export function useSchoolCoursesPage(page = 1): UseQueryResult<Page<SchoolCourse>, Error> {
   return useQuery({
-    queryKey: communityKeys.courses(),
-    queryFn: () => api.get<SchoolCourse[]>("/v1/school/courses"),
+    queryKey: communityKeys.coursesPage(page),
+    queryFn: () => api.get<Page<SchoolCourse>>(`/v1/school/courses?page=${page}&per_page=10`),
+    placeholderData: (previous) => previous,
   });
 }
 
-/** The subjects of the school, with the courses they are taught in. */
-export function useSchoolSubjects(): UseQueryResult<SchoolSubject[], Error> {
+/**
+ * Every course of the school, for the forms that offer a choice.
+ *
+ * The list is not cut here: the selector needs all of them.
+ */
+export function useSchoolCourseOptions(): UseQueryResult<SchoolCourse[], Error> {
   return useQuery({
-    queryKey: communityKeys.subjects(),
-    queryFn: () => api.get<SchoolSubject[]>("/v1/school/subjects"),
+    queryKey: communityKeys.courseOptions(),
+    queryFn: () => api.get<SchoolCourse[]>("/v1/school/courses/options"),
+  });
+}
+
+/**
+ * One page of the subjects of the school.
+ *
+ * `offered` says which ones come back: the ones that are taught in
+ * some course, or the ones that are in no course.
+ */
+export function useSchoolSubjects(
+  options: { offered?: boolean; page?: number } = {},
+): UseQueryResult<Page<SchoolSubject>, Error> {
+  const offered = options.offered;
+  const page = options.page ?? 1;
+  const query = new URLSearchParams({ page: String(page), per_page: "10" });
+  if (offered !== undefined) query.set("offered", String(offered));
+  return useQuery({
+    queryKey: communityKeys.subjectsPage(offered, page),
+    queryFn: () => api.get<Page<SchoolSubject>>(`/v1/school/subjects?${query}`),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Every subject of the school, for the forms that offer a choice. */
+export function useSchoolSubjectOptions(): UseQueryResult<SchoolSubject[], Error> {
+  return useQuery({
+    queryKey: communityKeys.subjectOptions(),
+    queryFn: () => api.get<SchoolSubject[]>("/v1/school/subjects/options"),
+  });
+}
+
+/** What the admin can change of a member of the community. */
+export type UpdateMemberInput = {
+  membershipId: string;
+  full_name?: string;
+  email?: string;
+  /** The courses of a student. */
+  course_ids?: string[];
+  /** The course subjects of a teacher. */
+  course_subject_ids?: string[];
+};
+
+/** The member, after the edit. */
+export type UpdatedMember = {
+  membership_id: string;
+  user_id: string;
+  role: string;
+  full_name: string | null;
+  email: string | null;
+  course_ids: string[];
+  course_subject_ids: string[];
+};
+
+/**
+ * Edit a teacher or a student of the school.
+ *
+ * The list of the community and the assignments change with it: the
+ * admin sees the new state without reloading.
+ */
+export function useUpdateMember(): UseMutationResult<UpdatedMember, Error, UpdateMemberInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ membershipId, ...changes }) =>
+      api.patch<UpdatedMember>(`/v1/school/members/${membershipId}`, changes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "teachers"] });
+      qc.invalidateQueries({ queryKey: ["school", "students"] });
+      qc.invalidateQueries({ queryKey: ["school", "assignments"] });
+      qc.invalidateQueries({ queryKey: ["teacher_assignments"] });
+      qc.invalidateQueries({ queryKey: ["student_enrollments"] });
+    },
   });
 }

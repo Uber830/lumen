@@ -18,7 +18,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import supabase_storage
+from app.core import storage
 from app.core.context import RequestContext
 from app.core.errors import ForbiddenError
 from app.db.enums import SchoolRole
@@ -110,12 +110,12 @@ async def upload_my_school_logo(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded file is empty.",
         )
-    logo_url = await supabase_storage.upload_school_logo(
+    logo_path = await storage.upload_school_logo(
         school_id=str(school_id),
         content=content,
         content_type=file.content_type or "application/octet-stream",
     )
-    school = await update_school(session, school_id=school_id, changes={"logo_url": logo_url})
+    school = await update_school(session, school_id=school_id, changes={"logo_url": logo_path})
     await session.commit()
     return _school_out(school)
 

@@ -1,8 +1,7 @@
 """Data layer: engine, session factory and SQLAlchemy models.
 
-The database is Postgres hosted by Supabase. Since Phase 0 the backend
-connects directly with asyncpg instead of going through the PostgREST
-SDK, so the Supabase Python client was removed from the dependencies.
+The database is Postgres. The backend connects directly with asyncpg:
+there is no SDK of a hosted service in the dependencies.
 
 Layout:
 

@@ -4,9 +4,10 @@ Business logic for the `users` module, expressed as plain functions
 that take an `AsyncSession`. The router validates the request, calls
 these, and returns the result; it never touches the session directly.
 
-Phase 0 note: invitations used to create a Supabase Auth user via
+Phase 0 note: invitations used to create a user of the previous
+identity provider via
 `auth.admin.create_user`. Phase 1 replaces that with a row in
-`public.users` plus a reset-password token, so that Supabase Auth is
+`public.users` plus a reset-password token, so that the identity of
 no longer involved. This module already writes to `public.users`
 directly, which makes it the natural home for that flow.
 """

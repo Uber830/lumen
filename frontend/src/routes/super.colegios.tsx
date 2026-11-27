@@ -22,7 +22,7 @@ export const Route = createFileRoute("/super/colegios")({
       { title: "Colegios — Lumen Platform" },
       {
         name: "description",
-        content: "Instituciones de la red y su cobertura del catálogo editorial.",
+        content: "Instituciones de la red y su cobertura de la biblioteca de recursos.",
       },
       { property: "og:title", content: "Colegios — Lumen Platform" },
       {

@@ -1,15 +1,14 @@
 """Alembic environment for Lumen.
 
 The database schema is owned by the SQL migrations under
-`supabase/migrations/`; they are applied to the Supabase project with
-the Supabase CLI. Alembic is configured here so that the Python side
-can:
+`db/migrations/`; they are applied to the database with `psql`.
+Alembic is configured here so that the Python side can:
 
 - autogenerate a diff between the SQLAlchemy models and a live
   database (useful to catch drift, and to produce the SQL for a new
   migration);
-- apply migrations in environments where the Supabase CLI is not
-  available (CI, local containers).
+- apply migrations in environments where the SQL migrations are not
+  applied by hand (CI, local containers).
 
 `target_metadata` is the shared `Base`, so autogenerate compares the
 models against the database.

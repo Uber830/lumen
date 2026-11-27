@@ -11,6 +11,10 @@ export type InviteUserInput = {
   role: "school_admin" | "teacher" | "student";
   school_id?: string;
   is_primary?: boolean;
+  /** The courses a new student is enrolled in. */
+  course_ids?: string[];
+  /** The course subjects a new teacher is assigned to. */
+  course_subject_ids?: string[];
 };
 
 export type InviteUserResult = {

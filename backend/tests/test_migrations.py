@@ -1,7 +1,7 @@
 """Migration tests.
 
 The SQL migrations are the single owner of the schema: the ones inherited
-from the original project live under `supabase/migrations/`, and the ones
+from the original project live under `db/migrations/`, and the ones
 owned by this project live under `backend/migrations/`. These tests apply
 them to a fresh Postgres and check that the result is a schema the backend
 can use:
@@ -29,10 +29,10 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 # The migrations are applied in order: the inherited ones first, then
 # the ones this project owns.
 MIGRATION_DIRS = (
-    BACKEND_DIR.parent / "supabase" / "migrations",
+    BACKEND_DIR.parent / "db" / "migrations",
     BACKEND_DIR / "migrations",
 )
-SHIM = BACKEND_DIR.parent / "supabase" / "local-shim.sql"
+SHIM = BACKEND_DIR.parent / "db" / "platform-shim.sql"
 
 CONTAINER = "lumen-test-db"
 DATABASE = "lumen_migration_test"
@@ -90,10 +90,10 @@ def _query(sql: str) -> list[str]:
 def migrated_database() -> Generator[None, None, None]:
     """A database with the SQL migrations applied.
 
-    The migrations assume the Supabase platform objects (`auth`
-    schema, `storage` schema, the `authenticated` role).
-    `local-shim.sql` creates stand-ins so they can be applied to a
-    plain Postgres.
+    The inherited migrations expect a few platform objects (`auth`
+    schema, the `authenticated` role).
+    `db/platform-shim.sql` creates stand-ins so they can be applied to
+    a plain Postgres.
     """
     try:
         subprocess.run(

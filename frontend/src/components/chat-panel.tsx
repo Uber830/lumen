@@ -1,8 +1,7 @@
 import { useRouteContext } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Plus, Send } from "lucide-react";
 
-import { getSupabaseClient, getSupabaseToken } from "@/lib/supabase/client";
 import { useChatMessages, useChatConversations, useSendChatMessage } from "@/lib/storage/hooks";
 import { useCreateChatConversation } from "@/features/chat/use-conversations";
 import { cn } from "@/lib/utils";
@@ -47,48 +46,6 @@ export function ChatPanel({
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-
-  // Subscribe to Realtime inserts on the active conversation so the
-  // chat refreshes when the other side sends a message.
-  //
-  // Realtime stays on Supabase, and its RLS policies call
-  // `auth.uid()`. The channel is authenticated with the short-lived
-  // token the backend mints.
-  useEffect(() => {
-    if (!schoolId || !activeConversation) return;
-    let cancelled = false;
-    let channel: ReturnType<ReturnType<typeof getSupabaseClient>["channel"]> | null = null;
-
-    void (async () => {
-      const token = await getSupabaseToken();
-      if (cancelled || !token) return;
-
-      const supabase = getSupabaseClient();
-      await supabase.realtime.setAuth(token);
-
-      channel = supabase
-        .channel(`chat:${activeConversation.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "chat_messages",
-            filter: `conversation_id=eq.${activeConversation.id}`,
-          },
-          () => {
-            // The hooks re-fetch on .data change; but with staleTime 0
-            // we leave the query cache invalidation to the mutation hook.
-          },
-        )
-        .subscribe();
-    })();
-
-    return () => {
-      cancelled = true;
-      if (channel) void channel.unsubscribe();
-    };
-  }, [activeConversation, schoolId]);
 
   if (!schoolId) {
     return (

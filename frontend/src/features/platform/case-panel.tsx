@@ -1,9 +1,10 @@
-import { History, MessageSquare, Send, X } from "lucide-react";
+import { History, MessageSquare, Paperclip, Send, X } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
 import { StatusPill, Tag } from "@/components/ui-kit";
 import { useCase, useResolveCase } from "@/lib/platform/hooks";
+import { fileNameFromPath, fileUrl } from "@/lib/storage/files";
 import {
   auditEventLabel,
   CASE_CATEGORY_LABEL,
@@ -149,6 +150,27 @@ export function CasePanel({
                         </span>
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">{message.body}</p>
+                      {message.attachment_ids.length > 0 && (
+                        <ul className="mt-2 flex flex-wrap gap-1.5">
+                          {message.attachment_ids.map((attachment) => (
+                            <li key={attachment}>
+                              <a
+                                href={fileUrl(attachment) ?? "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-idx border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                              >
+                                <Paperclip
+                                  className="size-3.5 shrink-0"
+                                  strokeWidth={1.9}
+                                  aria-hidden
+                                />
+                                {fileNameFromPath(attachment)}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </li>
                   ))}
                   {detail.messages.length === 0 && (

@@ -203,14 +203,19 @@ class FooterContent(BaseModel):
 
 
 class SiteCopy(BaseModel):
-    """The copy of the landing, section by section."""
+    """The copy of the landing, section by section.
+
+    The blocks that are not published are simply not in the copy: the
+    coverage by school size is optional, for instance, and the page
+    draws it only when the copy carries it.
+    """
 
     nav: NavContent
     hero: HeroContent
     catalog: CatalogContent
     process: ProcessContent
     roles: RolesContent
-    coverage: CoverageContent
+    coverage: CoverageContent | None = None
     faq: FaqContent
     cta: CtaContent
     footer: FooterContent

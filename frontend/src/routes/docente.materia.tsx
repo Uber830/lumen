@@ -165,9 +165,9 @@ function ContenidoTab({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   // Only the kinds that need no file upload are offered here. Documents
-  // and videos require a stored file (Supabase Storage), which is a
-  // separate upload flow; offering them would produce a 422 from the
-  // backend's content validation.
+  // and videos require a stored file, which is a separate upload
+  // flow; offering them would produce a 422 from the backend's
+  // content validation.
   const [kind, setKind] = useState<Extract<ContentItem["kind"], "link" | "text">>("link");
   const [url, setUrl] = useState("");
 

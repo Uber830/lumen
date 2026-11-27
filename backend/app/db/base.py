@@ -2,7 +2,7 @@
 
 Every model in app/db/models/ inherits from Base. The helpers here
 keep the column definitions consistent with the Postgres schema that
-lives in Supabase: uuid primary keys with gen_random_uuid() defaults,
+lives in Postgres: uuid primary keys with gen_random_uuid() defaults,
 timestamptz timestamps, and JSONB for the columns that hold structured
 data.
 """
@@ -20,7 +20,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     """Declarative base for every Lumen model.
 
-    The schema lives in Supabase's `public` schema. The models declare
+    The schema lives in the `public` schema of Postgres. The models declare
     it explicitly rather than inheriting a default, because
     `__table_args__` holds the table constraints and cannot be
     inherited and overridden at the same time.

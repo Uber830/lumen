@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, created_at
@@ -105,6 +105,14 @@ class SupportMessage(Base):
         server_default=text("'colegio'"),
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    # The files the author attached to the message: the paths of the
+    # store, so the thread can show them again.
+    attachment_ids: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
     created_at: Mapped[datetime] = created_at()
 
 

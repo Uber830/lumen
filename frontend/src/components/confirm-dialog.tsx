@@ -11,7 +11,7 @@
 // does not depend on a portal or on a dialog library.
 // =============================================================================
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 /** What is about to be deleted: the row and how to name it in the modal. */
@@ -30,13 +30,17 @@ export type DeleteTarget = {
  *
  * The list keeps the target, the modal asks about it, and the row is
  * removed when the user confirms.
+ *
+ * The generic is for the lists that need to know what kind of row is
+ * going away (a course, a subject, an offering): the extra fields
+ * travel with the target.
  */
-export function useDeleteConfirmation() {
-  const [target, setTarget] = useState<DeleteTarget | null>(null);
+export function useDeleteConfirmation<T extends DeleteTarget = DeleteTarget>() {
+  const [target, setTarget] = useState<T | null>(null);
   return {
     target,
     /** Ask about a row. */
-    ask: (next: DeleteTarget) => setTarget(next),
+    ask: (next: T) => setTarget(next),
     /** Close the modal (cancel, or the deletion is done). */
     close: () => setTarget(null),
   };
@@ -48,7 +52,7 @@ export type ConfirmDialogProps = {
   /** The question, in the language of the app: "Eliminar el curso 4to A?". */
   title: string;
   /** What happens if the user confirms. One or two short sentences. */
-  description?: string;
+  description?: ReactNode;
   /** The label of the destructive button. */
   confirmLabel?: string;
   /** The label of the button that leaves things as they are. */

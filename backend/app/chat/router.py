@@ -3,7 +3,7 @@
 A conversation is visible to its members. A message belongs to a
 conversation and is visible to the same people.
 
-The Realtime delivery stays on Supabase's Realtime service; these
+The live delivery is a periodic query on the API; these
 endpoints are the durable record it is built on.
 """
 

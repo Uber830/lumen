@@ -4,9 +4,10 @@ La API de Lumen. Es la dueña de la autenticación, la autorización y de cada
 regla de negocio: el navegador solo habla con este servicio.
 
 Postgres es el almacén de datos y el backend se conecta a él directamente con
-asyncpg. El material del catálogo se guarda en el disco del servidor
-(`PLATFORM_STORAGE_DIR`) hasta que el proyecto tenga un bucket; Supabase
-Realtime sigue en uso para el chat en vivo.
+asyncpg. El material del catálogo y los archivos de la aplicación (avatares,
+escudos, contenido de curso y entregas de tareas) se guardan en el disco del
+servidor: el backend los sube y los sirve, y el chat y las notificaciones se
+actualizan con un flujo de eventos (SSE) en `GET /v1/events`.
 
 - [Arranque rápido](#arranque-rápido)
 - [Layout](#layout)
@@ -60,7 +61,8 @@ ver que las migraciones no se aplicaron.
 | `CORS_ALLOWED_ORIGINS` | orígenes permitidos, separados por comas |
 | `COOKIE_DOMAIN` | solo si el frontend y la API viven en subdominios distintos |
 | `PLATFORM_STORAGE_DIR` | la carpeta del material del catálogo (por defecto `backend/var/materiales`) |
-| `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` | Realtime |
+| `UPLOADS_DIR` | la carpeta de los archivos de la aplicación (por defecto `backend/var/archivos`) |
+| `PUBLIC_BASE_URL` | la dirección pública del API, para armar las URLs de los archivos |
 | `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | la puerta del login (5 por minuto) |
 | `LOGIN_LOCK_THRESHOLD`, `LOGIN_LOCK_MINUTES` | el bloqueo de la cuenta (10 fallos, 15 min) |
 
@@ -90,8 +92,10 @@ app/
     pagination.py    el sobre de las listas
     permissions.py   los permisos (puerto de los helpers SQL)
     security.py      hash de contraseñas Argon2id
+    storage.py       el almacén de archivos en disco (bucket y ruta)
     tokens.py        emisión de tokens de acceso y de refresco
     errors.py        excepciones del dominio y su mapeo HTTP
+    events.py        el hub de eventos: quién está suscrito a qué
   db/
     base.py          DeclarativeBase y helpers de columnas
     enums.py         enums que reflejan los tipos enum de Postgres
@@ -99,6 +103,8 @@ app/
     session.py       engine async, session factory, dependencia get_db
     schema_check.py  la verificación del esquema al arrancar
   evaluations/       las evaluaciones escritas y sus intentos
+  events/            el flujo de eventos del usuario (SSE)
+  files/             la subida y la descarga de los archivos de la aplicación
   grades/            las notas que registra un docente
   health.py          las sondas /health y /ready
   icfes/             el ciclo de intento del banco y la autoría
@@ -108,10 +114,9 @@ app/
   school/            la API del administrador de colegio
   schools/           el perfil de cada colegio
   site/              el contenido editable del sitio público
-  subscriptions/     el checkout y el webhook de Wompi
+  subscriptions/     el plan del colegio y sus entitlements
   tasks/             las tareas y sus entregas
   users/             invitaciones y operaciones de identidad
-  wompi/             cliente HTTP de Wompi
 migrations/          migraciones SQL de este proyecto
 seeds/               datos semilla de este proyecto
 alembic/             andamiaje para el diff de esquema (el esquema vive en SQL)
@@ -142,7 +147,6 @@ Dockerfile           imagen de producción multi-etapa
 | POST | `/v1/auth/me/avatar` | cambiar el avatar |
 | POST | `/v1/auth/forgot-password` | iniciar el flujo de restablecimiento |
 | POST | `/v1/auth/reset-password` | poner una contraseña nueva con un token |
-| GET | `/v1/auth/supabase-token` | el token corto para Storage y Realtime |
 
 **No hay registro público.** Quien quiera usar Lumen habla con el equipo de
 plataforma; el alta la hace `POST /v1/platform/schools` (solo `platform_admin`),
@@ -218,10 +222,7 @@ que devuelve el enlace de activación del administrador.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/v1/subscriptions` | la suscripción y los entitlements del colegio |
-| POST | `/v1/subscriptions/checkout` | abrir el checkout de Wompi |
-| POST | `/v1/subscriptions/portal` | la URL del portal de cliente de Wompi |
-| POST | `/v1/webhooks/wompi` | el webhook de Wompi (firma verificada, idempotente) |
+| GET | `/v1/subscriptions` | el plan del colegio y sus entitlements |
 | POST | `/v1/icfes/simulations/{id}/attempts` | empezar un intento (sin respuestas) |
 | POST | `/v1/icfes/attempts/{id}/finalize` | entregar, calificar y guardar |
 | GET | `/v1/icfes/comparisons` | los agregados por simulación (docente) |
@@ -230,6 +231,38 @@ que devuelve el enlace de activación del administrador.
 | GET/POST/PATCH/DELETE | `/v1/grades` | las notas |
 | GET/POST/PATCH/DELETE | `/v1/evaluations` | las evaluaciones y sus intentos |
 | GET/POST/PATCH/DELETE | `/v1/chat/conversations` | el chat |
+
+### Eventos
+
+Un solo flujo por navegador: el backend avisa lo que le pasa al usuario y el
+cliente vuelve a pedir a la API lo que cambió. El evento dice **qué pasó**,
+no qué es, así que lo que se muestra siempre viene de la API.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/v1/events` | el flujo `text/event-stream` de lo que le pasa al llamador |
+| GET | `/v1/events/status` | cuántas conexiones tiene abiertas el llamador |
+
+Los eventos se publican **después del commit** de la transacción que los
+origina, así que el cliente nunca pide una fila que todavía no existe.
+
+### Archivos
+
+Los archivos viven en el disco del servidor (`UPLOADS_DIR`). El backend los
+guarda, los sirve y es el único que decide quién puede verlos: los avatares y
+los escudos son públicos, el material de una materia y las entregas de una
+tarea son de su colegio.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/v1/files/task-submissions/{task_id}` | subir la entrega de una tarea |
+| POST | `/v1/files/class-content/{course_subject_id}` | subir el material de una materia |
+| GET | `/v1/files/{bucket}/{path}` | descargar un archivo |
+
+En la base se guarda **una ruta relativa** (`avatars/<usuario>/avatar-123.png`),
+nunca una dirección: el frontend la resuelve contra el API. El avatar y el
+escudo entran por sus propios endpoints (`POST /v1/auth/me/avatar` y
+`POST /v1/schools/me/logo`) y acaban en el mismo almacén.
 
 ### Colegio
 
@@ -329,7 +362,7 @@ contraseña escrita de un sitio a otro.
 ## Esquema y migraciones
 
 **Las migraciones SQL son la única dueña del esquema**: las heredadas en
-`supabase/migrations/` y las de este proyecto en `backend/migrations/`, que se
+`db/migrations/` y las de este proyecto en `backend/migrations/`, que se
 aplican en ese orden. Eso incluye la tabla de identidad que usa el backend
 (`public.users`, que sustituye a `auth.users`) y sus tablas de sesión.
 
@@ -375,9 +408,9 @@ andamiaje para `alembic revision --autogenerate`, que contrasta los modelos
 SQLAlchemy con una base viva; la revisión generada se traduce a SQL y se
 borra. Ver `alembic/versions/README.md`.
 
-`supabase/local-shim.sql` crea los objetos de plataforma de Supabase (el
-schema `auth`, el `storage`, el rol `authenticated`) para que las migraciones
-heredadas también se puedan aplicar en un Postgres normal.
+`db/platform-shim.sql` crea los objetos de plataforma que las migraciones
+heredadas declaran (el schema `auth`, el `storage`, el rol `authenticated`)
+para que también se puedan aplicar en un Postgres normal.
 
 ---
 
@@ -441,9 +474,9 @@ Dos reglas que sigue el código:
 - **Aislamiento por tenant**: `school_id` nunca se toma del cuerpo de la
   petición, sale de las membresías del llamador y del recurso que se
   direcciona.
-- El webhook de Wompi **tiene que** verificar la firma antes de tocar la
-  base. La idempotencia se fuerza con un insert en
-  `wompi_events_processed` con `ON CONFLICT DO NOTHING`.
+- **Los archivos se guardan con una ruta relativa** al almacén (`UPLOADS_DIR`),
+  nunca con una dirección absoluta: el que lea la fila arma la URL contra el
+  API.
 - Los secretos vienen de `pydantic-settings` (`SecretStr` para los tokens).
   Nunca se registran ni se trazan.
 - Las pruebas son pytest. Las que tocan la base corren contra un Postgres

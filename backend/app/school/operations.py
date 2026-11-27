@@ -12,19 +12,23 @@ That number is published on the public site, so it is not a leak.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Select, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ConflictError, NotFoundError, ServiceUnavailableError
 from app.db.models import (
     AcademicPeriod,
     Course,
     Entitlement,
     Material,
     MaterialCourse,
+    MaterialFile,
     MaterialSchool,
     Profile,
     School,
@@ -34,6 +38,8 @@ from app.db.models import (
     TeacherAssignment,
     User,
 )
+from app.platform import catalog
+from app.platform.storage import build_storage_key, get_storage
 
 # The state of a material that a school can see. A draft or a review
 # one is not part of the enabled material.
@@ -374,12 +380,28 @@ async def _material_courses(
     return courses
 
 
+async def _school_creators(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+) -> set[uuid.UUID]:
+    """The people of the school.
+
+    A material created by one of them is a resource of the school; the
+    rest belong to the editorial team of the platform.
+    """
+    result = await session.execute(
+        select(SchoolMembership.user_id).where(SchoolMembership.school_id == school_id)
+    )
+    return {row[0] for row in result.all()}
+
+
 async def list_material(
     session: AsyncSession,
     school_id: uuid.UUID,
     *,
     query: str | None = None,
     area: str | None = None,
+    audience: str | None = None,
     page: int = 1,
     per_page: int = 6,
 ) -> dict[str, Any]:
@@ -404,6 +426,8 @@ async def list_material(
     ]
     if area:
         filters.append(Material.area == area)
+    if audience:
+        filters.append(Material.visible_to == audience)
     if query:
         pattern = f"%{query.strip().lower()}%"
         filters.append(
@@ -431,6 +455,7 @@ async def list_material(
     rows = result.all()
 
     courses = await _material_courses(session, school_id, [row[0].id for row in rows])
+    creators = await _school_creators(session, school_id)
 
     items = [
         {
@@ -439,7 +464,19 @@ async def list_material(
             "title": material.title,
             "description": material.description,
             "area": material.area,
+            # What the piece is pedagogically: "Libro", "Guía",
+            # "Evaluación", "Multimedia" or "Documento".
+            "type": material.type,
             "kind": material.kind,
+            # Who the piece is for: "all" or "teachers".
+            "visible_to": material.visible_to,
+            # "lumen" when the editorial team loaded it, "colegio" when
+            # it was uploaded by the school itself.
+            "origin": (
+                "colegio"
+                if material.created_by is not None and material.created_by in creators
+                else "lumen"
+            ),
             "file_size_bytes": material.file_size_bytes,
             "available_since": enabled_at,
             "courses": [
@@ -465,13 +502,45 @@ async def list_material(
     )
     areas = [str(area) for area in areas_result.scalars().all()]
 
+    # How much material the school has, with no filters: the counter of
+    # the toolbar talks about the whole library, not about the search.
+    available_total = await _count(
+        session,
+        select(func.count(Material.id))
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+            MaterialSchool.archived_at.is_(None),
+            Material.state == PUBLISHED_STATE,
+        ),
+    )
+
+    # The audiences the school can filter by: the ones it has material
+    # for. The filter never offers an audience with nothing behind it.
+    audiences_result = await session.execute(
+        select(Material.visible_to)
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+            MaterialSchool.archived_at.is_(None),
+            Material.state == PUBLISHED_STATE,
+        )
+        .distinct()
+        .order_by(Material.visible_to)
+    )
+    audiences = [str(value) for value in audiences_result.scalars().all()]
+
     return {
         "items": items,
         "total": total,
+        "available_total": available_total,
         "page": page,
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if total else 0,
         "areas": areas,
+        "audiences": audiences,
     }
 
 
@@ -504,13 +573,26 @@ async def get_material(
 
     material, enabled_at = row
     courses = await _material_courses(session, school_id, [material.id])
+    creators = await _school_creators(session, school_id)
+    # The file of the piece, when it has one: the viewer shows it.
+    files = await session.execute(
+        select(MaterialFile).where(MaterialFile.material_id == material.id)
+    )
+    stored = files.scalars().first()
     return {
         "id": str(material.id),
         "ref": material.ref,
         "title": material.title,
         "description": material.description,
         "area": material.area,
+        "type": material.type,
         "kind": material.kind,
+        "visible_to": material.visible_to,
+        "origin": (
+            "colegio"
+            if material.created_by is not None and material.created_by in creators
+            else "lumen"
+        ),
         "file_size_bytes": material.file_size_bytes,
         "available_since": enabled_at,
         "courses": [
@@ -521,16 +603,294 @@ async def get_material(
             "enabled_at": enabled_at,
             "note": "Este material está habilitado para tu colegio.",
         },
+        "file": (
+            {
+                "file_name": stored.file_name,
+                "mime_type": stored.mime_type,
+                "size_bytes": stored.size_bytes,
+                "size_label": catalog.format_size(stored.size_bytes),
+            }
+            if stored is not None
+            else None
+        ),
     }
 
 
+# ---------------------------------------------------------------------------
+# The resources of the school
+# ---------------------------------------------------------------------------
+#
+# A school loads its own resources: a manual of the school, a guide for
+# the teachers, a text for the students. The piece is a row of the
+# catalogue like any other; what tells it apart is that it was created
+# by somebody of the school and that it only lives in that school.
+# ---------------------------------------------------------------------------
+
+
+async def upload_school_file(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    file_name: str,
+    mime_type: str,
+    content: bytes,
+) -> MaterialFile:
+    """Store a file that a school uploaded.
+
+    The file waits in the pending folder until the piece that carries it
+    is created.
+    """
+    digest = hashlib.sha256(content).hexdigest()
+    storage_key = build_storage_key(file_name=file_name)
+    await get_storage().save(key=storage_key, content=content, content_type=mime_type)
+
+    uploaded = MaterialFile(
+        storage_key=storage_key,
+        file_name=file_name,
+        mime_type=mime_type,
+        size_bytes=len(content),
+        is_primary=False,
+        content_hash=digest,
+        uploaded_by=user_id,
+    )
+    session.add(uploaded)
+    await session.commit()
+    return uploaded
+
+
+async def create_school_material(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    title: str,
+    material_type: str,
+    area: str,
+    visible_to: str,
+    description: str | None,
+    file_id: uuid.UUID,
+) -> str:
+    """Create a resource of the school and enable it for the school.
+
+    The piece is born published: the school that loads it decides who
+    sees it, and there is no editorial team in the middle.
+    """
+    uploaded = await session.get(MaterialFile, file_id)
+    if uploaded is None:
+        raise NotFoundError("The uploaded file does not exist.")
+    if uploaded.material_id is not None:
+        raise ConflictError(
+            "That file already belongs to a resource.",
+            code="file_already_attached",
+        )
+
+    material = Material(
+        id=uuid.uuid4(),
+        ref=await catalog.next_code(session),
+        title=title,
+        type=material_type,
+        area=area,
+        kind=catalog.kind_of(uploaded.mime_type),
+        grades=[],
+        visible_to=visible_to,
+        description=description,
+        origin="upload",
+        state=PUBLISHED_STATE,
+        file_size_bytes=uploaded.size_bytes,
+        created_by=user_id,
+    )
+    session.add(material)
+    await session.flush()
+
+    uploaded.material_id = material.id
+    uploaded.is_primary = True
+    # The file leaves the pending folder and joins the one of its
+    # material.
+    final_key = build_storage_key(file_name=uploaded.file_name, material_code=material.ref)
+    await get_storage().move(key=uploaded.storage_key, new_key=final_key)
+    uploaded.storage_key = final_key
+
+    session.add(
+        MaterialSchool(
+            material_id=material.id,
+            school_id=school_id,
+            enabled=True,
+            enabled_by=user_id,
+        )
+    )
+
+    await catalog.record_history(
+        session,
+        material=material,
+        action="created",
+        actor_id=user_id,
+        detail={"title": material.title, "type": material.type, "area": material.area},
+    )
+    await catalog.record_audit(
+        session,
+        event_type="school.material.created",
+        actor_id=user_id,
+        actor_name=None,
+        subject_type="material",
+        subject_id=material.id,
+        school_id=school_id,
+        detail={"title": material.title, "visible_to": visible_to},
+    )
+
+    await session.commit()
+    return str(material.id)
+
+
+async def update_school_material(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    material_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID,
+    changes: dict[str, Any],
+) -> None:
+    """Change a resource of the school.
+
+    Only the pieces the school loaded can be changed: the ones of the
+    editorial team are not the school's to edit. The file never
+    changes: the piece keeps the file it was loaded with.
+
+    Only the values that arrive are written, so an empty description
+    clears it and an absent one leaves it as it was.
+    """
+    creators = await _school_creators(session, school_id)
+    result = await session.execute(
+        select(Material)
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            Material.id == material_id,
+            Material.created_by.is_not(None),
+            Material.created_by.in_(creators),
+            MaterialSchool.school_id == school_id,
+        )
+        .limit(1)
+    )
+    material = result.scalar_one_or_none()
+    if material is None:
+        raise NotFoundError("The resource does not exist.")
+
+    written: dict[str, Any] = {}
+    if "title" in changes:
+        material.title = str(changes["title"]).strip()
+        written["title"] = material.title
+    if "type" in changes:
+        material.type = str(changes["type"])
+        written["type"] = material.type
+    if "area" in changes:
+        material.area = str(changes["area"])
+        written["area"] = material.area
+    if "visible_to" in changes:
+        material.visible_to = str(changes["visible_to"])
+        written["visible_to"] = material.visible_to
+    if "description" in changes:
+        description = changes["description"]
+        material.description = str(description).strip() if description else None
+        written["description"] = material.description
+
+    if not written:
+        return
+
+    await catalog.record_history(
+        session,
+        material=material,
+        action="metadata_changed",
+        actor_id=actor_id,
+        detail=written,
+    )
+    await catalog.record_audit(
+        session,
+        event_type="school.material.updated",
+        actor_id=actor_id,
+        actor_name=None,
+        subject_type="material",
+        subject_id=material.id,
+        school_id=school_id,
+        detail=written,
+    )
+
+    await session.commit()
+
+
+async def delete_school_material(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    material_id: uuid.UUID,
+) -> None:
+    """Remove a resource of the school.
+
+    Only the pieces the school loaded can be removed: the ones of the
+    editorial team are not the school's to delete.
+    """
+    creators = await _school_creators(session, school_id)
+    result = await session.execute(
+        select(Material).where(
+            Material.id == material_id,
+            Material.created_by.is_not(None),
+            Material.created_by.in_(creators),
+        )
+    )
+    material = result.scalar_one_or_none()
+    if material is None:
+        raise NotFoundError("The resource does not exist.")
+
+    files = await session.execute(
+        select(MaterialFile).where(MaterialFile.material_id == material.id)
+    )
+    for stored in files.scalars().all():
+        with suppress(ServiceUnavailableError):
+            await get_storage().delete(key=stored.storage_key)
+
+    await session.delete(material)
+    await session.commit()
+
+
+async def get_material_file(
+    session: AsyncSession,
+    school_id: uuid.UUID,
+    material_id: uuid.UUID,
+) -> tuple[MaterialFile, Material] | None:
+    """The file of a resource of the school, and the piece that carries it.
+
+    Only the material that the school can see answers: a file of another
+    school does not exist for it.
+    """
+    result = await session.execute(
+        select(MaterialFile, Material)
+        .join(Material, Material.id == MaterialFile.material_id)
+        .join(MaterialSchool, MaterialSchool.material_id == Material.id)
+        .where(
+            Material.id == material_id,
+            MaterialSchool.school_id == school_id,
+            MaterialSchool.enabled.is_(True),
+            MaterialSchool.archived_at.is_(None),
+            Material.state == PUBLISHED_STATE,
+        )
+        .limit(1)
+    )
+    row = result.first()
+    if row is None:
+        return None
+    stored, material = row
+    return stored, material
+
+
 __all__ = [
+    "create_school_material",
+    "delete_school_material",
+    "update_school_material",
     "get_current_period",
     "get_material",
+    "get_material_file",
     "get_entitlement",
     "get_overview",
     "get_profile",
     "get_school",
     "get_user",
     "list_material",
+    "upload_school_file",
 ]

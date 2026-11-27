@@ -1,16 +1,16 @@
 // =============================================================================
-// The file helpers.
+// The files of the app.
 // -----------------------------------------------------------------------------
-// Storage stays on Supabase. The browser uploads the files directly,
-// with the short-lived token the backend mints, so the bucket's own
-// RLS policies decide who may write where.
+// The files live on the disk of the server: the browser sends them to
+// the API and the API gives them back. There is no third-party storage
+// in the middle.
 //
-// The path conventions are the same as in
-// `supabase/migrations/20260812220000_storage_buckets.sql` and are
-// enforced by those policies.
+// The rows of the database keep the PATH of the file (`avatars/<user>/
+// avatar-1712.png`), never its address: the browser asks the API for
+// the file and the API decides who may read it.
 // =============================================================================
 
-import { storageAuthHeaders } from "@/lib/supabase/client";
+import { apiBaseUrl } from "@/lib/api/client";
 
 export const BUCKETS = {
   schoolLogos: "school-logos",
@@ -21,32 +21,43 @@ export const BUCKETS = {
 
 export type BucketName = (typeof BUCKETS)[keyof typeof BUCKETS];
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
+/** Where the API serves the files. */
+export const FILES_PATH = "/v1/files";
 
-export function classContentPath(
-  schoolId: string,
-  courseSubjectId: string,
-  filename: string,
-): string {
-  return `${schoolId}/${courseSubjectId}/${safeFileName(filename)}`;
+/**
+ * The address of a file the API has to serve.
+ *
+ * The rows keep a relative path (`avatars/<user>/avatar.png`). An
+ * absolute address is left as it is: it points to a file that lives
+ * somewhere else.
+ */
+export function fileUrl(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  if (/^https?:\/\//i.test(stored)) return stored;
+  return `${apiBaseUrl}${FILES_PATH}/${stored.replace(/^\/+/, "")}`;
 }
 
-export function taskSubmissionPath(
-  schoolId: string,
-  taskId: string,
-  studentId: string,
-  filename: string,
-): string {
-  return `${schoolId}/${taskId}/${studentId}/${safeFileName(filename)}`;
+/**
+ * The name of a file, read from the path it has in the store.
+ *
+ * The store prefixes the name with the moment of the upload
+ * (`1750000000-factura.pdf`). That prefix is not what the person
+ * wrote: it is removed, so the list of attachments says what the
+ * files are.
+ */
+export function fileNameFromPath(path: string): string {
+  const file = path.split("/").pop() ?? path;
+  const dash = file.indexOf("-");
+  return dash > 0 ? file.slice(dash + 1) : file;
 }
 
 /**
  * A file name that is safe to put in a storage path.
  *
  * The browser sends the name the user gave the file: it can have
- * spaces, accents or characters the storage API does not like. The
- * name keeps its extension, because the bucket policies read the
- * first segments of the path and nothing else.
+ * spaces, accents or characters the file system does not like. The
+ * name keeps its extension, because the reader of the row uses it to
+ * know the type of the file.
  */
 export function safeFileName(name: string): string {
   const cleaned = name
@@ -59,117 +70,56 @@ export function safeFileName(name: string): string {
   return cleaned || "archivo";
 }
 
-/** The public URL of an object. It is stable: the bucket is public. */
-export function publicUrl(bucket: BucketName, path: string): string {
-  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
-}
+/** The response of the upload endpoints. */
+export type UploadedFile = {
+  /** The path of the file, the one the row keeps. */
+  path: string;
+  /** The address the API serves it under. */
+  url: string;
+};
 
 /**
- * Upload a file to a bucket.
+ * Upload a file to the API.
  *
- * The token goes in the Authorization header: the storage API reads it
- * from there, and the bucket's policies decide whether the write is
- * allowed.
+ * The API answers with the path of the file and the address it is
+ * served under.
  */
-export async function uploadFile(
-  bucket: BucketName,
-  path: string,
-  file: File,
-  options: { upsert?: boolean; contentType?: string } = {},
-): Promise<{ path: string }> {
-  const headers = await storageAuthHeaders();
-  const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodePath(path)}`;
+async function upload(path: string, file: File): Promise<UploadedFile> {
+  const form = new FormData();
+  form.append("file", file, file.name);
 
-  const response = await fetch(url, {
-    method: options.upsert ? "POST" : "PUT",
-    headers: {
-      ...headers,
-      "Content-Type": options.contentType ?? file.type,
-      ...(options.upsert ? { "x-upsert": "true" } : {}),
-    },
-    body: file,
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`No se pudo subir el archivo: ${response.status} ${detail}`);
-  }
-
-  return { path };
-}
-
-/**
- * Remove a file from a bucket.
- *
- * A failure here is not fatal: storage keeps the old file and the new
- * one goes in alongside it.
- */
-export async function removeFile(bucket: BucketName, path: string): Promise<void> {
-  const headers = await storageAuthHeaders();
-  const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${encodePath(path)}`;
-
-  const response = await fetch(url, {
-    method: "DELETE",
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(`No se pudo eliminar el archivo: ${response.status}`);
-  }
-}
-
-/**
- * A signed URL for a private object.
- *
- * The buckets the app reads from are public, so this is only needed
- * for the ones that are not.
- */
-export async function createSignedUrl(
-  bucket: BucketName,
-  path: string,
-  expiresInSeconds = 60,
-): Promise<string> {
-  const headers = await storageAuthHeaders();
-  const url = `${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${encodePath(path)}`;
-
-  const response = await fetch(url, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ expiresIn: expiresInSeconds }),
+    credentials: "include",
+    body: form,
   });
 
   if (!response.ok) {
-    throw new Error(`No se pudo firmar la URL: ${response.status}`);
+    let message = "No se pudo subir el archivo.";
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      // The body is not JSON: the generic message is fine.
+    }
+    throw new Error(message);
   }
 
-  const body = (await response.json()) as { signedURL?: string; signedUrl?: string };
-  const signed = body.signedURL ?? body.signedUrl;
-  if (!signed) {
-    throw new Error("Supabase no devolvio una URL firmada.");
-  }
-  return `${SUPABASE_URL}${signed.replace(/^\/storage\/v1/, "/storage/v1")}`;
+  return (await response.json()) as UploadedFile;
 }
 
-/** Encode a path for the storage API, keeping the slashes. */
-function encodePath(path: string): string {
-  return path.split("/").map(encodeURIComponent).join("/");
+/** Upload the delivery of a task. */
+export async function uploadTaskSubmission(args: {
+  taskId: string;
+  file: File;
+}): Promise<UploadedFile> {
+  return upload(`${FILES_PATH}/task-submissions/${args.taskId}`, args.file);
 }
 
+/** Upload the material of a class. */
 export async function uploadClassContent(args: {
-  schoolId: string;
   courseSubjectId: string;
   file: File;
-}): Promise<{ path: string }> {
-  const path = classContentPath(args.schoolId, args.courseSubjectId, args.file.name);
-  return uploadFile(BUCKETS.classContent, path, args.file, { upsert: true });
-}
-
-export async function uploadTaskSubmission(args: {
-  schoolId: string;
-  taskId: string;
-  studentId: string;
-  file: File;
-}): Promise<{ path: string }> {
-  const path = taskSubmissionPath(args.schoolId, args.taskId, args.studentId, args.file.name);
-  return uploadFile(BUCKETS.taskSubmissions, path, args.file, { upsert: true });
+}): Promise<UploadedFile> {
+  return upload(`${FILES_PATH}/class-content/${args.courseSubjectId}`, args.file);
 }

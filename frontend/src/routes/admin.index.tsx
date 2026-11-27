@@ -68,8 +68,8 @@ const activityIcons: Record<string, typeof Upload> = {
 
 const activityTones: Record<string, string> = {
   success: "text-success",
-  info: "text-[#7FB8FF]",
-  teal: "text-[#2DD4BF]",
+  info: "text-primary",
+  teal: "text-primary",
   muted: "text-muted-foreground",
 };
 
@@ -91,7 +91,7 @@ function relativeTime(value: string): string {
 function ActivityRow({ entry }: { entry: ActivityEntry }) {
   const Icon = activityIcons[entry.icon] ?? Info;
   return (
-    <li className="flex items-start gap-3 border-b border-[rgba(150,175,220,.08)] px-[18px] py-3 last:border-b-0">
+    <li className="flex items-start gap-3 border-b border-border px-[18px] py-3 last:border-b-0">
       <span className={`mt-px shrink-0 ${activityTones[entry.tone] ?? "text-muted-foreground"}`}>
         <Icon className="size-4" strokeWidth={1.9} aria-hidden />
       </span>
@@ -155,7 +155,7 @@ function AdminDashboard() {
           delta={
             teachers && teachers.pending > 0 ? (
               <>
-                <b className="font-semibold text-[#A0B2CE]">{teachers.pending}</b> sin acceso
+                <b className="font-semibold text-foreground">{teachers.pending}</b> sin activar
               </>
             ) : (
               "todos con acceso al material"
@@ -172,7 +172,7 @@ function AdminDashboard() {
             students ? (
               <>
                 en {students.courses} cursos ·{" "}
-                <b className="font-semibold text-[#A0B2CE]">{students.with_access}</b> con acceso
+                <b className="font-semibold text-foreground">{students.with_access}</b> con acceso
                 activo
               </>
             ) : (
@@ -189,10 +189,10 @@ function AdminDashboard() {
           delta={
             tasks && tasks.stale > 0 ? (
               <>
-                <b className="font-semibold text-[#A0B2CE]">{tasks.stale}</b> con más de 3 días
+                <b className="font-semibold text-foreground">{tasks.stale}</b> con más de 3 días
               </>
             ) : (
-              "entregas por calificar"
+              "creadas por tus docentes"
             )
           }
         />
@@ -200,12 +200,12 @@ function AdminDashboard() {
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
-          title="Material habilitado para tu colegio"
-          description="Lo que el equipo de plataforma cargó y dejó visible para tu institución"
+          title="La biblioteca de tu colegio"
+          description="Los recursos que el equipo de plataforma cargó y dejó visibles para tu institución"
           actions={
             <Link to="/admin/contenido">
               <Button variant="ghost" size="sm">
-                Ver todo
+                Ver la biblioteca
                 <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
               </Button>
             </Link>
@@ -215,9 +215,9 @@ function AdminDashboard() {
             <div className="flex flex-col gap-2.5" aria-hidden>
               {[0, 1, 2, 3].map((row) => (
                 <div key={row} className="grid grid-cols-[150px_1fr_54px] items-center gap-3">
-                  <span className="h-[11px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                  <span className="h-[9px] animate-pulse rounded-full bg-[rgba(150,175,220,.11)]" />
-                  <span className="h-[11px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
+                  <span className="h-[11px] animate-pulse rounded bg-muted" />
+                  <span className="h-[9px] animate-pulse rounded-full bg-muted" />
+                  <span className="h-[11px] animate-pulse rounded bg-muted" />
                 </div>
               ))}
             </div>
@@ -228,13 +228,15 @@ function AdminDashboard() {
                 className="grid grid-cols-[150px_1fr_54px] items-center gap-3 py-1.5 text-[12.8px]"
               >
                 <span className="truncate text-muted-foreground">{row.area}</span>
-                <span className="h-[9px] overflow-hidden rounded-full bg-[rgba(150,175,220,.12)]">
+                <span className="h-[9px] overflow-hidden rounded-full bg-muted">
                   <span
-                    className="block h-full rounded-full bg-gradient-to-r from-primary to-[#2DD4BF]"
+                    className="block h-full rounded-full bg-primary"
                     style={{ width: `${Math.round((row.count / maxArea) * 100)}%` }}
                   />
                 </span>
-                <span className="text-right font-mono text-[12px] text-[#A0B2CE]">{row.count}</span>
+                <span className="text-right font-mono text-[12px] text-foreground">
+                  {row.count}
+                </span>
               </div>
             ))
           ) : (
@@ -243,8 +245,8 @@ function AdminDashboard() {
             </p>
           )}
 
-          <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(46,143,255,.28)] bg-primary-soft p-3 text-[12.5px] text-[#A0B2CE]">
-            <Info className="mt-px size-4 shrink-0 text-[#7FB8FF]" strokeWidth={1.9} aria-hidden />
+          <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary-soft p-3 text-[12.5px] text-foreground">
+            <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
             <span>
               <b className="font-semibold text-foreground">
                 El material lo carga el equipo editorial de Lumen
@@ -262,7 +264,7 @@ function AdminDashboard() {
             <dt className="text-[12.4px] text-muted-foreground">Periodo</dt>
             <dd>
               {loading ? (
-                <span className="inline-block h-[11px] w-[132px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                <span className="inline-block h-[11px] w-[132px] animate-pulse rounded bg-muted" />
               ) : (
                 (data?.period?.name ?? "Sin periodo vigente")
               )}
@@ -276,9 +278,9 @@ function AdminDashboard() {
 
             <dt className="text-[12.4px] text-muted-foreground">Docentes con acceso</dt>
             <dd>
-              <span className="mt-1 block h-[9px] overflow-hidden rounded-full bg-[rgba(150,175,220,.12)]">
+              <span className="mt-1 block h-[9px] overflow-hidden rounded-full bg-muted">
                 <span
-                  className="block h-full rounded-full bg-gradient-to-r from-primary to-[#2DD4BF]"
+                  className="block h-full rounded-full bg-primary"
                   style={{ width: `${accessPct}%` }}
                 />
               </span>
@@ -297,16 +299,24 @@ function AdminDashboard() {
           title="Actividad reciente"
           description="Cargas y cambios de la última semana"
           bodyClassName="p-0"
+          actions={
+            <Link to="/admin/contenido">
+              <Button variant="ghost" size="sm">
+                Ver la biblioteca
+                <ChevronRight className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
+              </Button>
+            </Link>
+          }
         >
           {loading ? (
             <ul aria-hidden>
               {[0, 1, 2].map((row) => (
                 <li
                   key={row}
-                  className="flex items-start gap-3 border-b border-[rgba(150,175,220,.08)] px-[18px] py-3 last:border-b-0"
+                  className="flex items-start gap-3 border-b border-border px-[18px] py-3 last:border-b-0"
                 >
-                  <span className="size-4 animate-pulse rounded-full bg-[rgba(150,175,220,.11)]" />
-                  <span className="h-[11px] flex-1 animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
+                  <span className="size-4 animate-pulse rounded-full bg-muted" />
+                  <span className="h-[11px] flex-1 animate-pulse rounded bg-muted" />
                 </li>
               ))}
             </ul>
@@ -329,7 +339,7 @@ function AdminDashboard() {
               <Link
                 key={action.to}
                 to={action.to}
-                className="flex items-center gap-[11px] rounded-[10px] border border-border bg-[#0B1222] px-[10px] py-[9px] transition-colors hover:border-[rgba(150,175,220,.26)] hover:bg-secondary"
+                className="flex items-center gap-[11px] rounded-idx border border-border bg-secondary px-[10px] py-[9px] transition-colors hover:border-input hover:bg-secondary"
               >
                 <action.icon
                   className="size-[17px] shrink-0 opacity-85"
@@ -354,9 +364,6 @@ function AdminDashboard() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>Los datos son del colegio y se cuentan en el servidor al abrir la vista.</span>
       </p>
     </>

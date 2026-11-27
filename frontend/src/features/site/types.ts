@@ -159,7 +159,8 @@ export type SiteCopy = {
   catalog: SiteCatalog;
   process: SiteProcess;
   roles: SiteRoles;
-  coverage: SiteCoverage;
+  /** The block is only drawn when the copy carries it. */
+  coverage?: SiteCoverage | null;
   faq: SiteFaq;
   cta: SiteCta;
   footer: SiteFooter;

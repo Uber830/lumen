@@ -1,41 +1,49 @@
-import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, Info, Search, X } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  Info,
+  Pencil,
+  Search,
+  Settings2,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
+  Button,
   Chip,
   EmptyState,
-  PanelTable,
   PageHeader,
   Pagination,
   SectionCard,
   Toolbar,
-  tableCellClass,
-  tableHeadClass,
 } from "@/components/ui-kit";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { SchoolResourceDialog } from "@/features/admin/school-resource-dialog";
+import { SchoolMaterialCard } from "@/features/admin/school-material-card";
+import { SchoolMaterialEditor } from "@/features/admin/school-material-editor";
+import { SchoolMaterialPreview } from "@/features/admin/school-material-preview";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { audienceLabel, coverOf, ResourceCard } from "@/features/resources/resource-card";
 import {
   formatFileSize,
-  formatShortDate,
+  MATERIAL_PAGE_SIZE,
+  useDeleteSchoolMaterial,
   useSchoolMaterial,
-  useSchoolMaterialDetail,
   type MaterialListItem,
 } from "@/lib/school/material";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/contenido")({
   head: () => ({
     meta: [
-      { title: "Contenido — Lumen" },
+      { title: "Biblioteca — Lumen" },
       {
         name: "description",
-        content: "Material habilitado para tu colegio, cargado por el equipo editorial de Lumen.",
+        content: "La biblioteca del colegio: los recursos que publicó el equipo de Lumen.",
       },
     ],
   }),
@@ -51,17 +59,34 @@ const KIND_LABELS: Record<string, string> = {
   zip: "Comprimido",
 };
 
-function Contenido() {
-  const { session } = useRouteContext({ from: "/admin" });
+/** The line under the name of a resource: area, courses and size. */
+function metaOf(item: MaterialListItem): string {
+  const courses =
+    item.courses.length > 0
+      ? item.courses.map((course) => course.name).join(" · ")
+      : "Todo el colegio";
+  return `${item.area} · ${courses} · ${formatFileSize(item.file_size_bytes)}`;
+}
 
+function Contenido() {
   // The filters live in the URL state of the view: the browser can go
   // back and the page keeps them.
   const [query, setQuery] = useState("");
   const [area, setArea] = useState("all");
+  const [audience, setAudience] = useState("all");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<MaterialListItem | null>(null);
+  // The three controls of a resource of the school: the eye, the pencil
+  // and the characteristics.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [editorId, setEditorId] = useState<string | null>(null);
+  const [cardId, setCardId] = useState<string | null>(null);
+  // The form that loads a resource of the school, and the one that
+  // removes it.
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<MaterialListItem | null>(null);
 
-  const material = useSchoolMaterial({ q: query, area, page });
+  const material = useSchoolMaterial({ q: query, area, audience, page });
+  const deleteMaterial = useDeleteSchoolMaterial();
 
   // A new filter starts again on the first page: the second page of
   // the previous filter is not the second page of this one.
@@ -75,14 +100,30 @@ function Contenido() {
     setPage(1);
   };
 
-  const detail = useSchoolMaterialDetail(selected?.id ?? null);
+  const applyAudience = (value: string) => {
+    setAudience(value);
+    setPage(1);
+  };
+
   const areas = material.data?.areas ?? [];
+  const audiences = material.data?.audiences ?? [];
+
+  async function onDelete() {
+    if (!toDelete) return;
+    await deleteMaterial.mutateAsync(toDelete.id);
+    setToDelete(null);
+  }
 
   return (
     <>
       <PageHeader
-        title="Contenido"
-        subtitle="Material habilitado para tu colegio, cargado por el equipo editorial de Lumen."
+        title="Biblioteca del colegio"
+        subtitle="Los recursos que publicó el equipo de Lumen y los que cargó tu colegio. Todos los ven; lo que es solo para docentes o solo para administradores lo define quien lo carga."
+        actions={
+          <Button icon={Upload} onClick={() => setUploadOpen(true)}>
+            Cargar recurso
+          </Button>
+        }
       />
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
@@ -99,7 +140,7 @@ function Contenido() {
               onChange={(event) => applyQuery(event.target.value)}
               placeholder="Buscar por título, área o ID"
               aria-label="Buscar por título, área o ID"
-              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+              className="w-full rounded-idx border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
 
@@ -107,7 +148,7 @@ function Contenido() {
             value={area}
             onChange={(event) => applyArea(event.target.value)}
             aria-label="Filtrar por área"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todas las áreas</option>
             {areas.map((item) => (
@@ -117,8 +158,22 @@ function Contenido() {
             ))}
           </select>
 
+          <select
+            value={audience}
+            onChange={(event) => applyAudience(event.target.value)}
+            aria-label="Filtrar por destinatario"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+          >
+            <option value="all">Todos los destinatarios</option>
+            {audiences.map((item) => (
+              <option key={item} value={item}>
+                {audienceLabel(item)}
+              </option>
+            ))}
+          </select>
+
           <div className="ml-auto">
-            <Chip tone="muted">{material.data ? `${material.data.total} materiales` : "—"}</Chip>
+            <Chip tone="muted">{material.data ? `${material.data.total} recursos` : "—"}</Chip>
           </div>
         </Toolbar>
 
@@ -127,174 +182,178 @@ function Contenido() {
             {material.error.message}
           </p>
         ) : material.isLoading ? (
-          <div className="space-y-2 px-[18px] py-4" aria-hidden>
-            {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            aria-hidden
+          >
+            {Array.from({ length: 8 }).map((_, index) => (
               <div
                 key={index}
-                className="h-11 animate-pulse rounded-lg bg-[rgba(150,175,220,.08)]"
+                className="overflow-hidden rounded-idx border border-border"
                 style={{ animationDelay: `${index * 70}ms` }}
-              />
+              >
+                <div className="h-[104px] animate-pulse bg-muted" />
+                <div className="space-y-2 p-3">
+                  <div
+                    className="h-[13px] w-full animate-pulse rounded bg-muted"
+                    style={{ animationDelay: `${index * 70}ms` }}
+                  />
+                  <div className="h-[11px] w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
             ))}
           </div>
         ) : material.data && material.data.items.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
-              <PanelTable className="w-full border-collapse">
-                <caption className="sr-only">Material habilitado para tu colegio</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" className={tableHeadClass}>
-                      Material
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[120px]`}>
-                      Tipo
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[130px]`}>
-                      Área
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[130px]`}>
-                      Cursos
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[140px]`}>
-                      Disponible desde
-                    </th>
-                    <th scope="col" className={`${tableHeadClass} w-[90px]`}>
-                      <span className="sr-only">Acciones</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {material.data.items.map((item) => (
-                    <tr key={item.id} className="transition-colors hover:bg-white/[0.028]">
-                      <td className={tableCellClass}>
-                        <div className="font-medium">{item.title}</div>
-                        <div className="mt-px font-mono text-[12px] text-muted-foreground">
-                          {item.ref} · {formatFileSize(item.file_size_bytes)}
-                        </div>
-                      </td>
-                      <td className={tableCellClass}>
-                        <Chip tone="muted">{KIND_LABELS[item.kind] ?? item.kind}</Chip>
-                      </td>
-                      <td className={tableCellClass}>{item.area}</td>
-                      <td className={`${tableCellClass} text-muted-foreground`}>
-                        {item.courses.length > 0
-                          ? item.courses.map((course) => course.name).join(" · ")
-                          : "Todo el colegio"}
-                      </td>
-                      <td className={`${tableCellClass} font-mono text-muted-foreground`}>
-                        {formatShortDate(item.available_since)}
-                      </td>
-                      <td className={tableCellClass}>
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setSelected(item)}
-                            className="rounded-md px-1.5 py-0.5 text-[13px] text-primary transition-colors hover:bg-primary-soft"
-                          >
-                            Ver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </PanelTable>
-            </div>
+            {/* The shelf: every resource as a card, with its cover. */}
+            <ul className="grid gap-4 px-[18px] py-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {material.data.items.map((item) => (
+                <li key={item.id}>
+                  <ResourceCard
+                    data={{
+                      title: item.title,
+                      type: item.type,
+                      area: item.area,
+                      meta: metaOf(item),
+                      audience: audienceLabel(item.visible_to),
+                      fromSchool: item.origin === "colegio",
+                    }}
+                    chips={
+                      <>
+                        <Chip tone={item.visible_to === "all" ? "muted" : "info"}>
+                          {audienceLabel(item.visible_to)}
+                        </Chip>
+                        {item.origin === "colegio" ? (
+                          <Chip tone="teal">Cargado por el colegio</Chip>
+                        ) : null}
+                      </>
+                    }
+                    actions={
+                      /* Los controles son solo el icono: la tarjeta no
+                         pierde el espacio con los nombres. */
+                      <div className="flex items-center gap-1.5">
+                        {/* El ojo: la pieza se ve antes de decidir
+                            nada sobre ella. */}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          icon={Eye}
+                          className="size-[26px] justify-center px-0"
+                          onClick={() => setPreviewId(item.id)}
+                          aria-label={`Ver ${item.title}`}
+                          title="Ver el recurso"
+                        />
+                        {/* Los recursos del colegio son suyos: se editan
+                            y se miran. Los del equipo de Lumen se
+                            consultan, nada más. */}
+                        {item.origin === "colegio" ? (
+                          <>
+                            {/* El lápiz: los valores del recurso. */}
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              icon={Pencil}
+                              className="size-[26px] justify-center px-0"
+                              onClick={() => setEditorId(item.id)}
+                              aria-label={`Editar ${item.title}`}
+                              title="Editar el recurso"
+                            />
+                            {/* Las características: la ficha de la
+                                pieza y de su archivo. */}
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              icon={Settings2}
+                              className="size-[26px] justify-center px-0"
+                              onClick={() => setCardId(item.id)}
+                              aria-label={`Características de ${item.title}`}
+                              title="Ver las características del recurso"
+                            />
+                            {/* Solo los recursos del colegio son suyos
+                                para quitar: los del equipo de Lumen no. */}
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              icon={Trash2}
+                              className="size-[26px] justify-center px-0 text-destructive hover:text-destructive"
+                              onClick={() => setToDelete(item)}
+                              aria-label={`Quitar ${item.title}`}
+                              title="Quitar el recurso"
+                            />
+                          </>
+                        ) : null}
+                      </div>
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+
             <Pagination
               page={material.data.page}
               pageCount={material.data.pages}
               total={material.data.total}
-              pageSize={material.data.per_page}
+              pageSize={material.data.per_page || MATERIAL_PAGE_SIZE}
               onPageChange={setPage}
+              always
             />
           </>
         ) : (
           <EmptyState
             icon={BookOpen}
             title="Sin resultados"
-            description="Ajusta los filtros o revisa con el equipo de plataforma los materiales que te faltan."
+            description="Ajusta los filtros o revisa con el equipo de plataforma los recursos que te faltan."
           />
         )}
 
-        {/* The contact is always visible: it is the way to ask for the
-            material that is missing. */}
+        {/* The library belongs to everybody: the rules of the access are
+            written down, not guessed. */}
         <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
-          <Info className="mt-px size-4 shrink-0 text-[#2DD4BF]" strokeWidth={1.9} aria-hidden />
+          <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
           <span>
-            ¿Falta material o una versión nueva? La carga y la habilitación las hace el equipo de
-            plataforma de Lumen. Escríbele a tu coordinador para que lo agregue al catálogo.
+            <b className="font-semibold text-foreground">La biblioteca es de todos.</b> Todo lo que
+            el equipo de Lumen publica queda disponible para todos los colegios. Cada recurso define
+            a quién va dirigido: a todos, solo a docentes o solo a administradores.
           </span>
         </p>
       </SectionCard>
 
-      {/* The detail of the material: what it is and that the school has
-          access to it. The switches that enable the material belong to
-          the platform team, and the material is not downloaded by
-          anybody: it is consulted inside the platform. */}
-      <Drawer open={Boolean(selected)} onOpenChange={(open: boolean) => !open && setSelected(null)}>
-        <DrawerContent className="w-full border-l border-border bg-card sm:max-w-[440px]">
-          <DrawerHeader className="border-b border-border px-[18px] py-4">
-            <DrawerTitle className="text-[15px] font-semibold">
-              {detail.data?.title ?? selected?.title ?? "Material"}
-            </DrawerTitle>
-            <DrawerDescription className="font-mono text-[12px] text-muted-foreground">
-              {detail.data?.ref ?? selected?.ref}
-            </DrawerDescription>
-          </DrawerHeader>
+      {/* El recurso, como es: el ojo. Se abre sobre la estantería, sin
+          salir de la vista. */}
+      <SchoolMaterialPreview
+        key={previewId ?? "vista-previa-cerrada"}
+        materialId={previewId}
+        onClose={() => setPreviewId(null)}
+      />
 
-          <div className="flex-1 overflow-y-auto px-[18px] py-4">
-            {detail.isLoading ? (
-              <div
-                className="h-24 animate-pulse rounded-xl bg-[rgba(150,175,220,.08)]"
-                aria-hidden
-              />
-            ) : detail.data ? (
-              <dl className="grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
-                <dt className="text-[12.4px] text-muted-foreground">Área</dt>
-                <dd>{detail.data.area}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Tipo</dt>
-                <dd>{KIND_LABELS[detail.data.kind] ?? detail.data.kind}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Tamaño</dt>
-                <dd className="font-mono">{formatFileSize(detail.data.file_size_bytes)}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Disponible desde</dt>
-                <dd className="font-mono">{formatShortDate(detail.data.available_since)}</dd>
-                <dt className="text-[12.4px] text-muted-foreground">Cursos</dt>
-                <dd>
-                  {detail.data.courses.length > 0
-                    ? detail.data.courses.map((course) => course.name).join(" · ")
-                    : "Todo el colegio"}
-                </dd>
-                {detail.data.description && (
-                  <>
-                    <dt className="text-[12.4px] text-muted-foreground">Descripción</dt>
-                    <dd className="text-muted-foreground">{detail.data.description}</dd>
-                  </>
-                )}
-              </dl>
-            ) : (
-              <p className="text-[13px] text-muted-foreground">No se pudo cargar el material.</p>
-            )}
-          </div>
+      {/* El lápiz: los valores del recurso del colegio. */}
+      <SchoolMaterialEditor
+        key={editorId ?? "editor-cerrado"}
+        materialId={editorId}
+        onClose={() => setEditorId(null)}
+      />
 
-          <div className="border-t border-border px-[18px] py-4">
-            <p className="flex items-start gap-2 rounded-xl border border-border bg-[#0B1222] p-3 text-[12.5px] text-muted-foreground">
-              <CheckCircle2
-                className="mt-px size-4 shrink-0 text-success"
-                strokeWidth={1.9}
-                aria-hidden
-              />
-              <span>
-                <b className="font-semibold text-foreground">Acceso confirmado.</b>{" "}
-                {detail.data?.access.note ?? "Este material está habilitado para tu colegio."}
-              </span>
-            </p>
-            <DrawerClose className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[10px] border border-[rgba(150,175,220,.26)] bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
-              <X className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
-              Cerrar
-            </DrawerClose>
-          </div>
-        </DrawerContent>
-      </Drawer>
+      {/* Las características: la ficha de la pieza y de su archivo. */}
+      <SchoolMaterialCard
+        key={cardId ?? "ficha-cerrada"}
+        materialId={cardId}
+        onClose={() => setCardId(null)}
+      />
+
+      {/* The form that loads a resource of the school. */}
+      <SchoolResourceDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />
+
+      {/* Removing a resource of the school asks for confirmation: the
+          file leaves the library with it. */}
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={`Quitar ${toDelete?.title ?? "el recurso"}`}
+        description="El recurso sale de la biblioteca del colegio y el archivo que tiene deja de estar disponible."
+        confirmLabel="Quitar el recurso"
+        pending={deleteMaterial.isPending}
+        onCancel={() => setToDelete(null)}
+        onConfirm={() => void onDelete()}
+      />
     </>
   );
 }

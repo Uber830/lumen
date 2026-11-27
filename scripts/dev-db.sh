@@ -15,10 +15,10 @@
 #
 # The schema comes from two folders, applied in order:
 #
-#   supabase/migrations/   the schema inherited from the original project
-#   backend/migrations/    the schema owned by this project
+#   db/migrations/      the schema inherited from the original project
+#   backend/migrations/  the schema owned by this project
 #
-# The seed data comes from supabase/seed.sql and backend/seeds/.
+# The seed data comes from db/seed.sql and backend/seeds/.
 #
 # `migrate` is the one to use when the database already exists and a
 # new migration landed: it applies only what is pending and keeps the
@@ -111,14 +111,14 @@ create_database() {
   docker exec "$CONTAINER" psql -U postgres -d postgres -q \
     -c "CREATE DATABASE ${DB}" >/dev/null
 
-  # The migrations assume the Supabase platform objects. The shim
+  # The inherited migrations expect a few platform objects. The shim
   # creates stand-ins so they can be applied to a plain Postgres.
   docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
-    < "$ROOT/supabase/local-shim.sql" >/dev/null
+    < "$ROOT/db/platform-shim.sql" >/dev/null
 
   apply_migrations
 
-  for seed in "$ROOT/supabase/seed.sql" "$ROOT"/backend/seeds/*.sql; do
+  for seed in "$ROOT/db/seed.sql" "$ROOT"/backend/seeds/*.sql; do
     [ -e "$seed" ] || continue
     echo "  applying $(basename "$seed")"
     docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
@@ -203,7 +203,7 @@ apply_one() {
 # Apply the migrations that are pending, in order.
 apply_migrations() {
   ensure_log
-  for migration in "$ROOT"/supabase/migrations/*.sql "$ROOT"/backend/migrations/*.sql; do
+  for migration in "$ROOT"/db/migrations/*.sql "$ROOT"/backend/migrations/*.sql; do
     [ -e "$migration" ] || continue
     local name
     name="$(basename "$migration")"
@@ -221,12 +221,12 @@ migrate_database() {
   docker exec "$CONTAINER" psql -U postgres -d postgres -q \
     -c "CREATE DATABASE ${DB}" >/dev/null 2>&1 || true
 
-  # The migrations assume the Supabase platform objects. The shim
+  # The inherited migrations expect a few platform objects. The shim
   # creates stand-ins so they can be applied to a plain Postgres. It
   # is written with `if not exists`, so running it on a database that
   # already has the schema changes nothing.
   docker exec -i "$CONTAINER" psql -U postgres -d "$DB" -q -f - \
-    < "$ROOT/supabase/local-shim.sql" >/dev/null 2>&1
+    < "$ROOT/db/platform-shim.sql" >/dev/null 2>&1
 
   apply_migrations
   echo

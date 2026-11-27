@@ -27,11 +27,66 @@ que es el vocabulario que ya usaba.
 
 **Las transiciones válidas las decide el backend** (`available_transitions` en
 la respuesta del detalle): el frontend las muestra, no las adivina. Publicar
-exige título, tipo, área, grados y al menos un colegio; si falta algo, la
+exige título, tipo, área y al menos un colegio; si falta algo, la
 respuesta es un `422` con la lista de lo que falta en `missing`.
+
+Los **grados son opcionales**: una pieza sin grados es una pieza para todos los
+grados del colegio, así que nunca son un motivo para bloquear la publicación.
 
 Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
 colegios afectados, y el cliente lo reenvía con `{"confirm": true}`.
+
+## Los valores se editan
+
+Cada tarjeta de la biblioteca tiene **tres acciones**, y las tres son **solo
+un icono** (26 × 26 px), para que la tarjeta no pierda el espacio:
+
+| Icono | Qué hace |
+| --- | --- |
+| 👁️ **Ver** | Muestra la pieza como es (la imagen, el PDF, el video) |
+| ✏️ **Editar** | Abre el formulario: título, tipo, área, grados, visible para, descripción y **a qué colegios va la pieza** |
+| ⚙️ **Gestionar** | Abre el **resumen**: qué es la pieza, su estado y los colegios que la ven |
+
+El formulario de **Editar** es un **modal en el centro**, no un cajón: la pieza
+se administra en el medio de la pantalla, con el formulario completo a la
+vista. En la esquina está la **X de cerrar**, no el lápiz. Los cambios se
+guardan con `PATCH /v1/platform/catalog/{id}`: el botón **Guardar cambios** solo
+se enciende cuando algo cambió, y el cambio queda en el historial del material
+y en la traza de auditoría.
+
+**Gestionar** no cambia nada: es la ficha de la pieza, y es solo lectura —tampoco
+muestra el historial. Los valores se cambian con el lápiz.
+
+## El ojo: ver la pieza
+
+El **ojo** abre la pieza como es: una imagen como imagen, un PDF en el lector
+del navegador, un video con sus controles. Una pieza que solo es un enlace
+externo lo dice y ofrece el enlace. El archivo lo sirve la API
+(`GET /v1/platform/files/{id}`) **en línea**: el material se consulta, no se
+descarga, como en el resto del producto.
+
+## A qué colegios va la pieza
+
+Antes de la lista de colegios hay una **decisión**:
+
+| Decisión | Qué pasa |
+| --- | --- |
+| **Todos los colegios** | La pieza se habilita para toda la red (`all_schools: true`) y la lista de colegios no se muestra |
+| **Ciertos colegios** | Aparece la lista y solo ven la pieza los que se elijan |
+
+Así nadie deja la lista en blanco por descuido: lo que no se elige es una
+decisión, no un olvido.
+
+La misma decisión está en el formulario de **Editar**, para cambiar el acceso
+de una pieza que ya existe. El estado inicial se deriva de los datos: si la
+pieza llega a todos los colegios de la red, aparece **Todos los colegios**; si
+no, **Ciertos colegios** con la lista marcada. Al guardar, el acceso se
+escribe con `PUT /v1/platform/catalog/{id}/schools`, que acepta `all_schools`
+igual que la creación.
+
+Quitarle el acceso a un colegio a una pieza publicada devuelve `409` con los
+colegios afectados, y el formulario pide la confirmación con **Sí, cambiar el
+acceso** antes de reenviarlo con `{"confirm": true}`.
 
 ## La cobertura
 
@@ -43,10 +98,11 @@ toca a los demás colegios de la red.
 
 - **El prefijo es `/v1/platform`**, no `/api/platform`: es la convención del
   repositorio (`/v1/auth`, `/v1/schools`, `/v1/public`).
-- **El almacenamiento de los archivos** es el adaptador que ya tenía el
-  proyecto (`app/core/supabase_storage.py`), detrás de la interfaz de
-  `app/platform/storage.py`. Cambiar de destino es cambiar el adaptador, no el
-  catálogo; el bucket es configurable.
+- **El almacenamiento de los archivos** es `LocalMaterialStorage`, el adaptador
+  que vive detrás de la interfaz de `app/platform/storage.py`. Escribe en el
+  disco del servidor: los archivos van a `backend/var/materiales` (la carpeta
+  que nombra `PLATFORM_STORAGE_DIR`). Cambiar de destino es cambiar el
+  adaptador, no el catálogo; la carpeta es configurable.
 - **Los formatos admitidos** son PDF, EPUB, DOCX, MP4 y ZIP.
 - **ISBN, autor y editorial no bloquean la publicación**: son opcionales.
 - **Los avisos al equipo de plataforma** se registran en `audit_log` y se

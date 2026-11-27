@@ -1,8 +1,9 @@
-import { AlertTriangle, Check, FileText, History, Link2, Trash2, X } from "lucide-react";
+import { audienceLabel } from "@/features/resources/resource-card";
+import { AlertTriangle, Check, FileText, Link2, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
-import { StatusPill, Tag } from "@/components/ui-kit";
+import { Button, StatusPill, Tag } from "@/components/ui-kit";
 import { useChangeMaterialStatus, useDeleteMaterial, useMaterial } from "@/lib/platform/hooks";
 import {
   MATERIAL_STATUS_HINT,
@@ -16,10 +17,11 @@ import { cn } from "@/lib/utils";
  * The side panel of a material.
  *
  * It shows the metadata, the state of the piece, the schools that can
- * see it and the history. The access is not changed from here: the
- * panel says which schools have it. The switch per school lives in
- * the sheet of the school (Colegios → Gestionar), where the piece is
- * listed with the rest of the catalog.
+ * see it and the history. The metadata is **edited** from here: the
+ * title, the type, the area, the grades and who it is for. The access
+ * is not changed from here: the panel says which schools have it, and
+ * the switch per school lives in the sheet of the school (Colegios →
+ * Gestionar), where the piece is listed with the rest of the catalog.
  */
 
 export function MaterialPanel({
@@ -73,9 +75,11 @@ export function MaterialPanel({
       <DialogContent
         showClose={false}
         className={cn(
-          // The panel is a drawer on the right, not a centered dialog:
-          // the list stays visible behind it.
-          "fixed right-0 top-0 left-auto flex h-dvh max-h-none w-full max-w-lg translate-x-0 translate-y-0 flex-col gap-0 overflow-y-auto rounded-none border-l border-border bg-card p-0 shadow-lift sm:rounded-none",
+          // A centered modal, not a drawer: the piece is managed in the
+          // middle of the screen, where the form can be read at once.
+          // The head and the foot stay put; the form in the middle
+          // scrolls.
+          "max-h-[88vh] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
           className,
         )}
       >
@@ -98,7 +102,7 @@ export function MaterialPanel({
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-5">
           {problem && (
             <p
               role="alert"
@@ -124,6 +128,7 @@ export function MaterialPanel({
                 <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
                   Metadatos
                 </h3>
+
                 <dl className="grid grid-cols-[110px_1fr] gap-y-2 text-sm">
                   <dt className="text-muted-foreground">Tipo</dt>
                   <dd>{detail.type}</dd>
@@ -134,9 +139,7 @@ export function MaterialPanel({
                     {detail.grades.length > 0 ? detail.grades.join(" · ") : "Todo el colegio"}
                   </dd>
                   <dt className="text-muted-foreground">Visible para</dt>
-                  <dd>
-                    {detail.visible_to === "all" ? "Docentes y estudiantes" : detail.visible_to}
-                  </dd>
+                  <dd>{audienceLabel(detail.visible_to)}</dd>
                   <dt className="text-muted-foreground">Origen</dt>
                   <dd className="flex items-center gap-1.5">
                     {detail.origin === "upload" ? (
@@ -153,6 +156,11 @@ export function MaterialPanel({
                     </>
                   )}
                 </dl>
+
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Los valores se cambian con el lápiz: <b className="text-foreground">Editar</b>{" "}
+                  abre el formulario del recurso.
+                </p>
               </section>
 
               {missing.length > 0 && (
@@ -198,45 +206,19 @@ export function MaterialPanel({
                   pieza.
                 </p>
               </section>
-
-              <section>
-                <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
-                  <History className="size-3.5" strokeWidth={1.9} aria-hidden />
-                  Historial
-                </h3>
-                <ul className="flex flex-col divide-y divide-border">
-                  {detail.history.map((entry) => (
-                    <li key={entry.id} className="py-2.5">
-                      <p className="text-sm">{entry.action}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.actor_name ?? "Sistema"} ·{" "}
-                        {new Date(entry.created_at).toLocaleString("es-CO", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </li>
-                  ))}
-                  {detail.history.length === 0 && (
-                    <li className="py-2.5 text-sm text-muted-foreground">Sin movimientos.</li>
-                  )}
-                </ul>
-              </section>
             </>
           )}
         </div>
 
         {detail && (
-          <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3.5">
             {detail.available_transitions.map((status) => (
               <button
                 key={status}
                 type="button"
                 onClick={() => void moveTo(status as MaterialStatus)}
                 disabled={changeStatus.isPending}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                className="rounded-idx bg-primary px-2.5 py-1 text-[11.8px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
                 {MATERIAL_STATUS_LABEL[status as MaterialStatus]}
               </button>
@@ -246,7 +228,7 @@ export function MaterialPanel({
                 type="button"
                 onClick={() => void onDelete()}
                 disabled={removeMaterial.isPending}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive-soft disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-idx border border-destructive/40 px-2.5 py-1 text-[11.8px] font-semibold text-destructive transition-colors hover:bg-destructive-soft disabled:opacity-60"
               >
                 <Trash2 className="size-3.5" strokeWidth={1.9} aria-hidden />
                 Eliminar

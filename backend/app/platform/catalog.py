@@ -82,7 +82,7 @@ STATE_BY_STATUS: dict[str, str] = {
 
 STATUS_BY_STATE: dict[str, str] = {state: status for status, state in STATE_BY_STATUS.items()}
 
-VISIBLE_TO: tuple[str, ...] = ("all", "teachers")
+VISIBLE_TO: tuple[str, ...] = ("all", "teachers", "students", "admins")
 
 # The first code of the catalog. The numbers keep growing.
 FIRST_CODE_NUMBER = 1041
@@ -188,6 +188,9 @@ def publication_gaps(material: Material, school_count: int) -> list[str]:
 
     An empty list means it can go to "published". The names are the ones
     the frontend shows as the reason why the button is blocked.
+
+    The grades are not needed: a piece without grades is a piece for
+    every grade of the school.
     """
     gaps: list[str] = []
     if not material.title.strip():
@@ -196,8 +199,6 @@ def publication_gaps(material: Material, school_count: int) -> list[str]:
         gaps.append("type")
     if not material.area.strip():
         gaps.append("area")
-    if not material.grades:
-        gaps.append("grades")
     if school_count == 0:
         gaps.append("schools")
     return gaps
@@ -303,6 +304,7 @@ async def list_materials(
     query: str | None = None,
     material_type: str | None = None,
     status: str | None = None,
+    visible_to: str | None = None,
     school_id: uuid.UUID | None = None,
     page: int = 1,
     per_page: int = DEFAULT_PER_PAGE,
@@ -320,6 +322,8 @@ async def list_materials(
         conditions.append(Material.type == material_type)
     if status:
         conditions.append(Material.state == state_of(status))
+    if visible_to:
+        conditions.append(Material.visible_to == visible_to)
     if school_id:
         conditions.append(
             Material.id.in_(
@@ -743,6 +747,11 @@ ALLOWED_MIME_TYPES: dict[str, int] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": 100 * 1024 * 1024,
     "application/zip": 500 * 1024 * 1024,
     "video/mp4": 1024 * 1024 * 1024,
+    # An image: a manual of a school is often a photo of a page.
+    "image/png": 50 * 1024 * 1024,
+    "image/jpeg": 50 * 1024 * 1024,
+    "image/webp": 50 * 1024 * 1024,
+    "image/gif": 20 * 1024 * 1024,
 }
 
 # The extensions that map to a mime type when the browser sends none.
@@ -752,6 +761,11 @@ EXTENSION_MIME_TYPES: dict[str, str] = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".zip": "application/zip",
     ".mp4": "video/mp4",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
 }
 
 
@@ -762,6 +776,10 @@ KIND_BY_MIME_TYPE: dict[str, str] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/zip": "zip",
     "video/mp4": "mp4",
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/webp": "image",
+    "image/gif": "image",
 }
 
 

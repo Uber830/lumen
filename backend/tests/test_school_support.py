@@ -119,9 +119,64 @@ async def test_the_school_sees_only_its_own_cases(
     response = client.get("/v1/school/support/cases", headers=await _auth())
     assert response.status_code == 200, response.text
 
-    ids = [case["id"] for case in response.json()]
+    ids = [case["id"] for case in response.json()["items"]]
     assert str(cases["own_case_id"]) in ids
     assert str(cases["foreign_case_id"]) not in ids
+
+
+async def test_the_list_is_cut_in_pages(client, engine, seeded_school, cases):
+    """The requests come in pages, like the courses and the assignments."""
+    response = client.get("/v1/school/support/cases?page=1&per_page=1", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    assert body["per_page"] == 1
+    assert len(body["items"]) == 1
+    assert body["total"] >= 1
+    assert body["pages"] == body["total"]
+
+
+async def test_the_search_runs_in_the_server(client, engine, seeded_school, cases):
+    """The text looks for the title or the code of the request.
+
+    The search does not run in the browser: it has to reach the cases of
+    the school that are not on the page.
+    """
+    response = client.get("/v1/school/support/cases?q=ciencias", headers=await _auth())
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    ids = [case["id"] for case in body["items"]]
+    assert str(cases["own_case_id"]) in ids
+    assert str(cases["foreign_case_id"]) not in ids
+    assert body["total"] >= 1
+
+    # A code also finds its request.
+    own_case = await _case_code(engine, cases["own_case_id"])
+    by_code = client.get(f"/v1/school/support/cases?q={own_case}", headers=await _auth())
+    assert by_code.status_code == 200, by_code.text
+    assert [case["id"] for case in by_code.json()["items"]] == [str(cases["own_case_id"])]
+
+    # A word that is not there does not bring anything.
+    empty = client.get("/v1/school/support/cases?q=zzzsincoincidencia", headers=await _auth())
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["items"] == []
+    assert empty.json()["total"] == 0
+
+
+async def _case_code(engine, case_id) -> str:
+    """The code of a case, to look for it with the search."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        case = await session.get(SupportCase, case_id)
+        assert case is not None
+        return case.code
+
+
+async def test_the_open_cases_are_counted_for_the_bell(client, engine, seeded_school, cases):
+    """The counter of the rail counts every case of the school."""
+    response = client.get("/v1/school/support/open-count", headers=await _auth())
+    assert response.status_code == 200, response.text
+    assert response.json()["count"] >= 1
 
 
 async def test_the_detail_carries_the_thread(client, engine, seeded_school, cases):

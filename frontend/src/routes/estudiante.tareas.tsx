@@ -6,7 +6,7 @@ import { PageHeader, SectionCard } from "@/components/ui-kit";
 import { StatusBadge, toneForEstado } from "@/components/status-badge";
 import { useMySubmissions, useSaveSubmission } from "@/features/student/use-my-submissions";
 import { useTasks, type Task } from "@/lib/storage/hooks";
-import { BUCKETS, createSignedUrl, uploadTaskSubmission } from "@/lib/storage/files";
+import { fileUrl, uploadTaskSubmission } from "@/lib/storage/files";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/estudiante/tareas")({
@@ -96,9 +96,7 @@ function Tareas() {
     setUploadError(null);
     try {
       const uploaded = await uploadTaskSubmission({
-        schoolId: schoolId as string,
         taskId: selected.id,
-        studentId: studentId as string,
         file: next,
       });
       setFile(next);
@@ -125,11 +123,11 @@ function Tareas() {
     }
   }
 
-  async function download(path: string) {
+  function download(path: string) {
     setDownloading(true);
     try {
-      const url = await createSignedUrl(BUCKETS.taskSubmissions, path, 120);
-      window.open(url, "_blank", "noopener");
+      // The API serves the file with the session of who asks for it.
+      window.open(fileUrl(path) ?? "", "_blank", "noopener");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "No se pudo descargar el archivo.");
     } finally {

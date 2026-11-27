@@ -47,6 +47,7 @@ import { Route as EstudianteMaterialesRouteImport } from './routes/estudiante.ma
 import { Route as EstudianteNotasRouteImport } from './routes/estudiante.notas'
 import { Route as EstudianteTareasRouteImport } from './routes/estudiante.tareas'
 import { Route as PerfilIndexRouteImport } from './routes/perfil.index'
+import { Route as PerfilNotificacionesRouteImport } from './routes/perfil.notificaciones'
 import { Route as SuperIndexRouteImport } from './routes/super.index'
 import { Route as SuperCatalogoRouteImport } from './routes/super.catalogo'
 import { Route as SuperColegiosRouteImport } from './routes/super.colegios'
@@ -242,6 +243,11 @@ const PerfilIndexRoute = PerfilIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PerfilRoute,
 } as any)
+const PerfilNotificacionesRoute = PerfilNotificacionesRouteImport.update({
+  id: '/notificaciones',
+  path: '/notificaciones',
+  getParentRoute: () => PerfilRoute,
+} as any)
 const SuperIndexRoute = SuperIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -298,6 +304,7 @@ export interface FileRoutesByFullPath {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/perfil/notificaciones': typeof PerfilNotificacionesRoute
   '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
   '/super/soporte': typeof SuperSoporteRoute
@@ -337,6 +344,7 @@ export interface FileRoutesByTo {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/perfil/notificaciones': typeof PerfilNotificacionesRoute
   '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
   '/super/soporte': typeof SuperSoporteRoute
@@ -382,6 +390,7 @@ export interface FileRoutesById {
   '/estudiante/materiales': typeof EstudianteMaterialesRoute
   '/estudiante/notas': typeof EstudianteNotasRoute
   '/estudiante/tareas': typeof EstudianteTareasRoute
+  '/perfil/notificaciones': typeof PerfilNotificacionesRoute
   '/super/catalogo': typeof SuperCatalogoRoute
   '/super/colegios': typeof SuperColegiosRoute
   '/super/soporte': typeof SuperSoporteRoute
@@ -428,6 +437,7 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/perfil/notificaciones'
     | '/super/catalogo'
     | '/super/colegios'
     | '/super/soporte'
@@ -467,6 +477,7 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/perfil/notificaciones'
     | '/super/catalogo'
     | '/super/colegios'
     | '/super/soporte'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
     | '/estudiante/materiales'
     | '/estudiante/notas'
     | '/estudiante/tareas'
+    | '/perfil/notificaciones'
     | '/super/catalogo'
     | '/super/colegios'
     | '/super/soporte'
@@ -801,6 +813,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PerfilIndexRouteImport
       parentRoute: typeof PerfilRoute
     }
+    '/perfil/notificaciones': {
+      id: '/perfil/notificaciones'
+      path: '/notificaciones'
+      fullPath: '/perfil/notificaciones'
+      preLoaderRoute: typeof PerfilNotificacionesRouteImport
+      parentRoute: typeof PerfilRoute
+    }
     '/super/': {
       id: '/super/'
       path: '/'
@@ -916,10 +935,12 @@ const EstudianteRouteWithChildren = EstudianteRoute._addFileChildren(
 )
 
 interface PerfilRouteChildren {
+  PerfilNotificacionesRoute: typeof PerfilNotificacionesRoute
   PerfilIndexRoute: typeof PerfilIndexRoute
 }
 
 const PerfilRouteChildren: PerfilRouteChildren = {
+  PerfilNotificacionesRoute: PerfilNotificacionesRoute,
   PerfilIndexRoute: PerfilIndexRoute,
 }
 

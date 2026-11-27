@@ -1,6 +1,6 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { GraduationCap, Plus, Search, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { GraduationCap, KeyRound, Lock, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -16,18 +16,25 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { Select } from "@/components/select-field";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
-import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
+import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
+import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
 import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
 import type { SchoolMember } from "@/features/academics/types";
+import { activationLink, useInviteUser, useUpdateMembership } from "@/lib/users/invitations";
 import {
-  activationLink,
-  parseCsvInvitations,
-  useBulkInviteUsers,
-  useInviteUser,
-  type InviteUserResult,
-} from "@/lib/users/invitations";
-import { useSchoolCourses, useSchoolStudents, type SchoolMemberRow } from "@/lib/school/community";
+  useSchoolCourseOptions,
+  useSchoolStudents,
+  type SchoolMemberRow,
+} from "@/lib/school/community";
 import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/estudiantes")({
@@ -61,24 +68,21 @@ function EstudiantesPage() {
   const [page, setPage] = useState(1);
 
   const students = useSchoolStudents({ q: query, status, course_id: courseId, page });
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
 
   const invite = useInviteUser();
-  const bulkInvite = useBulkInviteUsers();
+  const updateMembership = useUpdateMembership();
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [newCourseId, setNewCourseId] = useState("");
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [csvText, setCsvText] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [activations, setActivations] = useState<ActivationLink[]>([]);
-  const [bulkSummary, setBulkSummary] = useState<{
-    created: number;
-    failures: BulkImportFailure[];
-  } | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<SchoolMemberRow | null>(null);
+  // The student whose edit form is open.
+  const [editingStudent, setEditingStudent] = useState<SchoolMemberRow | null>(null);
+  // The rows the administrator picked: the bar acts on all of them.
+  const [picked, setPicked] = useState<string[]>([]);
 
   const total = students.data?.total ?? 0;
 
@@ -106,6 +110,11 @@ function EstudiantesPage() {
       avatar_url: null,
       revoked_at: row.revoked_at,
       account_activated: row.account_activated,
+      access: row.access,
+      access_reason: row.access_reason,
+      courses: row.courses,
+      course_ids: row.course_ids,
+      average: row.average,
     };
   }
 
@@ -133,6 +142,9 @@ function EstudiantesPage() {
       role: "student",
       school_id: schoolId,
       is_primary: true,
+      // The course the admin picked: the student is enrolled in it, so
+      // it has material to see from the start.
+      ...(newCourseId ? { course_ids: [newCourseId] } : {}),
     });
     const activationToken = created.activation_token;
     if (activationToken) {
@@ -147,31 +159,17 @@ function EstudiantesPage() {
     setOpen(false);
   }
 
-  async function onBulkFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    setCsvText(text);
+  /** Turn the access of the picked students on or off. */
+  async function onBulkAccess(revoked: boolean) {
+    for (const membershipId of picked) {
+      try {
+        await updateMembership.mutateAsync({ membershipId, revoked });
+      } catch {
+        // The error of the last one is shown below the bar.
+      }
+    }
+    setPicked([]);
   }
-
-  async function onBulkSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    // The role is forced: this is the students' import.
-    const rows = parseCsvInvitations(csvText).map((row) => ({ ...row, role: "student" as const }));
-    if (!rows.length) return;
-    const result = await bulkInvite.mutateAsync(rows);
-    setBulkOpen(false);
-    setCsvText("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    const newLinks = result.created
-      .filter((c): c is InviteUserResult & { activation_token: string } => !!c.activation_token)
-      .map((c) => ({ email: c.email, link: activationLink(c.activation_token) }));
-    if (newLinks.length > 0) setActivations((prev) => [...newLinks, ...prev]);
-
-    setBulkSummary({ created: result.created.length, failures: result.failures });
-  }
-
-  const previewRows = csvText ? parseCsvInvitations(csvText) : [];
 
   return (
     <>
@@ -179,30 +177,11 @@ function EstudiantesPage() {
         title="Estudiantes"
         subtitle={`${students.isLoading ? "—" : total} estudiantes matriculados. Controla el acceso, el curso y el promedio.`}
         actions={
-          <>
-            <Button variant="outline" icon={Upload} onClick={() => fileInputRef.current?.click()}>
-              Carga masiva CSV
-            </Button>
-            <Button icon={Plus} onClick={() => setOpen(true)}>
-              Nuevo estudiante
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                void onBulkFile(e);
-                setBulkOpen(true);
-              }}
-            />
-          </>
+          <Button icon={Plus} onClick={() => setOpen(true)}>
+            Nuevo estudiante
+          </Button>
         }
       />
-
-      {bulkSummary && (
-        <BulkImportSummary created={bulkSummary.created} failures={bulkSummary.failures} />
-      )}
 
       <ActivationLinksCard
         links={activations}
@@ -210,9 +189,18 @@ function EstudiantesPage() {
         onHide={() => setActivations([])}
       />
 
-      {open && (
-        <SectionCard title="Nuevo estudiante" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onCreate}>
+      {/* The form lives in a modal: the list of the students does not
+          move when the admin opens it. */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nuevo estudiante</DialogTitle>
+            <DialogDescription>
+              Entra con el acceso pendiente hasta que lo matricules en un curso.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-3" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre completo
@@ -223,7 +211,7 @@ function EstudiantesPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Lucia Ferreyra"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
             <label className="block">
@@ -236,7 +224,7 @@ function EstudiantesPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="estudiante@colegio.edu"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
             <label className="block">
@@ -258,80 +246,22 @@ function EstudiantesPage() {
                 Si eliges un curso, el estudiante queda matriculado en él.
               </p>
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={invite.isPending}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {invite.isPending ? "Creando..." : "Crear estudiante"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
             {invite.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {invite.error.message}
               </p>
             )}
-          </form>
-        </SectionCard>
-      )}
-
-      {bulkOpen && (
-        <SectionCard title="Carga masiva CSV" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onBulkSubmit}>
-            <p className="text-xs text-muted-foreground">
-              Encabezados requeridos: <code>email, full_name</code>. Una fila por estudiante. Se
-              crean con rol de estudiante.
-            </p>
-            <textarea
-              rows={6}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"email,full_name\nmaria@example.com,Maria Lopez\n"}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <p className="text-xs text-muted-foreground">
-              {previewRows.length === 0
-                ? "Sin filas pendientes"
-                : `${previewRows.length} fila(s) detectadas`}
-            </p>
-            {bulkInvite.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {bulkInvite.error.message}
-              </p>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={bulkInvite.isPending || previewRows.length === 0}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {bulkInvite.isPending
-                  ? "Procesando..."
-                  : `Cargar ${previewRows.length} estudiante(s)`}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkOpen(false);
-                  setCsvText("");
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
                 Cancelar
-              </button>
-            </div>
+              </Button>
+              <Button type="submit" disabled={invite.isPending}>
+                {invite.isPending ? "Creando..." : "Crear estudiante"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         <Toolbar>
@@ -347,7 +277,7 @@ function EstudiantesPage() {
               onChange={(event) => applyQuery(event.target.value)}
               placeholder="Buscar por nombre o correo"
               aria-label="Buscar por nombre o correo"
-              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+              className="w-full rounded-idx border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
 
@@ -355,7 +285,7 @@ function EstudiantesPage() {
             value={status}
             onChange={(event) => applyStatus(event.target.value)}
             aria-label="Filtrar por estado"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los estados</option>
             <option value="activo">Activos</option>
@@ -366,7 +296,7 @@ function EstudiantesPage() {
             value={courseId}
             onChange={(event) => applyCourse(event.target.value)}
             aria-label="Filtrar por curso"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los cursos</option>
             {(courses.data ?? []).map((course) => (
@@ -381,6 +311,32 @@ function EstudiantesPage() {
           </div>
         </Toolbar>
 
+        <BulkBar count={picked.length} onClear={() => setPicked([])}>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={KeyRound}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(false)}
+          >
+            Activar acceso
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Lock}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(true)}
+          >
+            Desactivar acceso
+          </Button>
+          {updateMembership.error && (
+            <span role="alert" className="text-[12.5px] text-destructive">
+              {updateMembership.error.message}
+            </span>
+          )}
+        </BulkBar>
+
         {students.isError ? (
           <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {students.error.message}
@@ -389,10 +345,10 @@ function EstudiantesPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[180px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[180px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[74px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>
@@ -416,11 +372,27 @@ function EstudiantesPage() {
                 </caption>
                 <thead>
                   <tr>
+                    <th scope="col" className={`${tableHeadClass} w-[38px]`}>
+                      <SelectBox
+                        checked={
+                          (students.data?.items.length ?? 0) > 0 &&
+                          picked.length === students.data?.items.length
+                        }
+                        onChange={(checked) =>
+                          setPicked(
+                            checked
+                              ? (students.data?.items ?? []).map((row) => row.membership_id)
+                              : [],
+                          )
+                        }
+                        label="Seleccionar todos los estudiantes"
+                      />
+                    </th>
                     <th scope="col" className={tableHeadClass}>
                       Estudiante
                     </th>
                     <th scope="col" className={tableHeadClass}>
-                      Cursos
+                      Curso
                     </th>
                     <th scope="col" className={tableHeadClass}>
                       Ingreso
@@ -441,10 +413,20 @@ function EstudiantesPage() {
                 </thead>
                 <tbody>
                   {(students.data?.items ?? []).map((student) => (
-                    <tr
-                      key={student.membership_id}
-                      className="transition-colors hover:bg-white/[0.025]"
-                    >
+                    <tr key={student.membership_id} className="transition-colors hover:bg-muted">
+                      <td className={tableCellClass}>
+                        <SelectBox
+                          checked={picked.includes(student.membership_id)}
+                          onChange={(checked) =>
+                            setPicked((current) =>
+                              checked
+                                ? [...current, student.membership_id]
+                                : current.filter((id) => id !== student.membership_id),
+                            )
+                          }
+                          label={`Seleccionar a ${student.full_name ?? "el estudiante"}`}
+                        />
+                      </td>
                       <td className={tableCellClass}>
                         <p className="font-medium text-foreground">{student.full_name ?? "—"}</p>
                         <p className="text-[12px] text-muted-foreground">
@@ -458,16 +440,16 @@ function EstudiantesPage() {
                           <span className="text-muted-foreground">Sin curso</span>
                         )}
                       </td>
-                      <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                         {formatShortDate(student.joined_at)}
                       </td>
                       <td className={tableCellClass}>
                         <Chip tone={student.access === "activado" ? "ok" : "warn"} dot>
-                          {student.access === "activado" ? "Activado" : "Pendiente"}
+                          {student.access === "activado" ? "Activado" : "Sin activar"}
                         </Chip>
                       </td>
                       <td
-                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-[#A0B2CE]`}
+                        className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
                       >
                         {student.average === null || student.average === undefined
                           ? "—"
@@ -507,9 +489,6 @@ function EstudiantesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>El filtro por curso y la búsqueda se ejecutan en el servidor.</span>
       </p>
 
@@ -518,6 +497,24 @@ function EstudiantesPage() {
           member={asMember(selectedStudent)}
           roleLabel="estudiante"
           onClose={() => setSelectedStudent(null)}
+          onEdit={() => {
+            setEditingStudent(selectedStudent);
+            setSelectedStudent(null);
+          }}
+        />
+      )}
+
+      {editingStudent && (
+        <MemberEditDialog
+          member={{
+            membership_id: editingStudent.membership_id,
+            full_name: editingStudent.full_name,
+            email: editingStudent.email,
+            course_ids: editingStudent.course_ids,
+          }}
+          role="student"
+          onClose={() => setEditingStudent(null)}
+          onSaved={() => setEditingStudent(null)}
         />
       )}
     </>

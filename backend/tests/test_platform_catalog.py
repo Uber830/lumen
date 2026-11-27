@@ -53,7 +53,11 @@ def test_the_transitions_of_the_lifecycle_are_the_ones_the_prompt_describes() ->
 
 
 def test_a_material_that_is_missing_something_says_what() -> None:
-    """The reason why the button is blocked is exact."""
+    """The reason why the button is blocked is exact.
+
+    The grades are not a reason: a piece without grades is a piece for
+    every grade of the school.
+    """
     from app.platform.catalog import publication_gaps
 
     material = Material(
@@ -69,7 +73,7 @@ def test_a_material_that_is_missing_something_says_what() -> None:
     assert publication_gaps(material, school_count=1) == []
 
     material.grades = []
-    assert publication_gaps(material, school_count=1) == ["grades"]
+    assert publication_gaps(material, school_count=1) == []
 
     material.grades = ["7°"]
     assert publication_gaps(material, school_count=0) == ["schools"]
@@ -232,6 +236,7 @@ async def _make_material(
     grades: list[str] | None = None,
     status: str = "draft",
     school_ids: list[uuid.UUID] | None = None,
+    visible_to: str = "all",
 ) -> Material:
     """A material straight in the database."""
     material = Material(
@@ -241,7 +246,7 @@ async def _make_material(
         area=area,
         kind="pdf",
         grades=grades if grades is not None else ["7°"],
-        visible_to="all",
+        visible_to=visible_to,
         origin="upload",
         state=catalog.state_of(status),
         created_at=datetime.now(UTC),
@@ -315,6 +320,25 @@ async def test_the_listing_can_be_filtered(
     by_area = client.get("/v1/platform/catalog?type=Evaluación&area=ICFES", headers=platform_admin)
     assert by_area.status_code == 200
     assert by_area.json()["total"] >= 1
+
+
+async def test_the_listing_filters_by_audience(
+    client, platform_admin, engine, created_materials
+) -> None:
+    """The audience filter narrows the listing.
+
+    The library of the platform says who each resource is for, and the
+    administrator can ask for only the ones of one audience.
+    """
+    await _make_material(engine, created_materials, title="Para todos", visible_to="all")
+    await _make_material(engine, created_materials, title="Solo docentes", visible_to="teachers")
+
+    response = client.get("/v1/platform/catalog?visible_to=teachers", headers=platform_admin)
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["total"] == 1
+    assert body["items"][0]["visible_to"] == "teachers"
 
 
 async def test_the_listing_counts_the_schools_that_are_not_shown(
@@ -472,7 +496,11 @@ async def test_it_refuses_a_transition_that_is_not_valid(
 async def test_it_refuses_to_publish_a_material_that_is_incomplete(
     client, platform_admin, engine, created_materials
 ) -> None:
-    """The answer says exactly what is missing."""
+    """The answer says exactly what is missing.
+
+    The grades are not needed: a piece without grades is a piece for
+    every grade of the school.
+    """
     material = await _make_material(
         engine,
         created_materials,
@@ -490,7 +518,76 @@ async def test_it_refuses_to_publish_a_material_that_is_incomplete(
 
     body = response.json()
     assert body["detail"] == "No se puede publicar"
-    assert set(body["missing"]) == {"title", "grades", "schools"}
+    assert set(body["missing"]) == {"title", "schools"}
+
+
+async def test_a_material_without_grades_is_published(
+    client, platform_admin, engine, created_materials, catalog_school
+) -> None:
+    """No grades means the piece is for every grade of the school."""
+    material = await _make_material(
+        engine,
+        created_materials,
+        grades=[],
+        status="draft",
+        school_ids=[catalog_school],
+    )
+
+    response = client.post(
+        f"/v1/platform/catalog/{material.id}/status",
+        headers=platform_admin,
+        json={"status": "published"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "published"
+    assert response.json()["grades"] == []
+
+
+async def test_a_material_can_go_to_every_school(
+    client, platform_admin, engine, created_materials, catalog_school
+) -> None:
+    """The decision of the platform team: the piece is for the network.
+
+    The list of schools stays empty: the piece goes to every school
+    that the network has.
+    """
+    response = client.post(
+        "/v1/platform/catalog",
+        headers=platform_admin,
+        json={
+            "title": "Guía para toda la red",
+            "type": "Guía",
+            "area": "Convivencia",
+            "grades": [],
+            "origin": "link",
+            "external_url": "https://example.com/recursos/convivencia",
+            "all_schools": True,
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    body = response.json()
+    created_materials.append(uuid.UUID(body["id"]))
+    # The school of the test is part of the network, so the piece
+    # reaches it.
+    assert str(catalog_school) in [school["id"] for school in body["schools"]]
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        enabled = await session.execute(
+            select(MaterialSchool).where(MaterialSchool.material_id == uuid.UUID(body["id"]))
+        )
+        rows = enabled.scalars().all()
+        assert str(catalog_school) in [str(row.school_id) for row in rows]
+
+    # And it can be published: it has schools and the grades are not
+    # needed.
+    published = client.post(
+        f"/v1/platform/catalog/{body['id']}/status",
+        headers=platform_admin,
+        json={"status": "published"},
+    )
+    assert published.status_code == 200, published.text
+    assert published.json()["status"] == "published"
 
 
 async def test_it_publishes_a_material_that_is_complete(
@@ -757,3 +854,34 @@ async def test_the_upload_refuses_a_format_that_is_not_admitted(client, platform
     )
     assert response.status_code == 422
     assert response.json()["file_name"] == "nota.txt"
+
+
+async def test_the_access_can_go_to_every_school(
+    client, platform_admin, engine, created_materials, catalog_school, three_schools
+) -> None:
+    """The piece can be handed to the whole network after the fact.
+
+    It is the same decision as when it is created, and the list of
+    schools stays empty on purpose.
+    """
+    material = await _make_material(
+        engine,
+        created_materials,
+        status="draft",
+        school_ids=[catalog_school],
+    )
+
+    response = client.put(
+        f"/v1/platform/catalog/{material.id}/schools",
+        headers=platform_admin,
+        json={"school_ids": [], "all_schools": True},
+    )
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    enabled = {school["id"] for school in body["schools"]}
+    # The school of the test and the three of the listing are part of
+    # the network: the piece reaches all of them.
+    assert str(catalog_school) in enabled
+    for school_id in three_schools:
+        assert str(school_id) in enabled

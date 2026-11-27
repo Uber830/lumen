@@ -30,8 +30,8 @@ El detalle de cada entorno vive en su propio README.
 | Backend | Python 3.12 · FastAPI · SQLAlchemy 2 (async) · asyncpg · Pydantic 2 |
 | Base de datos | PostgreSQL 16 (Docker en local) |
 | Autenticación | JWT propio (HS256) + Argon2id, cookies httpOnly |
-| Pagos | Wompi (sandbox) |
-| Storage / Realtime | Supabase (opcional, solo para archivos y chat en vivo) |
+| Archivos | Disco del servidor (`UPLOADS_DIR`), subidos y servidos por el backend |
+| Chat | Flujo de eventos del servidor (SSE) |
 
 ---
 
@@ -83,6 +83,11 @@ cd backend
 uv sync --extra dev
 uv run lumen-api            # http://localhost:8010
 ```
+
+Los archivos que suben los usuarios (avatar, escudo del colegio, material de
+una materia y entregas de tareas) los guarda el backend en su propio disco:
+`UPLOADS_DIR` (por defecto `backend/var/archivos`). El navegador los pide a
+`/v1/files/...`, no a un servicio aparte.
 
 ### 3. Frontend
 
@@ -155,14 +160,14 @@ los colegios (ver [backend/README.md](backend/README.md)).
 ```
 backend/          API FastAPI
 frontend/         app React (TanStack Start)
-supabase/         migraciones y semilla heredadas del proyecto original
+db/               migraciones heredadas, shim local de Postgres y semilla
 scripts/          dev-db.sh (la base local) y dev-accounts.sh (las cuentas)
 docs/             las decisiones de producto, por parte
 docker-compose.yml servicio Postgres
 ```
 
 **El esquema SQL es propiedad de las migraciones**: las heredadas en
-`supabase/migrations/` y las de este proyecto en `backend/migrations/`, que se
+`db/migrations/` y las de este proyecto en `backend/migrations/`, que se
 aplican en ese orden. No se edita a mano la base: se escribe una migración y
 se corre `./scripts/dev-db.sh reset`.
 
@@ -177,3 +182,4 @@ se corre `./scripts/dev-db.sh reset`.
 | [docs/colegio.md](docs/colegio.md) | el rol de administrador de colegio: vistas, permisos y decisiones |
 | [docs/catalogo.md](docs/catalogo.md) | el catálogo editorial: ciclo de vida, cobertura y reglas |
 | [docs/site-style-guide.md](docs/site-style-guide.md) | la dirección visual del sitio público (landing y acceso) |
+| [README-brand.md](README-brand.md) | la marca: el vector del logo, los colores y cómo regenerarlo |

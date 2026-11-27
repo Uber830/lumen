@@ -233,13 +233,20 @@ async def test_the_assignment_counts_the_material_it_gives_visibility(
     response = client.get("/v1/school/assignments", headers=await _auth())
     assert response.status_code == 200, response.text
 
-    assignments = response.json()
-    assert len(assignments) == 1
-    assignment = assignments[0]
-    assert assignment["teacher_name"] == "Lucia Ferreyra"
+    body = response.json()
+    assert body["total"] == 1
+    assert len(body["items"]) == 1
+
+    # The row is the teacher, and the subjects it teaches travel inside.
+    row = body["items"][0]
+    assert row["teacher_name"] == "Lucia Ferreyra"
+    assert len(row["assignments"]) == 1
+
+    assignment = row["assignments"][0]
     assert assignment["course_name"] == "7° A"
     assert assignment["subject_name"] == "Matemáticas"
     assert assignment["visible_materials_count"] == 1
+    assert row["visible_materials_count"] == 1
 
 
 async def test_the_assignment_ignores_the_material_that_is_not_published(
@@ -254,7 +261,8 @@ async def test_the_assignment_ignores_the_material_that_is_not_published(
 
     response = client.get("/v1/school/assignments", headers=await _auth())
     assert response.status_code == 200, response.text
-    assert response.json()[0]["visible_materials_count"] == 0
+    body = response.json()
+    assert body["items"][0]["assignments"][0]["visible_materials_count"] == 0
 
 
 async def test_the_periods_come_with_their_status(client, engine, seeded_school, cycle):

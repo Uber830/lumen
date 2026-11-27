@@ -22,7 +22,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useSchoolCourses } from "@/lib/school/community";
+import { useSchoolCourseOptions } from "@/lib/school/community";
 import {
   useActivateSimulator,
   useSchoolSimulators,
@@ -68,11 +68,58 @@ function statusLabel(status: string): string {
   return status;
 }
 
+/**
+ * The simulators of the school are not shown yet.
+ *
+ * The module is still being tuned, so the panel says so instead of
+ * showing data that is not final. The list below is the one that will
+ * come back when the flag is turned on.
+ */
+const SIMULADORES_VISIBLES = false;
+
 function IcfesColegioPage() {
+  if (!SIMULADORES_VISIBLES) return <IcfesProximamente />;
+  return <SimuladoresDeLaEscuela />;
+}
+
+/** The notice that replaces the list while the module is being tuned. */
+function IcfesProximamente() {
+  return (
+    <>
+      <PageHeader
+        title="ICFES"
+        subtitle="Los simulacros Saber del colegio están en camino: el equipo de Lumen los está preparando."
+      />
+
+      <SectionCard className="overflow-hidden" bodyClassName="p-0">
+        <div className="flex flex-col items-center gap-3 px-[18px] py-14 text-center">
+          <span className="grid size-12 place-items-center rounded-idx border border-border bg-secondary">
+            <Target className="size-6 text-primary" strokeWidth={1.8} aria-hidden />
+          </span>
+          <p className="text-[15px] font-semibold text-foreground">Próximamente</p>
+          <p className="max-w-md text-[13px] text-muted-foreground">
+            Simulacros Saber por grado, con la activación por curso y los resultados del colegio. Te
+            avisamos en cuanto estén listos.
+          </p>
+        </div>
+
+        <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
+          <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
+          <span>
+            Mientras tanto, el material y las tareas de tus cursos siguen en{" "}
+            <strong>Biblioteca</strong> y en <strong>Cursos y materias</strong>.
+          </span>
+        </p>
+      </SectionCard>
+    </>
+  );
+}
+
+function SimuladoresDeLaEscuela() {
   const { session } = useRouteContext({ from: "/admin" });
 
   const simulators = useSchoolSimulators();
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   const activate = useActivateSimulator();
 
   // The simulator the admin is about to activate, and the one whose
@@ -181,8 +228,19 @@ function IcfesColegioPage() {
           <StatCard
             key={average.grade}
             label={`Promedio ${average.grade}`}
-            value={`${average.average_score} / ${kpis?.max_score ?? 500}`}
-            delta="en los simulacros corregidos de tu colegio"
+            value={`${average.latest_average || average.average_score} / ${kpis?.max_score ?? 500}`}
+            delta={
+              average.delta === null || average.delta === undefined ? (
+                "primer corte medido del grado"
+              ) : (
+                <>
+                  <b className="font-semibold text-foreground">
+                    {average.delta > 0 ? `+${average.delta}` : average.delta}
+                  </b>{" "}
+                  frente al corte anterior
+                </>
+              )
+            }
             icon={BarChart3}
             tone="teal"
             loading={simulators.isLoading}
@@ -215,7 +273,7 @@ function IcfesColegioPage() {
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="h-11 animate-pulse rounded-lg bg-[rgba(150,175,220,.08)]"
+                className="h-11 animate-pulse rounded-lg bg-muted"
                 style={{ animationDelay: `${index * 70}ms` }}
               />
             ))}
@@ -262,7 +320,7 @@ function IcfesColegioPage() {
               </thead>
               <tbody>
                 {(simulators.data?.items ?? []).map((simulator) => (
-                  <tr key={simulator.id} className="transition-colors hover:bg-white/[0.028]">
+                  <tr key={simulator.id} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="font-medium">{simulator.name}</div>
                       <div className="mt-px font-mono text-[12px] text-muted-foreground">
@@ -344,7 +402,7 @@ function IcfesColegioPage() {
         )}
 
         <p className="flex items-start gap-2 border-t border-border px-[18px] py-3.5 text-[12.5px] text-muted-foreground">
-          <Info className="mt-px size-4 shrink-0 text-[#2DD4BF]" strokeWidth={1.9} aria-hidden />
+          <Info className="mt-px size-4 shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
           <span>
             El equipo de Lumen carga y habilita los simulacros; tu colegio decide en qué cursos se
             aplican y hasta qué fecha. Un simulacro sin activar no llega a los estudiantes.
@@ -371,10 +429,10 @@ function IcfesColegioPage() {
                   return (
                     <label
                       key={course.id}
-                      className={`flex cursor-pointer items-center gap-2 rounded-[10px] border px-3 py-2 text-[13px] transition-colors ${
+                      className={`flex cursor-pointer items-center gap-2 rounded-idx border px-3 py-2 text-[13px] transition-colors ${
                         checked
                           ? "border-primary/50 bg-primary-soft text-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-[rgba(150,175,220,.26)]"
+                          : "border-border bg-background text-muted-foreground hover:border-input"
                       }`}
                     >
                       <input
@@ -387,7 +445,7 @@ function IcfesColegioPage() {
                               : [...current, course.id],
                           )
                         }
-                        className="size-[15px] accent-[#2E8FFF]"
+                        className="size-[15px] accent-primary"
                       />
                       {course.name}
                     </label>
@@ -451,10 +509,7 @@ function IcfesColegioPage() {
 
           <div className="flex-1 overflow-y-auto px-[18px] py-4">
             {results.isLoading ? (
-              <div
-                className="h-24 animate-pulse rounded-xl bg-[rgba(150,175,220,.08)]"
-                aria-hidden
-              />
+              <div className="h-24 animate-pulse rounded-xl bg-muted" aria-hidden />
             ) : results.data ? (
               <>
                 <dl className="grid grid-cols-[118px_1fr] gap-x-3.5 gap-y-2.5 text-[13.2px]">
@@ -484,7 +539,7 @@ function IcfesColegioPage() {
                     {results.data.courses.map((course) => (
                       <li
                         key={course.course_id}
-                        className="rounded-xl border border-border bg-[#0B1222] p-3"
+                        className="rounded-xl border border-border bg-secondary p-3"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[13.2px] font-medium">{course.course_name}</span>
@@ -513,7 +568,7 @@ function IcfesColegioPage() {
           </div>
 
           <div className="border-t border-border px-[18px] py-4">
-            <DrawerClose className="inline-flex w-full items-center justify-center gap-2 rounded-[10px] border border-[rgba(150,175,220,.26)] bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
+            <DrawerClose className="inline-flex w-full items-center justify-center gap-2 rounded-idx border border-input bg-card px-[15px] py-2 text-[13.2px] font-medium text-foreground transition-colors hover:bg-secondary">
               <X className="size-[15.5px]" strokeWidth={1.9} aria-hidden />
               Cerrar
             </DrawerClose>
@@ -528,9 +583,6 @@ function IcfesColegioPage() {
       )}
 
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           El puntaje promedio se calcula con las respuestas de los estudiantes de los cursos
           activados, sobre una escala de {kpis?.max_score ?? 500} puntos.

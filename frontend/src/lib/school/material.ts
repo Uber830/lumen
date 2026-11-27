@@ -10,9 +10,15 @@
 // platform does not travel to the browser to be filtered there.
 // =============================================================================
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 
-import { api } from "@/lib/api/client";
+import { api, apiBaseUrl } from "@/lib/api/client";
 
 /** One course of the school a material applies to. */
 export type MaterialCourse = {
@@ -28,7 +34,13 @@ export type MaterialListItem = {
   title: string;
   description: string | null;
   area: string;
+  /** What the piece is: "Libro", "Guía", "Evaluación"... */
+  type: string;
   kind: string;
+  /** Who the piece is for: "all" or "teachers". */
+  visible_to: string;
+  /** "lumen" when the editorial team loaded it, "colegio" when the school did. */
+  origin: string;
   file_size_bytes: number | null;
   /** When the platform enabled it for this school. */
   available_since: string;
@@ -42,24 +54,41 @@ export type MaterialAccess = {
   note: string;
 };
 
+/** The file of a resource: the viewer shows it inside the platform. */
+export type MaterialFile = {
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  size_label: string;
+};
+
 /** One material, with its access confirmed. */
-export type MaterialDetail = MaterialListItem & { access: MaterialAccess };
+export type MaterialDetail = MaterialListItem & {
+  access: MaterialAccess;
+  file: MaterialFile | null;
+};
 
 /** A page of the material of the school. */
 export type MaterialPage = {
   items: MaterialListItem[];
+  /** How many materials the filters leave. */
   total: number;
+  /** How much material the school has, with no filters. */
+  available_total: number;
   page: number;
   per_page: number;
   pages: number;
   /** The areas the school can filter by. */
   areas: string[];
+  /** The audiences the school can filter by. */
+  audiences: string[];
 };
 
 /** The filters of the list, as the URL sends them. */
 export type MaterialFilters = {
   q?: string;
   area?: string;
+  audience?: string;
   page?: number;
 };
 
@@ -67,6 +96,8 @@ export const materialKeys = {
   list: (filters: MaterialFilters) => ["school", "material", filters] as const,
   detail: (id: string) => ["school", "material", "detail", id] as const,
 };
+/** How many resources the shelf shows at once. */
+export const MATERIAL_PAGE_SIZE = 12;
 
 /** The material of the school, filtered and paginated in the server. */
 export function useSchoolMaterial(filters: MaterialFilters): UseQueryResult<MaterialPage, Error> {
@@ -76,8 +107,11 @@ export function useSchoolMaterial(filters: MaterialFilters): UseQueryResult<Mate
       const params = new URLSearchParams();
       if (filters.q) params.set("q", filters.q);
       if (filters.area && filters.area !== "all") params.set("area", filters.area);
+      if (filters.audience && filters.audience !== "all") {
+        params.set("audience", filters.audience);
+      }
       params.set("page", String(filters.page ?? 1));
-      params.set("per_page", "6");
+      params.set("per_page", String(MATERIAL_PAGE_SIZE));
       return api.get<MaterialPage>(`/v1/school/material?${params.toString()}`);
     },
   });
@@ -90,6 +124,141 @@ export function useSchoolMaterialDetail(id: string | null): UseQueryResult<Mater
     enabled: Boolean(id),
     queryFn: () => api.get<MaterialDetail>(`/v1/school/material/${id}`),
   });
+}
+
+// ---------------------------------------------------------------------------
+// The resources the school loads
+// ---------------------------------------------------------------------------
+//
+// The school publishes its own guides and manuals: a manual of the
+// school, a guide for the teachers, a text for the students. The file
+// is uploaded first and the piece is created with it, like in the
+// platform.
+// ---------------------------------------------------------------------------
+
+/** The file that was uploaded, before the piece that carries it. */
+export type UploadedFile = {
+  file_id: string;
+  file_name: string;
+  size_bytes: number;
+  size_label: string;
+  mime_type: string;
+};
+
+/** What the school writes when it loads a resource. */
+export type CreateSchoolMaterial = {
+  title: string;
+  type: string;
+  area: string;
+  visible_to: string;
+  description?: string | null;
+  file_id: string;
+};
+
+/** The closed catalogs of the resources: types, areas and audiences. */
+export type MaterialOptions = {
+  types: string[];
+  areas: string[];
+  audiences: string[];
+};
+
+/** The catalogs the form of a new resource offers. */
+export function useSchoolMaterialOptions(): UseQueryResult<MaterialOptions, Error> {
+  return useQuery({
+    queryKey: ["school", "material", "options"],
+    queryFn: () => api.get<MaterialOptions>("/v1/school/material/options"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Upload the file of a resource. */
+export function useUploadSchoolFile(): UseMutationResult<UploadedFile, Error, File> {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch(`${apiBaseUrl}/v1/school/material/uploads`, {
+        method: "POST",
+        body,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo subir el archivo.");
+      }
+      return (await response.json()) as UploadedFile;
+    },
+  });
+}
+
+/** Create a resource of the school and enable it for the school. */
+export function useCreateSchoolMaterial(): UseMutationResult<
+  MaterialDetail,
+  Error,
+  CreateSchoolMaterial
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateSchoolMaterial) =>
+      api.post<MaterialDetail>("/v1/school/material", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "material"] });
+    },
+  });
+}
+
+/** What the school writes when it changes a resource of its own. */
+export type UpdateSchoolMaterial = {
+  id: string;
+  input: {
+    title?: string;
+    type?: string;
+    area?: string;
+    visible_to?: string;
+    description?: string | null;
+  };
+};
+
+/** Change a resource of the school. */
+export function useUpdateSchoolMaterial(): UseMutationResult<
+  MaterialDetail,
+  Error,
+  UpdateSchoolMaterial
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }) => api.patch<MaterialDetail>(`/v1/school/material/${id}`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "material"] });
+    },
+  });
+}
+
+/** Remove a resource of the school. */
+export function useDeleteSchoolMaterial(): UseMutationResult<void, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/v1/school/material/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "material"] });
+    },
+  });
+}
+
+/**
+ * The content of the file of a resource.
+ *
+ * The file is served by the API and shown inside the platform: the
+ * material is consulted, not downloaded. The blob is fetched with the
+ * session cookie, so the browser can show it without a public address.
+ */
+export async function fetchSchoolMaterialFile(id: string): Promise<Blob> {
+  const response = await fetch(`${apiBaseUrl}/v1/school/material/${id}/file`, {
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el archivo del recurso.");
+  }
+  return await response.blob();
 }
 
 /** The size of a file, in the units a person reads. */

@@ -1,27 +1,9 @@
 // =============================================================================
-// Billing domain types: subscriptions and entitlements.
+// Billing domain types: the plan of a school and what it enables.
 // -----------------------------------------------------------------------------
-// The entities the billing hooks read, plus the subscription response
-// envelope.
+// The app does not sell anything: the platform team sets the plan when
+// the school is registered. These types are what the hooks read.
 // =============================================================================
-
-export type Subscription = {
-  id: string;
-  school_id: string;
-  plan_id: string;
-  status: string;
-  interval: string;
-  customer_email: string | null;
-  wompi_subscription_id: string | null;
-  wompi_payment_source_id: string | null;
-  started_at: string | null;
-  current_period_start: string | null;
-  current_period_end: string | null;
-  cancelled_at: string | null;
-  raw: unknown;
-  created_at: string;
-  updated_at: string;
-};
 
 export type Entitlement = {
   school_id: string;
@@ -39,6 +21,6 @@ export type Entitlement = {
 
 /** The envelope the /v1/subscriptions endpoint returns. */
 export type SubscriptionResponse = {
-  subscription: Subscription | null;
+  subscription: Record<string, unknown> | null;
   entitlements: Entitlement | null;
 };

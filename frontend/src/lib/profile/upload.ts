@@ -1,15 +1,13 @@
 // =============================================================================
 // The profile photo.
 // -----------------------------------------------------------------------------
-// The image is sent to the backend (multipart), which uploads it to the
-// Supabase `avatars` bucket with the service-role key and records the
-// public URL on the caller's profile.
+// The image is sent to the backend (multipart), which writes it to the
+// file store of the server and records the path of the file on the
+// caller's profile.
 //
-// Why through the backend: newer Supabase projects sign JWTs with
-// asymmetric keys (ES256), so the backend cannot mint an HS256 token
-// that Storage will verify for a browser-direct upload. Routing the
-// upload through the backend sidesteps that and keeps the service key
-// off the browser.
+// Why through the backend: the browser never writes a file by itself.
+// The API validates the upload, decides where the file goes and keeps
+// the disk of the server out of the reach of the browser.
 // =============================================================================
 
 import { apiBaseUrl } from "@/lib/api/client";

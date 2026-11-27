@@ -253,6 +253,9 @@ async def list_catalog(
     q: Annotated[str | None, Query(max_length=120)] = None,
     type: Annotated[str | None, Query(max_length=32)] = None,
     status: Annotated[str | None, Query(max_length=16)] = None,
+    visible_to: Annotated[
+        str | None, Query(max_length=16, description="A quién va dirigido: all o teachers")
+    ] = None,
     school_id: Annotated[uuid.UUID | None, Query()] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=catalog.MAX_PER_PAGE)] = catalog.DEFAULT_PER_PAGE,
@@ -267,6 +270,7 @@ async def list_catalog(
         query=q,
         material_type=type,
         status=status,
+        visible_to=visible_to,
         school_id=school_id,
         page=page,
         per_page=per_page,
@@ -324,7 +328,12 @@ async def create_material(
 
     # The schools that will have access must exist.
     known_schools: list[School] = []
-    if body.school_ids:
+    if body.all_schools:
+        # The decision of the platform team: the piece goes to every
+        # school of the network.
+        result = await session.execute(select(School).order_by(School.name))
+        known_schools = list(result.scalars().all())
+    elif body.school_ids:
         result = await session.execute(select(School).where(School.id.in_(body.school_ids)))
         known_schools = list(result.scalars().all())
         known_ids = {school.id for school in known_schools}
@@ -405,6 +414,7 @@ async def create_material(
             "type": material.type,
             "area": material.area,
             "schools": [str(school.id) for school in known_schools],
+            "all_schools": body.all_schools,
         },
     )
     await catalog.record_audit(
@@ -602,6 +612,7 @@ async def set_material_schools(
         session,
         material=material,
         wanted=body.school_ids,
+        all_schools=body.all_schools,
         confirm=body.confirm,
         actor_id=context.user_id,
     )
@@ -614,10 +625,16 @@ async def _replace_schools(
     *,
     material: Material,
     wanted: list[uuid.UUID],
+    all_schools: bool = False,
     confirm: bool,
     actor_id: uuid.UUID | None,
 ) -> None:
     """Write the access of a material: the schools that change, and only those."""
+    if all_schools:
+        # The decision of the platform team: the piece goes to every
+        # school of the network.
+        result = await session.execute(select(School).order_by(School.name))
+        wanted = [school.id for school in result.scalars().all()]
     wanted = list(dict.fromkeys(wanted))
     known_schools: list[School] = []
     if wanted:
@@ -876,10 +893,12 @@ async def download_file(
         raise NotFoundError("The file is not in the storage.") from error
 
     name = stored.file_name.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    # The file is consulted inside the platform, not downloaded: the
+    # browser can show it (a cover, a PDF, a video).
     return Response(
         content=content,
         media_type=stored.mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
     )
 
 

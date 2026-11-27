@@ -1,21 +1,27 @@
 // =============================================================================
 // Apply a school's primary colour to the theme at runtime.
 // -----------------------------------------------------------------------------
-// The design tokens live as CSS variables on :root (see styles.css).
-// Overriding --primary and its derivatives on the document element
-// re-themes the whole app without a rebuild. The colour is an oklch()
-// string, the same format the palette and the base tokens use.
+// The colour is written in `--school-primary`, a variable of the
+// document root, and the panel reads it from there (see
+// components/panel/panel.css): `--primary` is derived from it, so the
+// accent of the school, its soft tint, the ring of the focus and the
+// accent of the rail all move together.
+//
+// The variable lives on the document element on purpose: the panel
+// scope derives `--primary` from it, and a declaration made in the
+// scope would shadow the inherited value.
 // =============================================================================
 
 /** The CSS variables driven by the primary colour. */
-const PRIMARY_VARS = ["--primary", "--ring", "--sidebar-ring", "--sidebar-primary"] as const;
+const PRIMARY_VARS = ["--school-primary"] as const;
 
 /**
  * Apply (or clear) the school's primary colour.
  *
  * Pass null to restore the stylesheet default (removes the inline
- * overrides). A "soft" tint for --primary-soft is derived by lowering
- * the chroma and raising the lightness of the given oklch colour.
+ * overrides). A "soft" tint for `--school-primary-soft` is derived by
+ * lowering the chroma and raising the lightness of the given oklch
+ * colour.
  */
 export function applyPrimaryColor(color: string | null): void {
   if (typeof document === "undefined") return;
@@ -23,14 +29,14 @@ export function applyPrimaryColor(color: string | null): void {
 
   if (!color) {
     for (const v of PRIMARY_VARS) root.style.removeProperty(v);
-    root.style.removeProperty("--primary-soft");
+    root.style.removeProperty("--school-primary-soft");
     return;
   }
 
   for (const v of PRIMARY_VARS) root.style.setProperty(v, color);
 
   const soft = softVariant(color);
-  if (soft) root.style.setProperty("--primary-soft", soft);
+  if (soft) root.style.setProperty("--school-primary-soft", soft);
 }
 
 /**
@@ -50,7 +56,7 @@ export function primaryColorStyle(color: string | null): string {
 
   const soft = softVariant(color);
   const declarations = PRIMARY_VARS.map((v) => `${v}: ${color};`).join(" ");
-  const withSoft = soft ? `${declarations} --primary-soft: ${soft};` : declarations;
+  const withSoft = soft ? `${declarations} --school-primary-soft: ${soft};` : declarations;
   return `html:root { ${withSoft} }`;
 }
 

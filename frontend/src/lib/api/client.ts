@@ -77,6 +77,8 @@ async function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
+export { refreshSession };
+
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
   if (!query) return url;
@@ -105,6 +107,18 @@ async function readError(response: Response): Promise<ApiError> {
         // FastAPI's validation errors: show the first one.
         const first = record.detail[0] as { msg?: string } | undefined;
         message = first?.msg ?? message;
+      }
+      // The backend explains a refusal field by field (the contrast of
+      // a colour, for example). Those reasons are more useful than the
+      // generic summary, so they go with it.
+      const fields = record.fields;
+      if (fields && typeof fields === "object" && !Array.isArray(fields)) {
+        const reasons = Object.values(fields as Record<string, unknown>)
+          .filter((value): value is string => typeof value === "string" && value.length > 0)
+          .map((value) => value.replace(/\.$/, ""));
+        if (reasons.length > 0) {
+          message = `${message}. ${reasons.join(" ")}`;
+        }
       }
       if (typeof record.code === "string") {
         code = record.code;

@@ -17,7 +17,8 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 
-import { api } from "@/lib/api/client";
+import { api, apiBaseUrl } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 
 /** One message of the thread of a case. */
 export type SupportMessage = {
@@ -27,7 +28,18 @@ export type SupportMessage = {
   author_role: string;
   author_name: string;
   body: string;
+  /** The files the author attached to the message. */
+  attachment_ids: string[];
   created_at: string;
+};
+
+/** A file uploaded to attach to a request. */
+export type SupportAttachment = {
+  /** The path of the file in the store: it is what the thread keeps. */
+  id: string;
+  name: string;
+  size: number;
+  url: string;
 };
 
 /** One request of the school, as it appears in the list. */
@@ -61,9 +73,27 @@ export const SUPPORT_CATEGORIES = [
   { id: "otro", label: "Otro" },
 ] as const;
 
+/** A page of the requests of the school. */
+export type SupportCasePage = {
+  items: SupportCaseSummary[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+};
+
+/** The filters of the list of requests. */
+export type SupportCaseFilters = {
+  page?: number;
+  per_page?: number;
+  /** The text to look for: the title or the code of the request. */
+  q?: string;
+};
+
 export const supportKeys = {
-  cases: () => ["school", "support", "cases"] as const,
-  case: (caseId: string) => ["school", "support", "cases", caseId] as const,
+  cases: (filters: SupportCaseFilters = {}) => ["school", "support", "cases", filters] as const,
+  case: (caseId: string) => ["school", "support", "case", caseId] as const,
+  openCount: ["school", "support", "open-count"] as const,
 };
 
 /**
@@ -72,17 +102,46 @@ export const supportKeys = {
  * The query can be switched off for the roles that do not have the
  * channel: the rail only counts the open cases of the administrator.
  */
-export function useSchoolSupportCases(enabled = true): UseQueryResult<SupportCaseSummary[], Error> {
+export function useSchoolSupportCases(
+  filters: SupportCaseFilters = {},
+  enabled = true,
+): UseQueryResult<SupportCasePage, Error> {
+  const qc = useQueryClient();
+
+  // The bell says that there is something new in the thread: the list
+  // is asked again, so the answer of the platform shows up without a
+  // reload.
+  useEvent("notification", () => {
+    qc.invalidateQueries({ queryKey: ["school", "support"] });
+  });
+
   return useQuery({
-    queryKey: supportKeys.cases(),
+    queryKey: supportKeys.cases(filters),
     enabled,
-    queryFn: () => api.get<SupportCaseSummary[]>("/v1/school/support/cases"),
+    queryFn: () =>
+      api.get<SupportCasePage>("/v1/school/support/cases", {
+        page: filters.page ?? 1,
+        per_page: filters.per_page ?? 10,
+        ...(filters.q ? { q: filters.q } : {}),
+      }),
   });
 }
 
-/** How many cases of the school are still open. */
-export function openCaseCount(cases: SupportCaseSummary[] | undefined): number {
-  return (cases ?? []).filter((item) => item.status !== "resuelto").length;
+/**
+ * How many requests of the school are still open.
+ *
+ * The number is its own call: the list is cut in pages and the badge
+ * counts every case of the school, not only the ones of the first page.
+ */
+export function useOpenSupportCaseCount(enabled = true): UseQueryResult<number, Error> {
+  return useQuery({
+    queryKey: supportKeys.openCount,
+    enabled,
+    queryFn: async () => {
+      const body = await api.get<{ count: number }>("/v1/school/support/open-count");
+      return body.count;
+    },
+  });
 }
 
 /** One request of the school, with its thread. */
@@ -98,7 +157,7 @@ export function useSchoolSupportCase(caseId: string | null): UseQueryResult<Supp
 export function useOpenSupportCase(): UseMutationResult<
   SupportCase,
   Error,
-  { title: string; category: string; body: string }
+  { title: string; category: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
@@ -113,15 +172,49 @@ export function useOpenSupportCase(): UseMutationResult<
 export function useAddSupportMessage(): UseMutationResult<
   SupportCase,
   Error,
-  { caseId: string; body: string }
+  { caseId: string; body: string; attachment_ids?: string[] }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ caseId, body }) =>
-      api.post<SupportCase>(`/v1/school/support/cases/${caseId}/messages`, { body }),
+    mutationFn: ({ caseId, body, attachment_ids }) =>
+      api.post<SupportCase>(`/v1/school/support/cases/${caseId}/messages`, {
+        body,
+        attachment_ids,
+      }),
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: supportKeys.cases() });
       qc.setQueryData(supportKeys.case(updated.id), updated);
+    },
+  });
+}
+
+/**
+ * Upload a file to attach to a request.
+ *
+ * The file goes to the store of the school and the path it gets back is
+ * what the thread keeps: the message points at the file.
+ */
+export function useUploadSupportAttachment(): UseMutationResult<SupportAttachment, Error, File> {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const response = await fetch(`${apiBaseUrl}/v1/school/support/attachments`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!response.ok) {
+        let detail = `No se pudo adjuntar el archivo (${response.status}).`;
+        try {
+          const body = await response.json();
+          detail = body?.detail ?? detail;
+        } catch {
+          // The answer was not JSON: the message above is enough.
+        }
+        throw new Error(detail);
+      }
+      return (await response.json()) as SupportAttachment;
     },
   });
 }

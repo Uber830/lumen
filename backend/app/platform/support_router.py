@@ -12,12 +12,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import storage
 from app.core.context import RequestContext
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, ValidationError
 from app.db.models import Profile, School, User
 from app.db.session import get_db
 from app.deps import require_platform_admin
@@ -29,6 +30,8 @@ from app.platform.support_schemas import (
     CaseOptions,
     CasePage,
     CaseSummary,
+    CreateCaseRequest,
+    PlatformAttachmentOut,
     ReplyRequest,
     case_options,
 )
@@ -120,6 +123,7 @@ async def _detail(
                 ),
                 author_role=message.author_role,
                 body=message.body,
+                attachment_ids=list(message.attachment_ids or []),
                 created_at=message.created_at,
             )
             for message in thread.messages
@@ -176,6 +180,36 @@ async def list_cases(
     )
 
 
+@router.post("/cases", response_model=CaseDetail, status_code=status.HTTP_201_CREATED)
+async def create_case(
+    body: CreateCaseRequest,
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CaseDetail:
+    """Open a conversation with a school.
+
+    The platform team does not only answer: it can also start the
+    conversation. The case belongs to the school and appears in its own
+    support desk, with the message of the team at the head of the
+    thread.
+    """
+    case = await support.create_case(
+        session,
+        school_id=body.school_id,
+        author_id=context.user_id,
+        title=body.title,
+        category=body.category,
+        body=body.body,
+        attachment_ids=body.attachment_ids,
+    )
+    await session.commit()
+
+    thread = await support.get_case(session, case.id)
+    if thread is None:
+        raise NotFoundError("The case does not exist.")
+    return await _detail(session, thread)
+
+
 @router.get("/cases/{case_id}", response_model=CaseDetail)
 async def read_case(
     case_id: uuid.UUID,
@@ -210,6 +244,7 @@ async def answer_case(
         case=thread.case,
         author_id=context.user_id,
         body=body.body,
+        attachment_ids=body.attachment_ids,
     )
     await catalog.record_audit(
         session,
@@ -226,6 +261,50 @@ async def answer_case(
     refreshed = await support.get_case(session, case_id)
     assert refreshed is not None
     return await _detail(session, refreshed)
+
+
+@router.post("/cases/{case_id}/attachments", response_model=PlatformAttachmentOut, status_code=201)
+async def upload_case_attachment(
+    case_id: uuid.UUID,
+    file: Annotated[UploadFile, File()],
+    context: Annotated[RequestContext, Depends(require_platform_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PlatformAttachmentOut:
+    """Upload a file to attach to the answer of a case.
+
+    The file belongs to the school of the case: it goes to the store
+    under its id, so the school and the support team read the same
+    copy. It is up to 10 MB.
+    """
+    thread = await support.get_case(session, case_id)
+    if thread is None:
+        raise NotFoundError("The case does not exist.")
+
+    content = await file.read()
+    if len(content) > storage.MAX_SUPPORT_ATTACHMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="El archivo supera el límite de 10 MB.",
+        )
+
+    if thread.case.school_id is None:
+        raise ValidationError(
+            "El caso no pertenece a un colegio: no hay dónde guardar el archivo.",
+            code="no_school",
+        )
+
+    path = storage.upload_support_attachment(
+        school_id=str(thread.case.school_id),
+        filename=file.filename or "archivo",
+        content=content,
+        content_type=file.content_type,
+    )
+    return PlatformAttachmentOut(
+        id=path,
+        name=file.filename or "archivo",
+        size=len(content),
+        url=storage.public_path(path),
+    )
 
 
 @router.post("/cases/{case_id}/resolve", response_model=CaseDetail)

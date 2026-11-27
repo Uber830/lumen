@@ -5,9 +5,9 @@
 // unread (the badge) and the list itself (the panel). The list is only
 // fetched when the panel is open, so the badge stays cheap.
 //
-// The unread count is polled, because the app has no push channel yet:
-// the backend will grow one (the email provider) and the polling can be
-// replaced then.
+// The badge is not polled: the server pushes an event when there is
+// something new, and the count is asked for again. The event says what
+// happened, not what it is, so what is shown always comes from the API.
 // =============================================================================
 
 import {
@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-query";
 
 import { api } from "@/lib/api/client";
+import { useEvent } from "@/lib/events/event-stream";
 import type {
   Notification,
   NotificationKind,
@@ -27,9 +28,6 @@ import type {
 } from "@/lib/api/types";
 
 export type { Notification, NotificationKind, NotificationPreferences, UnreadCount };
-
-/** How often the unread count is refreshed, in milliseconds. */
-export const UNREAD_POLL_INTERVAL = 60_000;
 
 /** How many notifications the panel asks for. */
 export const NOTIFICATION_PAGE_SIZE = 20;
@@ -66,14 +64,23 @@ export function useNotifications(
 /**
  * How many notifications the user has not read.
  *
- * This is what the badge shows, so it is polled.
+ * This is what the badge shows, so it has to be right the moment it
+ * changes: the server pushes the event and the count is asked for
+ * again. There is no polling.
  */
 export function useUnreadCount(userId: string | null): UseQueryResult<UnreadCount, Error> {
+  const qc = useQueryClient();
+
+  useEvent("notification", () => {
+    if (!userId) return;
+    qc.invalidateQueries({ queryKey: queryKeys.unreadCount(userId) });
+    qc.invalidateQueries({ queryKey: ["notifications", "list", userId] });
+  });
+
   return useQuery({
     queryKey: userId ? queryKeys.unreadCount(userId) : ["notifications", "unread_count", "none"],
     enabled: !!userId,
     queryFn: () => api.get<UnreadCount>("/v1/notifications/unread-count"),
-    refetchInterval: UNREAD_POLL_INTERVAL,
   });
 }
 

@@ -4,9 +4,8 @@
 - `chat_members`      — who can read/write in a conversation.
 - `chat_messages`     — the messages themselves.
 
-Persistence lives in Postgres. Realtime delivery stays on Supabase's
-Realtime service (see the Phase 0 decisions), so these models are the
-durable record that the realtime channel is built on.
+Persistence lives in Postgres. The live delivery is a periodic query
+on the API, so these models are the durable record the panel reads.
 """
 
 from __future__ import annotations

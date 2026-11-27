@@ -1,6 +1,6 @@
 """ICFES scoring module.
 
-Pure functions: no I/O, no Supabase calls. These are exercised against
+Pure functions: no I/O, no calls to the database. These are exercised against
 fixtures by tests/test_icfes_scoring.py.
 
 The scoring rules follow the convention used by the original

@@ -290,6 +290,37 @@ class StudentTeacherOut(BaseModel):
     subjects: list[str] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# Study plan
+# ---------------------------------------------------------------------------
+
+
+class StudyPlanOut(BaseModel):
+    """One grade of the study plan, with the state of the school."""
+
+    course_name: str
+    grade_label: str
+    subjects: list[str] = Field(default_factory=list)
+    subject_count: int = 0
+    enrolled_students: int = 0
+    exists: bool = False
+
+
+class StudyPlanImport(BaseModel):
+    """The grades of the plan the admin picked."""
+
+    courses: list[str] = Field(min_length=1)
+
+
+class StudyPlanImportOut(BaseModel):
+    """What the import did."""
+
+    created_courses: list[str] = Field(default_factory=list)
+    skipped_courses: list[str] = Field(default_factory=list)
+    created_subjects: int = 0
+    offered_subjects: int = 0
+
+
 __all__ = [
     "AcademicPeriodCreate",
     "AcademicPeriodOut",
@@ -307,6 +338,9 @@ __all__ = [
     "StudentEnrollmentOut",
     "StudentEnrollmentUpdate",
     "StudentTeacherOut",
+    "StudyPlanImport",
+    "StudyPlanImportOut",
+    "StudyPlanOut",
     "SubjectCreate",
     "SubjectOut",
     "SubjectUpdate",

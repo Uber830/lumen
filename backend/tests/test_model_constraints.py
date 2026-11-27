@@ -24,7 +24,7 @@ from app.db.models import Base
 # The migrations are applied in order: the inherited ones first, then
 # the ones this project owns.
 MIGRATION_DIRS = (
-    Path(__file__).resolve().parents[2] / "supabase" / "migrations",
+    Path(__file__).resolve().parents[2] / "db" / "migrations",
     Path(__file__).resolve().parents[1] / "migrations",
 )
 

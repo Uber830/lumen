@@ -27,7 +27,9 @@ from typing import Any
 from sqlalchemy import ColumnElement, Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError
 from app.db.models import AuditLog, Profile, School, SupportCase, SupportMessage, User
+from app.notifications.service import notify_support_case_replied
 
 # The number the first case gets.
 FIRST_CASE_NUMBER = 1001
@@ -193,6 +195,21 @@ async def actor_names(
     return {user_id: full_name or email or "Colegio" for user_id, full_name, email in result.all()}
 
 
+async def _actor_name(session: AsyncSession, user_id: uuid.UUID | None) -> str:
+    """The name of the author, for the notification of the school."""
+    if user_id is None:
+        return "El equipo de Lumen"
+    result = await session.execute(
+        select(Profile.full_name, User.email)
+        .join(Profile, Profile.id == User.id, isouter=True)
+        .where(User.id == user_id)
+    )
+    row = result.first()
+    if row is None:
+        return "El equipo de Lumen"
+    return row[0] or row[1] or "El equipo de Lumen"
+
+
 async def get_case(session: AsyncSession, case_id: uuid.UUID) -> CaseThread | None:
     """One case with its conversation."""
     result = await session.execute(
@@ -212,25 +229,93 @@ async def get_case(session: AsyncSession, case_id: uuid.UUID) -> CaseThread | No
     return CaseThread(case=case, messages=list(messages.scalars().all()))
 
 
+async def create_case(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+    author_id: uuid.UUID | None,
+    title: str,
+    category: str,
+    body: str,
+    attachment_ids: list[str] | None = None,
+) -> SupportCase:
+    """Open a conversation with a school from the platform desk.
+
+    The platform team does not only answer: it can also start the
+    conversation. The case belongs to the school and the thread opens
+    with the message of the team, so the school sees it in its own
+    support desk.
+    """
+    school = await session.get(School, school_id)
+    if school is None:
+        raise NotFoundError("The school does not exist.")
+
+    case = SupportCase(
+        school_id=school_id,
+        code=await next_case_code(session),
+        title=title.strip(),
+        category=category,
+        channel="formulario_web",
+        level="info",
+        status="abierto",
+        opened_by=author_id,
+    )
+    session.add(case)
+    await session.flush()
+
+    session.add(
+        SupportMessage(
+            case_id=case.id,
+            author_id=author_id,
+            author_role="plataforma",
+            body=body.strip(),
+            attachment_ids=list(attachment_ids or []),
+        )
+    )
+
+    # The administrators of the school are the ones waiting for an
+    # answer: the bell of their panel says that the team wrote.
+    await notify_support_case_replied(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, author_id),
+    )
+
+    return case
+
+
 async def answer_case(
     session: AsyncSession,
     *,
     case: SupportCase,
     author_id: uuid.UUID | None,
     body: str,
+    attachment_ids: list[str] | None = None,
 ) -> SupportMessage:
     """Write the answer of the platform team in a case.
 
     A closed case reopens: the school wrote again, so it is waiting
     for an answer.
+
+    The answer may carry files: the support team answers with a
+    document (a guide, a capture of the fix) as well as with words.
     """
     message = SupportMessage(
         case_id=case.id,
         author_id=author_id,
         author_role="plataforma",
         body=body.strip(),
+        attachment_ids=list(attachment_ids or []),
     )
     session.add(message)
+
+    # The school opened the case and waits for the answer: the bell of
+    # the administrators of the school says that it is there.
+    await notify_support_case_replied(
+        session,
+        case=case,
+        actor_name=await _actor_name(session, author_id),
+    )
 
     case.status = "en_espera"
     case.resolved_at = None
@@ -279,6 +364,7 @@ __all__ = [
     "CaseThread",
     "actor_names",
     "answer_case",
+    "create_case",
     "case_state_changed",
     "get_case",
     "list_cases",

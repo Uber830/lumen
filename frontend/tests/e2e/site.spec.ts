@@ -2,8 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { siteFixture } from "../../src/test/site-fixture";
 
-// The password of the seeded accounts: a fixture of the test, not a secret.
-const SEED_LOGIN = "lumen-dev";
+import { SEED_LOGIN } from "./credentials";
 
 /**
  * The public site is served with the content of the API.
@@ -28,24 +27,30 @@ test.describe("landing", () => {
     await mockSite(page);
   });
 
-  test("renders the eight blocks of the index", async ({ page }) => {
+  test("renders the blocks of the index", async ({ page }) => {
     await page.goto("/");
 
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
-      "El material de la editorial,",
+      "El material de su colegio,",
     );
-    await expect(page.getByRole("heading", { name: "Índice del catálogo" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "El catálogo de material" })).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Cómo llega el material al colegio" }),
+      page.getByRole("heading", { name: "Cómo el colegio pone en marcha su material" }),
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Quién usa Lumen y hasta dónde" }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Cobertura por tamaño de colegio" }),
-    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Preguntas frecuentes" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Veamos su colegio/ })).toBeVisible();
+  });
+
+  test("does not publish the platform role nor the coverage by size", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByText("PLATAFORMA")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Cobertura por tamaño de colegio" }),
+    ).toHaveCount(0);
   });
 
   test("shows the catalog with its states written out", async ({ page }) => {
@@ -182,7 +187,6 @@ test.describe("login", () => {
             primary_school_id: "s",
             school: null,
           },
-          supabase_token: null,
         }),
       });
     });
@@ -224,7 +228,6 @@ test.describe("login", () => {
             primary_school_id: "s",
             school: null,
           },
-          supabase_token: null,
         }),
       });
     });

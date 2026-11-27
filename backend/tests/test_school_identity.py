@@ -273,12 +273,12 @@ async def test_a_teacher_cannot_write_the_identity(client, engine, seeded_school
 
 async def test_the_shield_is_uploaded_and_saved(client, engine, monkeypatch, platform_admin):
     """The shield of the school is stored on the school."""
-    from app.core import supabase_storage
+    from app.core import storage
 
     async def fake_upload(**kwargs):
-        return f"https://example.test/escudo-{uuid.uuid4().hex[:6]}.png"
+        return f"school-logos/escudo-{uuid.uuid4().hex[:6]}.png"
 
-    monkeypatch.setattr(supabase_storage, "upload_school_logo", fake_upload)
+    monkeypatch.setattr(storage, "upload_school_logo", fake_upload)
 
     token = await _admin_with_school(client, engine, platform_admin, "escudo")
 
@@ -288,7 +288,9 @@ async def test_the_shield_is_uploaded_and_saved(client, engine, monkeypatch, pla
         files={"file": ("escudo.png", b"fake-image-bytes", "image/png")},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["logo_url"].startswith("https://example.test/escudo-")
+    # The row keeps the path of the file, never its address: the API
+    # serves it and decides who may read it.
+    assert response.json()["logo_url"].startswith("school-logos/escudo-")
 
 
 async def test_the_shield_upload_requires_authentication(client):

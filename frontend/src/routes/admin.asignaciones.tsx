@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { ClipboardList, GraduationCap, Link2, Pencil, Plus, X } from "lucide-react";
+import { ClipboardList, GraduationCap, Link2, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   Chip,
   EmptyState,
   PageHeader,
+  Pagination,
   SectionCard,
   TableShell,
   Toolbar,
@@ -15,17 +16,28 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ConfirmDialog, useDeleteConfirmation } from "@/components/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
 import { MemberAvatar } from "@/components/member-avatar";
 import { Select } from "@/components/select-field";
+import {
+  AssignmentSubjectChips,
+  type AssignmentChipItem,
+} from "@/features/admin/assignment-subject-chips";
 import {
   useCourseSubjects,
   useCreateTeacherAssignment,
   useDeleteTeacherAssignment,
   useSchoolMembers,
-  useUpdateTeacherAssignment,
 } from "@/features/academics/hooks";
 import { useSchoolAssignments, type SchoolAssignment } from "@/lib/school/cycles";
-import { useSchoolCourses } from "@/lib/school/community";
+import { useSchoolCourseOptions } from "@/lib/school/community";
 
 export const Route = createFileRoute("/admin/asignaciones")({
   head: () => ({
@@ -46,30 +58,35 @@ export const Route = createFileRoute("/admin/asignaciones")({
   component: AsignacionesPage,
 });
 
+/** How many teachers are on a page. */
+const PAGE_SIZE = 10;
+
 function AsignacionesPage() {
   const { session } = useRouteContext({ from: "/admin/asignaciones" });
   const schoolId = session.primarySchoolId;
 
   const [teacherFilter, setTeacherFilter] = useState("all");
   const [courseFilter, setCourseFilter] = useState("all");
+  // The page of the list of teachers.
+  const [page, setPage] = useState(1);
   const assignments = useSchoolAssignments(
     teacherFilter === "all" ? undefined : teacherFilter,
     courseFilter === "all" ? undefined : courseFilter,
+    page,
   );
 
   // The write side keeps using the academic hooks: an assignment is the
   // same operation it always was.
   const courseSubjects = useCourseSubjects(schoolId);
   const teachers = useSchoolMembers(schoolId, "teacher");
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
   const createAssignment = useCreateTeacherAssignment(schoolId ?? "");
-  const updateAssignment = useUpdateTeacherAssignment(schoolId ?? "");
   const deleteAssignment = useDeleteTeacherAssignment(schoolId ?? "");
 
-  // The form is the same for creating and for editing: what changes is
-  // what it holds and what the button says.
+  // The form adds a subject to a teacher. When it comes from a row,
+  // the teacher is the one of that row and does not change.
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<SchoolAssignment | null>(null);
+  const [fixedTeacher, setFixedTeacher] = useState<{ id: string; name: string } | null>(null);
   const [teacherId, setTeacherId] = useState("");
   const [courseSubjectId, setCourseSubjectId] = useState("");
   const [justAssigned, setJustAssigned] = useState<string | null>(null);
@@ -77,6 +94,13 @@ function AsignacionesPage() {
   // Removing an assignment asks for confirmation: the teacher stops
   // seeing the content of that subject.
   const assignmentToDelete = useDeleteConfirmation();
+
+  // The list of the subjects of a teacher: the counter opens it to
+  // read it, the column of the actions opens it to act on it.
+  const [subjectsDialog, setSubjectsDialog] = useState<{
+    teacherId: string;
+    withActions: boolean;
+  } | null>(null);
 
   const teacherOptions = useMemo(
     () =>
@@ -104,44 +128,57 @@ function AsignacionesPage() {
   const noTeachers = teacherOptions.length === 0;
   const noCourseSubjects = courseSubjectOptions.length === 0;
 
-  function openCreate() {
-    setEditing(null);
-    setTeacherId("");
+  // The rows are the teachers, not the assignments: the person is the
+  // one that repeats, and what matters is what each one teaches. The
+  // server groups them and cuts the page.
+  const byTeacher = (assignments.data?.items ?? []).map((group) => ({
+    teacherId: group.teacher_id,
+    name: group.teacher_name ?? "Docente",
+    email: group.teacher_email,
+    avatarUrl: group.teacher_avatar_url,
+    assignments: group.assignments,
+    visibleMaterialsCount: group.visible_materials_count,
+  }));
+  const visibleGroups = byTeacher;
+
+  const totalAssignments = byTeacher.reduce((total, group) => total + group.assignments.length, 0);
+
+  function openCreate(fixed?: { id: string; name: string }) {
+    setFixedTeacher(fixed ?? null);
+    setTeacherId(fixed?.id ?? "");
     setCourseSubjectId("");
     setJustAssigned(null);
     setFormOpen(true);
   }
 
-  function openEdit(assignment: SchoolAssignment) {
-    setEditing(assignment);
-    setTeacherId(assignment.teacher_id);
-    setCourseSubjectId("");
-    setJustAssigned(null);
-    setFormOpen(true);
+  /** Removing an assignment asks for confirmation: the teacher stops
+      seeing the content of that subject. */
+  function askRemoveAssignment(assignment: SchoolAssignment) {
+    assignmentToDelete.ask({
+      id: assignment.id,
+      title: `la asignación de ${
+        assignment.teacher_name ?? "el docente"
+      } a ${assignment.course_name ? `${assignment.course_name} · ` : ""}${assignment.subject_name}`,
+      description:
+        "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
+      confirmLabel: "Quitar asignación",
+    });
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!teacherId || !courseSubjectId) return;
 
-    if (editing) {
-      await updateAssignment.mutateAsync({
-        id: editing.id,
-        patch: { teacher_id: teacherId, course_subject_id: courseSubjectId },
-      });
-      setJustAssigned("Cambios guardados");
-    } else {
-      await createAssignment.mutateAsync({
-        course_subject_id: courseSubjectId,
-        teacher_id: teacherId,
-      });
-      setJustAssigned("Asignación creada");
-    }
+    await createAssignment.mutateAsync({
+      course_subject_id: courseSubjectId,
+      teacher_id: teacherId,
+    });
+    setJustAssigned(fixedTeacher ? `Materia asignada a ${fixedTeacher.name}` : "Asignación creada");
     setFormOpen(false);
-    setEditing(null);
+    setFixedTeacher(null);
   }
 
-  const pending = createAssignment.isPending || updateAssignment.isPending;
+  const pending = createAssignment.isPending;
 
   return (
     <>
@@ -149,51 +186,61 @@ function AsignacionesPage() {
         title="Asignaciones"
         subtitle="Vincula docentes con cursos y materias. Cada asignación habilita el acceso al contenido."
         actions={
-          <Button icon={Plus} onClick={openCreate}>
+          <Button icon={Plus} onClick={() => openCreate()}>
             Nueva asignación
           </Button>
         }
       />
 
-      {formOpen && (
-        <SectionCard
-          className="mb-4"
-          title={editing ? "Editar asignación" : "Nueva asignación"}
-          description={
-            editing
-              ? "El docente deja de ver el material de la materia anterior y empieza a ver el de la nueva."
-              : "La asignación habilita el acceso del docente al material de esa materia."
-          }
-          actions={
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={X}
-              onClick={() => {
-                setFormOpen(false);
-                setEditing(null);
-              }}
-            >
-              Cerrar
-            </Button>
-          }
-        >
+      {/* The form lives in a modal: the list of the assignments does not
+          move when the admin opens it. */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setFixedTeacher(null);
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">
+              {fixedTeacher ? `Asignar otra materia a ${fixedTeacher.name}` : "Nueva asignación"}
+            </DialogTitle>
+            <DialogDescription>
+              La asignación habilita el acceso del docente al material de esa materia.
+            </DialogDescription>
+          </DialogHeader>
+
           <form className="space-y-3" onSubmit={onSubmit}>
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Docente
-                </span>
-                <div className="mt-1.5">
-                  <Select
-                    value={teacherId}
-                    onChange={setTeacherId}
-                    options={teacherOptions}
-                    placeholder={noTeachers ? "No hay docentes" : "Elige un docente"}
-                    emptyLabel="Todavía no hay docentes en el colegio"
-                  />
-                </div>
-              </label>
+              {fixedTeacher ? (
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Docente
+                  </span>
+                  <div className="mt-1.5 rounded-idx border border-input bg-secondary px-3 py-2 text-[13px] font-medium">
+                    {fixedTeacher.name}
+                  </div>
+                  <span className="mt-1.5 block text-xs text-muted-foreground">
+                    El docente de la fila: la materia es la que se elige.
+                  </span>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Docente
+                  </span>
+                  <div className="mt-1.5">
+                    <Select
+                      value={teacherId}
+                      onChange={setTeacherId}
+                      options={teacherOptions}
+                      placeholder={noTeachers ? "No hay docentes" : "Elige un docente"}
+                      emptyLabel="Todavía no hay docentes en el colegio"
+                    />
+                  </div>
+                </label>
+              )}
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Curso · Materia
@@ -232,27 +279,34 @@ function AsignacionesPage() {
               </p>
             )}
 
-            <div className="flex items-center gap-2">
+            {createAssignment.error && (
+              <p role="alert" className="text-[13px] text-destructive">
+                {createAssignment.error.message}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setFormOpen(false);
+                  setFixedTeacher(null);
+                }}
+              >
+                Cancelar
+              </Button>
               <Button
                 type="submit"
                 icon={Link2}
                 disabled={pending || !teacherId || !courseSubjectId}
               >
-                {pending
-                  ? "Guardando..."
-                  : editing
-                    ? "Guardar cambios"
-                    : "Asignar docente a la materia"}
+                {pending ? "Guardando..." : "Asignar la materia"}
               </Button>
-              {(createAssignment.error || updateAssignment.error) && (
-                <p role="alert" className="text-[13px] text-destructive">
-                  {(createAssignment.error ?? updateAssignment.error)?.message}
-                </p>
-              )}
-            </div>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {justAssigned && (
         <p role="status" className="mb-3 text-[13px] text-success">
@@ -266,7 +320,7 @@ function AsignacionesPage() {
             value={teacherFilter}
             onChange={(event) => setTeacherFilter(event.target.value)}
             aria-label="Filtrar por docente"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los docentes</option>
             {teacherOptions.map((option) => (
@@ -280,7 +334,7 @@ function AsignacionesPage() {
             value={courseFilter}
             onChange={(event) => setCourseFilter(event.target.value)}
             aria-label="Filtrar por curso"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los cursos</option>
             {(courses.data ?? []).map((course) => (
@@ -292,7 +346,9 @@ function AsignacionesPage() {
 
           <div className="ml-auto">
             <Chip tone="muted">
-              {assignments.data ? `${assignments.data.length} asignaciones` : "—"}
+              {assignments.data
+                ? `${assignments.data.total} docente(s) · ${totalAssignments} asignación(es)`
+                : "—"}
             </Chip>
           </div>
         </Toolbar>
@@ -305,20 +361,20 @@ function AsignacionesPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[190px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[110px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[92px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[190px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[110px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[92px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>
-        ) : (assignments.data?.length ?? 0) === 0 ? (
+        ) : (assignments.data?.total ?? 0) === 0 ? (
           <EmptyState
             icon={ClipboardList}
             title="Sin asignaciones"
             description="Vincula un docente con un curso y una materia para que tenga acceso al contenido."
             action={
-              <Button icon={Plus} onClick={openCreate}>
+              <Button icon={Plus} onClick={() => openCreate()}>
                 Nueva asignación
               </Button>
             }
@@ -327,7 +383,7 @@ function AsignacionesPage() {
           <TableShell>
             <PanelTable className="w-full border-collapse">
               <caption className="sr-only">
-                Asignaciones del colegio, con el material visible de cada una
+                Docentes del colegio y las materias que tiene asignadas
               </caption>
               <thead>
                 <tr>
@@ -335,13 +391,10 @@ function AsignacionesPage() {
                     Docente
                   </th>
                   <th scope="col" className={tableHeadClass}>
-                    Curso
+                    Materias asignadas
                   </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Materia
-                  </th>
-                  <th scope="col" className={tableHeadClass}>
-                    Material visible
+                  <th scope="col" className={`${tableHeadClass} text-right`}>
+                    Material
                   </th>
                   <th scope="col" className={`${tableHeadClass} text-right`}>
                     Acción
@@ -349,67 +402,70 @@ function AsignacionesPage() {
                 </tr>
               </thead>
               <tbody>
-                {(assignments.data ?? []).map((assignment) => (
-                  <tr key={assignment.id} className="transition-colors hover:bg-white/[0.025]">
+                {visibleGroups.map((group) => (
+                  <tr key={group.teacherId} className="transition-colors hover:bg-muted">
                     <td className={tableCellClass}>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        <MemberAvatar
-                          name={assignment.teacher_name ?? "Docente"}
-                          avatarUrl={assignment.teacher_avatar_url}
-                          size="sm"
-                        />
+                        <MemberAvatar name={group.name} avatarUrl={group.avatarUrl} size="sm" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            {assignment.teacher_name ?? "Sin nombre"}
-                          </p>
+                          <p className="truncate font-medium text-foreground">{group.name}</p>
                           <p className="truncate text-[12px] text-muted-foreground">
-                            {assignment.teacher_email ?? "Sin correo"}
+                            {group.email ?? "Sin correo"}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className={tableCellClass}>{assignment.course_name}</td>
                     <td className={tableCellClass}>
-                      <p>{assignment.subject_name}</p>
-                      {assignment.subject_area && (
-                        <p className="text-[12px] text-muted-foreground">
-                          {assignment.subject_area}
-                        </p>
-                      )}
+                      {/* What the teacher teaches: one chip and the
+                          count of the rest, so the person is not
+                          repeated and the row does not grow. */}
+                      <AssignmentSubjectChips
+                        items={group.assignments.map((assignment) => ({
+                          id: assignment.id,
+                          courseName: assignment.course_name,
+                          subjectName: assignment.subject_name,
+                        }))}
+                        who={group.name}
+                        open={subjectsDialog?.teacherId === group.teacherId}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setSubjectsDialog(null);
+                            return;
+                          }
+                          setSubjectsDialog({ teacherId: group.teacherId, withActions: false });
+                        }}
+                        withActions={subjectsDialog?.withActions ?? false}
+                        onRemove={(item) => {
+                          const assignment = group.assignments.find((one) => one.id === item.id);
+                          if (assignment) askRemoveAssignment(assignment);
+                        }}
+                      />
                     </td>
-                    <td className={tableCellClass}>
-                      <Chip tone={assignment.visible_materials_count > 0 ? "ok" : "muted"} dot>
-                        {assignment.visible_materials_count > 0
-                          ? `${assignment.visible_materials_count} publicados`
-                          : "Sin material"}
-                      </Chip>
+                    <td
+                      className={`${tableCellClass} text-right font-mono text-[12.6px] text-foreground`}
+                    >
+                      {group.visibleMaterialsCount}
                     </td>
                     <td className={`${tableCellClass} text-right`}>
+                      {/* The actions of the row live together: adding
+                          a subject and managing the ones it has. */}
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={Pencil}
-                          onClick={() => openEdit(assignment)}
+                          icon={Plus}
+                          onClick={() => openCreate({ id: group.teacherId, name: group.name })}
                         >
-                          Editar
+                          Asignar otra
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          icon={X}
+                          icon={Trash2}
                           onClick={() =>
-                            assignmentToDelete.ask({
-                              id: assignment.id,
-                              title: `la asignación de ${
-                                assignment.teacher_name ?? "el docente"
-                              } a ${assignment.subject_name}`,
-                              description:
-                                "El docente deja de tener esa materia asignada y deja de ver su material. Los contenidos y las tareas que ya subió se conservan.",
-                              confirmLabel: "Quitar asignación",
-                            })
+                            setSubjectsDialog({ teacherId: group.teacherId, withActions: true })
                           }
-                          disabled={deleteAssignment.isPending}
+                          aria-label={`Quitar las materias de ${group.name}`}
                         >
                           Quitar
                         </Button>
@@ -425,6 +481,16 @@ function AsignacionesPage() {
           <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
             {deleteAssignment.error.message}
           </p>
+        )}
+        {(assignments.data?.total ?? 0) > 0 && (
+          <Pagination
+            page={assignments.data?.page ?? 1}
+            pageCount={assignments.data?.pages ?? 0}
+            total={assignments.data?.total ?? 0}
+            pageSize={assignments.data?.per_page ?? PAGE_SIZE}
+            onPageChange={setPage}
+            always
+          />
         )}
       </SectionCard>
 
@@ -450,12 +516,10 @@ function AsignacionesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
-          El material visible se cuenta en el servidor: es el material publicado del área de la
-          materia, habilitado para el colegio, que aplica a los cursos del docente.
+          Cada docente aparece una sola vez con todas sus materias: cada asignación habilita el
+          acceso del docente al material de esa materia, que es lo que abre el contenido que el
+          equipo de plataforma habilitó para el colegio.
         </span>
       </p>
     </>

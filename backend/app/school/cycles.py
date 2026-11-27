@@ -55,18 +55,28 @@ async def list_assignments(
     *,
     teacher_id: uuid.UUID | None = None,
     course_id: uuid.UUID | None = None,
-) -> list[dict[str, Any]]:
+    page: int | None = None,
+    per_page: int = 10,
+) -> tuple[list[dict[str, Any]], int]:
     """The assignments of the school, with the material each one sees.
 
     The count of visible material is computed in the database: it is the
     published material of the area of the subject, enabled for the
     school, that applies to the course of the assignment (or to the whole
     school, when the material has no course of its own).
+
+    The rows are the teachers, not the assignments: the person is the
+    one that repeats, and what matters is what each one teaches. When a
+    page is asked for, only the teachers of that page come back, with
+    the total count of teachers.
     """
     statement = (
         select(
             TeacherAssignment.id,
             TeacherAssignment.teacher_id,
+            # The course subject is the assignment itself: the form needs it
+            # to edit the row without losing the link.
+            TeacherAssignment.course_subject_id,
             # The name lives in the profile when the account has one, and
             # in the user otherwise.
             func.coalesce(Profile.full_name, User.full_name),
@@ -107,6 +117,7 @@ async def list_assignments(
         (
             assignment_id,
             teacher_id,
+            course_subject_id,
             full_name,
             email,
             avatar_url,
@@ -126,6 +137,7 @@ async def list_assignments(
             {
                 "id": str(assignment_id),
                 "teacher_id": str(teacher_id),
+                "course_subject_id": str(course_subject_id),
                 "teacher_name": full_name,
                 "teacher_email": email,
                 "teacher_avatar_url": avatar_url,
@@ -138,7 +150,32 @@ async def list_assignments(
             }
         )
 
-    return assignments
+    # The rows are the teachers: the assignments of each one travel
+    # inside its row, so the person is not repeated.
+    groups: dict[str, dict[str, Any]] = {}
+    for assignment in assignments:
+        group = groups.setdefault(
+            assignment["teacher_id"],
+            {
+                "teacher_id": assignment["teacher_id"],
+                "teacher_name": assignment["teacher_name"],
+                "teacher_email": assignment["teacher_email"],
+                "teacher_avatar_url": assignment["teacher_avatar_url"],
+                "assignments": [],
+                "visible_materials_count": 0,
+            },
+        )
+        group["assignments"].append(assignment)
+        group["visible_materials_count"] += int(assignment["visible_materials_count"])
+
+    rows = list(groups.values())
+    total = len(rows)
+
+    if page is not None:
+        start = (max(page, 1) - 1) * per_page
+        rows = rows[start : start + per_page]
+
+    return rows, total
 
 
 async def _visible_material_count(

@@ -21,10 +21,11 @@ import uuid
 from datetime import UTC, date, datetime
 from typing import Any, Protocol, cast
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.academics.study_plan import STUDY_PLANS, find_plan
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.enums import AcademicPeriodModality, EnrollmentStatus, SchoolRole
 from app.db.models import (
@@ -749,7 +750,7 @@ async def list_members(
     school_id: uuid.UUID,
     role: SchoolRole | None = None,
     include_revoked: bool = False,
-) -> list[tuple[SchoolMembership, Profile, str | None, bool]]:
+) -> list[tuple[SchoolMembership, Profile | None, str | None, bool, str | None]]:
     """List the school's members, joined with their profile.
 
     The frontend used to build this with a PostgREST join. Doing it
@@ -762,9 +763,20 @@ async def list_members(
     ``include_revoked`` is set, which the admin management view uses to
     show deactivated members too.
     """
+    # The profile is joined on the left: a member without a profile
+    # still is a member of the school, and the name it has is in the
+    # account. With an inner join the members without a profile were
+    # missing from the directory, and the forms that offer a choice of
+    # teacher came out empty.
     statement = (
-        select(SchoolMembership, Profile, User.email, User.password_hash)
-        .join(Profile, Profile.id == SchoolMembership.user_id)
+        select(
+            SchoolMembership,
+            Profile,
+            User.email,
+            User.password_hash,
+            func.coalesce(Profile.full_name, User.full_name),
+        )
+        .outerjoin(Profile, Profile.id == SchoolMembership.user_id)
         .join(User, User.id == SchoolMembership.user_id)
         .where(SchoolMembership.school_id == school_id)
         .order_by(SchoolMembership.joined_at.desc())
@@ -776,7 +788,7 @@ async def list_members(
 
     result = await session.execute(statement)
     # The account is "activated" once it has a non-empty password hash.
-    return [(row[0], row[1], row[2], bool(row[3])) for row in result.all()]
+    return [(row[0], row[1], row[2], bool(row[3]), row[4]) for row in result.all()]
 
 
 async def list_teachers_for_student(
@@ -870,6 +882,146 @@ async def _flush_or_conflict(session: AsyncSession, detail: str) -> None:
         raise _conflict(detail) from exc
 
 
+# ---------------------------------------------------------------------------
+# Study plan
+# ---------------------------------------------------------------------------
+
+
+async def list_study_plans(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+) -> list[dict[str, Any]]:
+    """The study plan, with what the school already has of it.
+
+    Each plan says whether its course exists already and how many
+    students are enrolled in it, so the admin sees what the import
+    would add before picking it.
+    """
+    courses = {course.name: course for course in await list_courses(session, school_id=school_id)}
+
+    plans: list[dict[str, Any]] = []
+    for plan in STUDY_PLANS:
+        course = courses.get(plan.course_name)
+        students = 0
+        if course is not None:
+            students = await _count(
+                session,
+                select(func.count(StudentEnrollment.id)).where(
+                    StudentEnrollment.school_id == school_id,
+                    StudentEnrollment.course_id == course.id,
+                    StudentEnrollment.status == EnrollmentStatus.ACTIVE,
+                ),
+            )
+        plans.append(
+            {
+                "course_name": plan.course_name,
+                "grade_label": plan.grade_label,
+                "subjects": [name for name, _area in plan.subjects],
+                "subject_count": len(plan.subjects),
+                "enrolled_students": students,
+                "exists": course is not None,
+            }
+        )
+
+    return plans
+
+
+async def import_study_plans(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+    course_names: list[str],
+) -> dict[str, Any]:
+    """Create the courses of the picked plans, with their subjects.
+
+    The import is idempotent: a course that already exists is left
+    alone, and the subjects that the school already has are reused
+    instead of duplicated.
+    """
+    created_courses: list[str] = []
+    skipped_courses: list[str] = []
+    created_subjects = 0
+    offered_subjects = 0
+
+    for name in course_names:
+        plan = find_plan(name)
+        if plan is None:
+            raise ValidationError(f"“{name}” no es un curso del plan de estudios.")
+
+        existing = await _find_course_by_name(session, school_id=school_id, name=plan.course_name)
+        if existing is not None:
+            skipped_courses.append(plan.course_name)
+            continue
+
+        course = await create_course(
+            session,
+            school_id=school_id,
+            name=plan.course_name,
+            grade_label=plan.grade_label,
+        )
+        created_courses.append(plan.course_name)
+
+        for subject_name, area in plan.subjects:
+            subject = await _find_subject_by_name(session, school_id=school_id, name=subject_name)
+            if subject is None:
+                subject = await create_subject(
+                    session,
+                    school_id=school_id,
+                    name=subject_name,
+                    area=area,
+                )
+                created_subjects += 1
+
+            offered = await session.execute(
+                select(CourseSubject.id).where(
+                    CourseSubject.course_id == course.id,
+                    CourseSubject.subject_id == subject.id,
+                )
+            )
+            if offered.scalar_one_or_none() is None:
+                await create_course_subject(
+                    session,
+                    school_id=school_id,
+                    course_id=course.id,
+                    subject_id=subject.id,
+                )
+                offered_subjects += 1
+
+    return {
+        "created_courses": created_courses,
+        "skipped_courses": skipped_courses,
+        "created_subjects": created_subjects,
+        "offered_subjects": offered_subjects,
+    }
+
+
+async def _find_course_by_name(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+    name: str,
+) -> Course | None:
+    """The course of a school with that name, or None."""
+    result = await session.execute(
+        select(Course).where(Course.school_id == school_id, Course.name == name)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _find_subject_by_name(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+    name: str,
+) -> Subject | None:
+    """The subject of a school with that name, or None."""
+    result = await session.execute(
+        select(Subject).where(Subject.school_id == school_id, Subject.name == name)
+    )
+    return result.scalar_one_or_none()
+
+
 __all__ = [
     "create_course",
     "create_course_subject",
@@ -889,10 +1041,12 @@ __all__ = [
     "get_student_enrollment",
     "get_subject",
     "get_teacher_assignment",
+    "import_study_plans",
     "list_course_subjects",
     "list_courses",
     "list_members",
     "list_periods",
+    "list_study_plans",
     "list_student_enrollments",
     "list_subjects",
     "list_teacher_assignments",

@@ -13,7 +13,7 @@ The modules are grouped by domain:
 - `chat`       — conversations, members, messages.
 - `evaluations`— authored assessments and their attempts.
 - `icfes`      — the question bank, simulations and attempts.
-- `billing`    — subscriptions, entitlements, the Wompi ledger.
+- `billing`    — subscriptions and entitlements.
 - `catalog`    — the editorial catalog of the platform role: materials,
                  their files, their access, their history and the audit trail.
 - `sessions`   — refresh tokens, password resets, email verifications.
@@ -31,7 +31,7 @@ from app.db.models.academics import (
     Subject,
     TeacherAssignment,
 )
-from app.db.models.billing import Entitlement, Subscription, WompiEventProcessed
+from app.db.models.billing import Entitlement, Subscription
 from app.db.models.catalog import (
     AuditLog,
     Material,
@@ -143,5 +143,4 @@ __all__ = [
     "TaskSubmission",
     "TeacherAssignment",
     "User",
-    "WompiEventProcessed",
 ]

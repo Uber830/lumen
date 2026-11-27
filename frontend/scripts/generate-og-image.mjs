@@ -13,7 +13,7 @@
  * version, for the pages that can use it).
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +21,8 @@ import sharp from "sharp";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(here, "..", "public");
+// The canonical mark, copied here by `tools/build_brand.py`.
+const brandPath = resolve(publicDir, "brand", "logo-lumen.svg");
 
 // The tokens of the design. Keep them in sync with
 // `src/features/site/site.css`.
@@ -34,27 +36,27 @@ const ACCENT = "#1A4CF0";
 const WIDTH = 1200;
 const HEIGHT = 630;
 
-/** The sun of the logo, on its square of ink. */
-function logo(x, y, size) {
-  const c = size / 2;
-  const rays = [0, 45, 90, 135, 180, 225, 270, 315]
-    .map((angle) => {
-      const rad = (angle * Math.PI) / 180;
-      const inner = c + size * 0.22;
-      const outer = c + size * 0.42;
-      return `<line x1="${(x + inner * Math.cos(rad)).toFixed(2)}" y1="${(y + inner * Math.sin(rad)).toFixed(2)}" x2="${(x + outer * Math.cos(rad)).toFixed(2)}" y2="${(y + outer * Math.sin(rad)).toFixed(2)}" stroke="#FCFCFD" stroke-width="${(size * 0.045).toFixed(2)}" />`;
-    })
-    .join("");
+// The badge of the mark, inside its own canvas of 1024.
+const BRAND_CANVAS = 1024;
+const BRAND_BOX = 174;
+const BRAND_SIZE = 676;
 
-  return `<g>
-  <rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${INK}" />
-  <circle cx="${x + c}" cy="${y + c}" r="${(size * 0.14).toFixed(2)}" fill="${PAPER}" />
-  ${rays}
-</g>`;
+/** The mark of the brand, taken from the canonical SVG. */
+async function logo(x, y, size) {
+  const source = await readFile(brandPath, "utf8");
+  // The contents of the SVG, without the wrapper and without the title.
+  const inner = source
+    .replace(/^[\s\S]*?<svg[^>]*>/, "")
+    .replace(/<\/svg>\s*$/, "")
+    .replace(/<title[\s\S]*?<\/title>/, "")
+    .replace(/<desc[\s\S]*?<\/desc>/, "");
+  const scale = size / BRAND_SIZE;
+  const offset = BRAND_BOX * scale;
+  return `<g transform="translate(${x - offset} ${y - offset}) scale(${scale})">\n${inner}\n</g>`;
 }
 
 /** The image, as an SVG. */
-function svg() {
+async function svg() {
   const margin = 72;
   const font = "'Space Grotesk', system-ui, sans-serif";
   const mono = "'IBM Plex Mono', ui-monospace, monospace";
@@ -66,17 +68,17 @@ function svg() {
     ${Array.from({ length: Math.ceil(WIDTH / 80) }, (_, i) => `<line x1="${i * 80}" y1="0" x2="${i * 80}" y2="${HEIGHT}" stroke="${INK}" stroke-opacity="0.022" />`).join("")}
   </g>
 
-  ${logo(margin, margin, 56)}
-  <text x="${margin + 76}" y="${margin + 38}" font-family="${font}" font-size="30" font-weight="700" fill="${INK}">Lumen</text>
-  <text x="${margin + 76}" y="${margin + 66}" font-family="${mono}" font-size="17" letter-spacing="3" fill="${INK_3}">BOGOTÁ, COLOMBIA</text>
+  ${await logo(margin, margin, 56)}
+  <text x="${margin + 78}" y="${margin + 38}" font-family="${font}" font-size="30" font-weight="700" fill="${INK}">Lumen</text>
+  <text x="${margin + 78}" y="${margin + 66}" font-family="${mono}" font-size="17" letter-spacing="3" fill="${INK_3}">BOGOTÁ, COLOMBIA</text>
 
-  <text x="${margin}" y="300" font-family="${mono}" font-size="18" letter-spacing="4" fill="${INK_3}">IDX-001 / CATÁLOGO EDITORIAL</text>
+  <text x="${margin}" y="300" font-family="${mono}" font-size="18" letter-spacing="4" fill="${INK_3}">IDX-001 / SOLUCIÓN PARA COLEGIOS</text>
   <line x1="${margin}" y1="330" x2="${WIDTH - margin}" y2="330" stroke="${LINE}" stroke-width="1" />
 
-  <text x="${margin}" y="420" font-family="${font}" font-size="72" font-weight="700" fill="${INK}">El material de la editorial,</text>
-  <text x="${margin}" y="500" font-family="${font}" font-size="72" font-weight="700" fill="${ACCENT}">indexado por colegio.</text>
+  <text x="${margin}" y="420" font-family="${font}" font-size="72" font-weight="700" fill="${INK}">El material de su colegio,</text>
+  <text x="${margin}" y="500" font-family="${font}" font-size="72" font-weight="700" fill="${ACCENT}">ordenado y listo para usar.</text>
 
-  <text x="${margin}" y="570" font-family="${font}" font-size="24" fill="${INK_2}">Un solo catálogo. El acceso se configura colegio por colegio.</text>
+  <text x="${margin}" y="570" font-family="${font}" font-size="24" fill="${INK_2}">Una plataforma para el material académico de los colegios.</text>
 </svg>
 `;
 }
@@ -84,7 +86,7 @@ function svg() {
 async function main() {
   await mkdir(publicDir, { recursive: true });
 
-  const source = svg();
+  const source = await svg();
   await writeFile(resolve(publicDir, "og-lumen.svg"), source, "utf8");
 
   await sharp(Buffer.from(source)).png().toFile(resolve(publicDir, "og-lumen.png"));

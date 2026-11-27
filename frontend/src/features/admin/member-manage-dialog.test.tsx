@@ -51,7 +51,13 @@ async function render(props: Partial<React.ComponentProps<typeof MemberManageDia
 
   await act(async () => {
     root.render(
-      <MemberManageDialog member={member()} roleLabel="docente" onClose={() => {}} {...props} />,
+      <MemberManageDialog
+        member={member()}
+        roleLabel="docente"
+        onClose={() => {}}
+        onEdit={() => {}}
+        {...props}
+      />,
     );
   });
 
@@ -106,6 +112,54 @@ describe("MemberManageDialog", () => {
     });
 
     expect(container.textContent).toContain("token-nuevo");
+
+    await cleanup();
+  });
+
+  it("shows the data of the person and the access", async () => {
+    const { container, cleanup } = await render({
+      member: member({
+        access: "activado",
+        courses: ["7° A"],
+        subjects: ["Matemáticas"],
+      }),
+    });
+
+    expect(container.textContent).toContain("Correo");
+    expect(container.textContent).toContain("Ingreso");
+    expect(container.textContent).toContain("Acceso");
+    expect(container.textContent).toContain("Activado");
+    expect(container.textContent).toContain("Estado");
+    expect(container.textContent).toContain("Acceso al material");
+
+    await cleanup();
+  });
+
+  it("does not show the courses of the person", async () => {
+    // The courses and the subjects of a teacher are changed in the
+    // assign view: in this drawer there is nothing to change.
+    const { container, cleanup } = await render({
+      member: member({
+        access: "activado",
+        courses: ["7° A"],
+        subjects: ["Matemáticas"],
+      }),
+    });
+
+    expect(container.textContent).not.toContain("Curso · Materia");
+    expect(container.textContent).not.toContain("7° A");
+    expect(container.textContent).not.toContain("Matemáticas");
+
+    await cleanup();
+  });
+
+  it("offers to edit and to turn the access off", async () => {
+    const { container, cleanup } = await render();
+
+    const buttons = Array.from(container.querySelectorAll("button")).map((b) => b.textContent);
+    expect(buttons).toContain("Cerrar");
+    expect(buttons).toContain("Editar");
+    expect(buttons).toContain("Desactivar acceso");
 
     await cleanup();
   });

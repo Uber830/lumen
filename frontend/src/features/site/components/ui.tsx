@@ -12,6 +12,7 @@
 import type { ReactNode } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { cn } from "@/lib/utils";
 
 import type { CatalogState, SiteActionVariant } from "../types";
 
@@ -89,7 +90,7 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 }
 
 /**
- * The sun of the logo: a square of ink with a ring of rays.
+ * The mark of the brand: the badge with the tape "L" cut out of it.
  *
  * It is decorative: the name of the brand travels next to it as text.
  *
@@ -97,7 +98,7 @@ export function SectionTitle({ children }: { children: ReactNode }) {
  * carries the same one, so the whole application shows one logo.
  */
 export function SiteLogo({ className = "" }: { className?: string }) {
-  return <BrandLogo className={className} />;
+  return <BrandLogo className={cn("size-[30px]", className)} />;
 }
 
 /**

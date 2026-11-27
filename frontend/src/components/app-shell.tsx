@@ -1,6 +1,5 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
-  Bell,
   ChevronDown,
   Info,
   LogOut,
@@ -8,6 +7,8 @@ import {
   Monitor,
   Moon,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sun,
   UserSquare2,
   X,
@@ -25,9 +26,14 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth/browser";
+import { useEventStream } from "@/lib/events/event-stream";
+import { fileUrl } from "@/lib/storage/files";
 import type { SessionContext } from "@/lib/auth/functions";
 import { useEntitlement } from "@/lib/billing/hooks";
 import { NAV, ROLE_LABEL, ROLE_NOTE, isCurrentPath, type AppShellRole } from "@/lib/navigation";
@@ -35,8 +41,9 @@ import type { NavItem } from "@/lib/navigation";
 import { usePlatformMetrics } from "@/lib/platform/hooks";
 import { useSchool } from "@/lib/school/hooks";
 import { useSchoolOverview } from "@/lib/school/overview";
-import { openCaseCount, useSchoolSupportCases } from "@/lib/school/support";
+import { useOpenSupportCaseCount } from "@/lib/school/support";
 import { applyPrimaryColor, primaryColorStyle } from "@/lib/school/theme";
+import { useCollapsedSidebar } from "@/lib/sidebar";
 import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -53,9 +60,18 @@ type BadgeCounts = Partial<Record<NonNullable<NavItem["badgeSource"]>, number | 
  *   from 1180 px   the labels are shown
  *   900 to 1180    the rail is a strip of icons
  *   below 900      the rail is a drawer, opened from the top bar
+ *
+ * On top of that, the person can collapse the rail from the top bar:
+ * then it stays a strip of icons on any screen, and the choice is
+ * remembered in the browser (see `lib/sidebar.ts`).
  */
-const ICON_ONLY = "max-[1179px]:hidden";
-const ICON_ONLY_ITEM = "max-[1179px]:justify-center max-[1179px]:px-0";
+function iconOnly(collapsed: boolean): string {
+  return collapsed ? "hidden" : "max-[1179px]:hidden";
+}
+
+function iconOnlyItem(collapsed: boolean): string {
+  return collapsed ? "justify-center px-0" : "max-[1179px]:justify-center max-[1179px]:px-0";
+}
 
 function initials(name: string): string {
   return name
@@ -67,24 +83,49 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function Brand({ role, schoolName }: { role: AppShellRole; schoolName: string | null }) {
-  // The mark of the application is the same everywhere: the logo of
-  // Lumen, the one the public site shows. The shield of the school is
-  // not worn here: it belongs to the school, and the administrator
-  // configures it in Personalización.
-  const mark = (
-    <BrandLogo
-      className="size-[38px] text-sidebar-foreground"
-      cutClassName="fill-[var(--sidebar)] stroke-[var(--sidebar)]"
+function Brand({
+  role,
+  schoolName,
+  schoolLogo,
+  collapsed,
+}: {
+  role: AppShellRole;
+  schoolName: string | null;
+  schoolLogo: string | null;
+  collapsed: boolean;
+}) {
+  // The mark of the platform is the logo of Lumen. The roles of a school
+  // wear the shield of their school instead: it is the identity of the
+  // institution, and the administrator configures it in Personalización.
+  const shield = role !== "super" ? fileUrl(schoolLogo) : null;
+  const mark = shield ? (
+    <img
+      src={shield}
+      alt=""
+      className="size-[34px] shrink-0 rounded-idx object-cover"
+      width={34}
+      height={34}
     />
+  ) : (
+    <BrandLogo className="size-[34px]" />
   );
 
   return (
-    <div className="flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]">
+    <div
+      className={cn(
+        "flex min-w-0 items-center gap-[11px] px-[18px] pb-3.5 pt-[18px]",
+        collapsed && "justify-center px-0",
+      )}
+    >
       {mark}
-      <div className="min-w-0">
+      <div className={cn("min-w-0", collapsed && "hidden")}>
         <p className="truncate text-[15.5px] font-bold leading-tight tracking-[-0.01em]">Lumen</p>
-        <p className={cn("truncate text-[11.5px] leading-tight text-muted-foreground", ICON_ONLY)}>
+        <p
+          className={cn(
+            "truncate text-[11.5px] leading-tight text-muted-foreground",
+            iconOnly(collapsed),
+          )}
+        >
           {role === "super" ? "Panel de plataforma" : (schoolName ?? "Colegio")}
         </p>
       </div>
@@ -104,11 +145,13 @@ function NavGroups({
   role,
   icfesEnabled,
   badges,
+  collapsed,
   onNavigate,
 }: {
   role: AppShellRole;
   icfesEnabled: boolean;
   badges: BadgeCounts;
+  collapsed: boolean;
   onNavigate?: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -124,7 +167,7 @@ function NavGroups({
             <p
               className={cn(
                 "px-[10px] pb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-muted-foreground",
-                ICON_ONLY,
+                iconOnly(collapsed),
               )}
             >
               {group.label}
@@ -145,27 +188,27 @@ function NavGroups({
                       aria-label={item.label}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex w-full items-center gap-[11px] rounded-[10px] border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
-                        ICON_ONLY_ITEM,
+                        "flex w-full items-center gap-[11px] rounded-idx border border-transparent px-[10px] py-[9px] text-left text-[13.5px] transition-colors",
+                        iconOnlyItem(collapsed),
                         active
-                          ? "border-sidebar-border bg-sidebar-accent font-medium text-white"
-                          : "text-sidebar-foreground hover:bg-white/[0.045] hover:text-foreground",
+                          ? "border-sidebar-border bg-sidebar-accent font-medium text-sidebar-active-foreground"
+                          : "text-sidebar-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <item.icon
                         className={cn(
                           "size-[17px] shrink-0 opacity-85",
-                          active && "text-primary opacity-100",
+                          active && "text-sidebar-active-foreground opacity-100",
                         )}
                         strokeWidth={1.9}
                         aria-hidden
                       />
-                      <span className={cn("truncate", ICON_ONLY)}>{item.label}</span>
+                      <span className={cn("truncate", iconOnly(collapsed))}>{item.label}</span>
                       {count !== null && count > 0 && (
                         <span
                           className={cn(
-                            "ml-auto rounded-full bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-[#7FB8FF]",
-                            ICON_ONLY,
+                            "ml-auto rounded-idx bg-primary-soft px-[7px] py-px font-mono text-[11px] font-semibold text-primary",
+                            iconOnly(collapsed),
                           )}
                         >
                           {count}
@@ -184,16 +227,17 @@ function NavGroups({
 }
 
 /** The foot of the rail: what the role of the session can do. */
-function RoleNote({ role }: { role: AppShellRole }) {
+function RoleNote({ role, collapsed }: { role: AppShellRole; collapsed: boolean }) {
   return (
-    <div className="border-t border-sidebar-border p-3">
-      <div className="flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground">
-        <Info
-          className="mt-0.5 size-[15px] shrink-0 text-[#2DD4BF]"
-          strokeWidth={1.9}
-          aria-hidden
-        />
-        <p className={cn("min-w-0 leading-snug", ICON_ONLY)}>
+    <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
+      <div
+        className={cn(
+          "flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-card p-3 text-[12px] text-muted-foreground",
+          collapsed && "justify-center p-2",
+        )}
+      >
+        <Info className="mt-0.5 size-[15px] shrink-0 text-primary" strokeWidth={1.9} aria-hidden />
+        <p className={cn("min-w-0 leading-snug", iconOnly(collapsed))}>
           <span className="font-semibold text-sidebar-foreground">{ROLE_LABEL[role]}</span>
           <br />
           {ROLE_NOTE[role]}
@@ -227,7 +271,7 @@ function UserMenu({
   signingOut: boolean;
   onSignOut: () => void;
 }) {
-  const avatar = session.profile?.avatar_url;
+  const avatar = fileUrl(session.profile?.avatar_url);
   // The theme is a personal preference that lives in the browser: the
   // store is the source of truth, so the menu reads it directly.
   const theme = useSyncExternalStore(subscribeTheme, getStoredTheme, getStoredTheme);
@@ -237,19 +281,19 @@ function UserMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-[9px] rounded-xl border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-[rgba(150,175,220,.26)]"
+          className="flex items-center gap-[9px] rounded-xl border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-input"
         >
           {avatar ? (
             <img
               src={avatar}
               alt={`Foto de ${displayName}`}
-              className="size-8 shrink-0 rounded-[9px] object-cover"
+              className="size-8 shrink-0 rounded-idx object-cover"
               loading="lazy"
               width={32}
               height={32}
             />
           ) : (
-            <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-primary to-[#6D4BE0] text-[12px] font-bold text-white">
+            <span className="grid size-8 shrink-0 place-items-center rounded-idx bg-primary text-[12px] font-bold text-white">
               {initials(displayName)}
             </span>
           )}
@@ -273,28 +317,29 @@ function UserMenu({
             Mi perfil y seguridad
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/perfil">
-            <Bell className="size-4" strokeWidth={1.9} aria-hidden />
-            Notificaciones
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="flex items-center gap-2">
-          <Palette className="size-3.5" strokeWidth={1.9} aria-hidden />
-          Tema
-        </DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={theme}
-          onValueChange={(value) => setTheme(value as ThemePreference)}
-        >
-          {THEME_CHOICES.map((choice) => (
-            <DropdownMenuRadioItem key={choice.value} value={choice.value}>
-              <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
-              {choice.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Palette className="size-4" strokeWidth={1.9} aria-hidden />
+            Tema
+            <span className="ml-auto pl-4 text-xs text-muted-foreground">
+              {THEME_CHOICES.find((choice) => choice.value === theme)?.label}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={theme}
+              onValueChange={(value) => setTheme(value as ThemePreference)}
+            >
+              {THEME_CHOICES.map((choice) => (
+                <DropdownMenuRadioItem key={choice.value} value={choice.value}>
+                  <choice.icon className="size-4" strokeWidth={1.9} aria-hidden />
+                  {choice.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(event: Event) => {
@@ -323,15 +368,24 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  // The shape of the rail: expanded or collapsed. It is a personal
+  // preference that lives in the browser, so every panel of the app
+  // starts with the rail the way the person left it.
+  const [collapsed, setCollapsed] = useCollapsedSidebar();
+
   const entitlement = useEntitlement(session.primarySchoolId);
   const school = useSchool(session.primarySchoolId);
+  // The stream of events of the user: the badge of the bell and the
+  // chat panel are told when there is something new, so neither of
+  // them polls.
+  useEventStream(true);
   // The counter of the rail: how much material the school has
   // available. The dashboard reads the same query, so the panel asks
   // for it once.
   const overview = useSchoolOverview(role === "admin" ? session.primarySchoolId : null);
   // The counter of the support: the cases of the school that are still
   // open. The query is off for the roles that do not have the channel.
-  const supportCases = useSchoolSupportCases(role === "admin");
+  const openCases = useOpenSupportCaseCount(role === "admin");
   // The size of the network, for the rail of the platform role.
   const metrics = usePlatformMetrics(role === "super");
 
@@ -340,6 +394,10 @@ export function AppShell({
   // it fresh after the admin saves a change.
   const sessionBrand = session.school;
   const primaryColor = school.data?.primary_color ?? sessionBrand?.primary_color ?? null;
+  // The shield of the school, the same one the administrator uploads in
+  // Personalización. It travels with the session, so the rail wears it
+  // from the first frame.
+  const schoolLogo = school.data?.logo_url ?? sessionBrand?.logo_url ?? null;
 
   // Paint the theme with the school's colour. The rules are rendered
   // with the page (so the first frame is already in the school's
@@ -402,7 +460,7 @@ export function AppShell({
   // panel never shows a number that is written by hand.
   const badges: BadgeCounts = {
     material: overview.data?.material.available ?? null,
-    support: supportCases.data ? openCaseCount(supportCases.data) : null,
+    support: openCases.data ?? null,
     schools: metrics.data?.schools ?? null,
     materials: metrics.data?.materials ?? null,
   };
@@ -417,7 +475,7 @@ export function AppShell({
         title: "Panel de plataforma",
         detail:
           schools !== undefined && materials !== undefined
-            ? `${schools} colegios · ${materials} materiales en catálogo`
+            ? `${schools} colegios · ${materials} recursos en la biblioteca`
             : "Cargando la red…",
       };
     }
@@ -428,7 +486,7 @@ export function AppShell({
   })();
 
   return (
-    <div className="lumen-panel min-h-screen w-full bg-background">
+    <div className="lumen-panel idx-site min-h-screen w-full bg-background">
       {/* The school's colour, painted with the page: the first frame is
           already in the school's colour, so there is no flash of the
           default theme while the browser catches up. */}
@@ -438,14 +496,24 @@ export function AppShell({
         className={cn(
           "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-sidebar-border bg-sidebar",
           "min-[900px]:flex",
-          "w-[270px] max-[1179px]:w-[68px]",
+          collapsed ? "w-[68px]" : "w-[270px] max-[1179px]:w-[68px]",
         )}
       >
-        <Brand role={role} schoolName={resolvedSchoolName} />
+        <Brand
+          role={role}
+          schoolName={resolvedSchoolName}
+          schoolLogo={schoolLogo}
+          collapsed={collapsed}
+        />
         <div className="flex-1 overflow-y-auto px-3 pb-[18px] pt-1.5">
-          <NavGroups role={role} icfesEnabled={icfesEnabled} badges={badges} />
+          <NavGroups
+            role={role}
+            icfesEnabled={icfesEnabled}
+            badges={badges}
+            collapsed={collapsed}
+          />
         </div>
-        <RoleNote role={role} />
+        <RoleNote role={role} collapsed={collapsed} />
       </aside>
 
       {open && (
@@ -457,7 +525,12 @@ export function AppShell({
           />
           <div className="absolute inset-y-0 left-0 flex w-[270px] flex-col bg-sidebar">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-              <Brand role={role} schoolName={resolvedSchoolName} />
+              <Brand
+                role={role}
+                schoolName={resolvedSchoolName}
+                schoolLogo={schoolLogo}
+                collapsed={false}
+              />
               <button
                 aria-label="Cerrar menú"
                 className="mt-[18px] grid size-9 shrink-0 place-items-center rounded-lg hover:bg-sidebar-accent"
@@ -471,22 +544,44 @@ export function AppShell({
                 role={role}
                 icfesEnabled={icfesEnabled}
                 badges={badges}
+                collapsed={false}
                 onNavigate={() => setOpen(false)}
               />
             </div>
-            <RoleNote role={role} />
+            <RoleNote role={role} collapsed={false} />
           </div>
         </div>
       )}
 
-      <div className="min-[900px]:pl-[270px] max-[1179px]:pl-[68px]">
+      <div
+        className={cn(
+          collapsed ? "min-[900px]:pl-[68px]" : "min-[900px]:pl-[270px] max-[1179px]:pl-[68px]",
+        )}
+      >
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-md sm:px-6">
           <button
             aria-label="Abrir menú"
-            className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-border bg-card text-muted-foreground hover:text-foreground min-[900px]:hidden"
+            className="grid size-9 shrink-0 place-items-center rounded-idx border border-border bg-card text-muted-foreground hover:text-foreground min-[900px]:hidden"
             onClick={() => setOpen(true)}
           >
             <Menu className="size-[18px]" strokeWidth={1.9} />
+          </button>
+
+          {/* The rail folds away from here: the choice is remembered in
+              the browser, so it is the same in every panel of the app. */}
+          <button
+            type="button"
+            aria-label={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+            title={collapsed ? "Expandir la barra lateral" : "Contraer la barra lateral"}
+            aria-pressed={collapsed}
+            className="hidden size-9 shrink-0 place-items-center rounded-idx border border-border bg-card text-muted-foreground transition-colors hover:text-foreground min-[900px]:grid"
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-[18px]" strokeWidth={1.9} />
+            ) : (
+              <PanelLeftClose className="size-[18px]" strokeWidth={1.9} />
+            )}
           </button>
 
           {/* The bar shows the context of the session, not a search: the
@@ -512,7 +607,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-7">
+        <main className="relative z-10 mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-7">
           <Outlet />
         </main>
       </div>

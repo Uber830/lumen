@@ -15,6 +15,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { panelContainer } from "@/components/panel/scope";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = {
@@ -239,6 +240,11 @@ export function Select({
             tabIndex={-1}
             aria-activedescendant={`${listboxId}-option-${activeIndex}`}
             onKeyDown={onListKeyDown}
+            // The modal of the panel blocks the scroll of the page with
+            // a listener on the document: without this, the wheel never
+            // reaches the list and the options below cannot be reached
+            // with the mouse.
+            onWheel={(event) => event.stopPropagation()}
             style={{
               position: "fixed",
               left: placement.left,
@@ -248,7 +254,7 @@ export function Select({
                 ? { bottom: placement.bottom }
                 : { top: placement.top }),
             }}
-            className="z-50 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lift outline-none"
+            className="pointer-events-auto z-50 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-lift outline-none"
           >
             {options.length === 0 ? (
               <p className="px-3 py-2.5 text-sm text-muted-foreground">{emptyLabel}</p>
@@ -291,7 +297,9 @@ export function Select({
               })
             )}
           </div>,
-          document.body,
+          // The list is drawn inside the panel: there it has the type and
+          // the colours of the app.
+          panelContainer() ?? document.body,
         )}
     </>
   );

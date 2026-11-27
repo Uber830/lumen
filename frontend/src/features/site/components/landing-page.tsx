@@ -1,8 +1,9 @@
 // =============================================================================
 // The landing of the public site.
 // -----------------------------------------------------------------------------
-// The page is an index, not a collection of cards: eight blocks in a
-// fixed order, all of them filled with the content the API serves.
+// The page is an index, not a collection of cards: a fixed set of
+// blocks, all of them filled with the content the API serves. The
+// blocks that are not published are simply not in the copy.
 //
 // The first element of the page is the skip link: it is the first
 // thing a keyboard reaches.
@@ -53,7 +54,7 @@ export function LandingPage() {
         <CatalogIndex catalog={content.catalog} entries={catalog} total={catalogTotal} />
         <ProcessSection process={content.process} />
         <RolesSection roles={content.roles} />
-        <CoverageSection coverage={content.coverage} />
+        {content.coverage ? <CoverageSection coverage={content.coverage} /> : null}
         <FaqSection faq={content.faq} />
         <CtaSection cta={content.cta} />
       </main>

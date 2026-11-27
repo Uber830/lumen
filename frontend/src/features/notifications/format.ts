@@ -8,7 +8,14 @@
 // These are pure functions, so they can be tested without a browser.
 // =============================================================================
 
-import { BookOpen, CheckCircle2, ClipboardList, FileCheck2, MessageSquare } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  ClipboardList,
+  FileCheck2,
+  LifeBuoy,
+  MessageSquare,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import type { NotificationKind, SchoolRole } from "@/lib/api/types";
@@ -20,6 +27,8 @@ export const NOTIFICATION_ICONS: Record<NotificationKind, LucideIcon> = {
   task_graded: CheckCircle2,
   content_published: BookOpen,
   chat_message: MessageSquare,
+  support_case_opened: LifeBuoy,
+  support_case_replied: LifeBuoy,
 };
 
 /**
@@ -60,6 +69,16 @@ export const NOTIFICATION_KINDS: {
     label: "Mensajes de chat",
     description: "Cuando te escriben en una conversación.",
   },
+  {
+    kind: "support_case_opened",
+    label: "Caso de soporte nuevo",
+    description: "Cuando un colegio abre una solicitud.",
+  },
+  {
+    kind: "support_case_replied",
+    label: "Respuesta en un caso",
+    description: "Cuando alguien escribe en el hilo de una solicitud.",
+  },
 ];
 
 /**
@@ -79,8 +98,8 @@ export type NotificationRole = "platform_admin" | "school_admin" | "teacher" | "
  * switches would be noise.
  */
 const KINDS_BY_ROLE: Record<NotificationRole, NotificationKind[]> = {
-  platform_admin: ["chat_message"],
-  school_admin: ["chat_message"],
+  platform_admin: ["chat_message", "support_case_opened", "support_case_replied"],
+  school_admin: ["chat_message", "support_case_replied"],
   teacher: ["task_submitted", "task_graded", "content_published", "chat_message"],
   student: ["task_assigned", "task_graded", "content_published", "chat_message"],
 };

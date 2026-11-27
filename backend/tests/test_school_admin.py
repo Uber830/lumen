@@ -182,3 +182,102 @@ async def test_the_session_carries_the_permissions(client, seeded_school):
     body = response.json()
     assert "periods.close" in body["permissions"]
     assert body["memberships"][0]["admin_role"] == "principal"
+
+
+# ---------------------------------------------------------------------------
+# The single principal
+# ---------------------------------------------------------------------------
+
+
+async def test_the_invitation_creates_a_secondary(client, seeded_school):
+    """A new administrator enters as secondary: the rank is handed over later."""
+    from tests.conftest import mint_token
+
+    response = client.post(
+        "/v1/school/admins/invite",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+        json={
+            "email": f"nuevo.{uuid.uuid4().hex[:8]}@colegio.edu",
+            "full_name": "Carla Mendez",
+            "admin_role": "secundario",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["admin_role"] == "secundario"
+
+
+async def test_the_invitation_refuses_a_second_principal(client, seeded_school):
+    """The school has one principal: the invitation cannot create another."""
+    from tests.conftest import mint_token
+
+    response = client.post(
+        "/v1/school/admins/invite",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+        json={
+            "email": f"otro.{uuid.uuid4().hex[:8]}@colegio.edu",
+            "full_name": "Carla Mendez",
+            "admin_role": "principal",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "only_one_principal"
+
+
+async def test_promoting_somebody_is_refused_while_there_is_a_principal(client, seeded_school):
+    """The rank moves, it is never duplicated."""
+    from tests.conftest import mint_token
+
+    invitation = client.post(
+        "/v1/school/admins/invite",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+        json={
+            "email": f"promover.{uuid.uuid4().hex[:8]}@colegio.edu",
+            "full_name": "Carla Mendez",
+            "admin_role": "secundario",
+        },
+    )
+    membership_id = invitation.json()["membership_id"]
+
+    response = client.patch(
+        f"/v1/school/admins/{membership_id}",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+        json={"admin_role": "principal"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "only_one_principal"
+
+
+async def test_the_principal_hands_the_rank_over(client, seeded_school):
+    """Ceding the rank moves it: the school always keeps one principal."""
+    from tests.conftest import mint_token
+
+    invitation = client.post(
+        "/v1/school/admins/invite",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+        json={
+            "email": f"cesion.{uuid.uuid4().hex[:8]}@colegio.edu",
+            "full_name": "Carla Mendez",
+            "admin_role": "secundario",
+        },
+    )
+    membership_id = invitation.json()["membership_id"]
+
+    response = client.post(
+        f"/v1/school/admins/{membership_id}/transfer",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["admin_role"] == "principal"
+
+    # The team keeps exactly one principal: the one who received it.
+    team = client.get(
+        "/v1/school/admins",
+        headers={"Authorization": f"Bearer {mint_token()}"},
+    ).json()
+    principals = [admin for admin in team if admin["admin_role"] == "principal"]
+    assert len(principals) == 1
+    assert principals[0]["membership_id"] == membership_id

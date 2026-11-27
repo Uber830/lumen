@@ -1,13 +1,12 @@
 """Billing models.
 
-- `subscriptions`         — a school bound to a plan over a period.
-- `entitlements`          — a denormalized cache of the active plan's
-                            limits, so the ICFES guard and the
-                            permission checks can read them cheaply.
-- `wompi_events_processed`— the idempotency ledger for Wompi webhooks.
+- `subscriptions` — a school bound to a plan over a period.
+- `entitlements`  — a denormalized cache of the active plan's limits,
+                    so the ICFES guard and the permission checks can
+                    read them cheaply.
 
-The webhook writes `subscriptions` and `entitlements`; nothing else
-does.
+The app does not sell anything: the platform team sets the plan when
+the school is registered, and `entitlements` is written from there.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, created_at, jsonb, updated_at
@@ -70,8 +69,6 @@ class Subscription(Base):
         nullable=False,
     )
     customer_email: Mapped[str | None] = mapped_column(Text, nullable=True)
-    wompi_subscription_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    wompi_payment_source_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -136,24 +133,7 @@ class Entitlement(Base):
     updated_at: Mapped[datetime] = updated_at()
 
 
-class WompiEventProcessed(Base):
-    """The idempotency ledger for Wompi webhooks.
-
-    The primary key is the event id. The webhook inserts with
-    ON CONFLICT DO NOTHING; when the insert reports a conflict, the
-    event is a duplicate and the handler skips it.
-    """
-
-    __tablename__ = "wompi_events_processed"
-    __table_args__ = ({"schema": "public"},)
-    event_id: Mapped[str] = mapped_column(Text, primary_key=True)
-    event_type: Mapped[str] = mapped_column(Text, nullable=False)
-    payload: Mapped[object] = mapped_column(JSONB, nullable=False)
-    processed_at: Mapped[datetime] = created_at()
-
-
 __all__ = [
     "Entitlement",
     "Subscription",
-    "WompiEventProcessed",
 ]

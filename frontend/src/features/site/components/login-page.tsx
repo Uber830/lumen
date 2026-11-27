@@ -117,7 +117,7 @@ export function LoginPage({
               Su colegio ya tiene el material cargado.
             </h1>
             <p className="mt-4 max-w-[38ch] text-[15px] leading-relaxed text-ink-2">
-              Todo el contenido editorial habilitado para su institución, en el mismo lugar.
+              Todo el material habilitado para su institución, en el mismo lugar.
             </p>
 
             {/* A miniature of the index. The rows are illustrative. */}
@@ -308,7 +308,7 @@ export function LoginPage({
                 >
                   Solicite su acceso
                 </a>{" "}
-                y el equipo editorial deja el catálogo listo para usted.
+                y el equipo de Lumen deja el catálogo listo para usted.
               </p>
             </SpecPanel>
 

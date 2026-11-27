@@ -106,6 +106,20 @@ export type SchoolMember = {
   revoked_at: string | null;
   // True once the user has set a password (redeemed their activation).
   account_activated: boolean;
+  // Whether the member can reach the content of the school, and why not
+  // when they cannot. One signal, not two loose badges.
+  access?: "activado" | "pendiente";
+  access_reason?: string | null;
+  // The courses of the member: taught by a teacher, attended by a student.
+  courses?: string[];
+  // The subjects the teacher teaches.
+  subjects?: string[];
+  // The courses of a student, by id.
+  course_ids?: string[];
+  // The course subjects of a teacher, by id.
+  course_subject_ids?: string[];
+  // The average of a student: `null` when it has no grades.
+  average?: number | null;
 };
 
 // --- Hook inputs -----------------------------------------------------------

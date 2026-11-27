@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the project sources and install the application itself.
 COPY app ./app
 # Alembic ships with the image so the schema can be migrated from a
-# running container when the Supabase CLI is not available.
+# running container when the migration tool is not available.
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -20,9 +20,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.academics.operations import create_student_enrollment, create_teacher_assignment
 from app.auth.operations import issue_activation_token
 from app.core.context import RequestContext
 from app.core.errors import ConflictError, NotFoundError
+from app.db.enums import EnrollmentStatus
 from app.db.enums import SchoolRole as SchoolRoleEnum
 from app.db.session import get_db
 from app.deps import get_context
@@ -366,6 +368,47 @@ async def _create_one_invitation(
     # previous link stops working.
     activation_token, _expires_at = await issue_activation_token(session, user.id)
     await session.flush()
+
+    # A student is created in a course: the admin picks it in the form,
+    # and a student without a course has no material to see. A student is
+    # in **one** course: two courses would leave him without an average
+    # and without tasks.
+    if body.course_ids:
+        if body.role.value != SchoolRoleEnum.STUDENT.value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Only a student can be enrolled in a course.",
+            )
+        if len(body.course_ids) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A student belongs to one course.",
+            )
+        for course_id in body.course_ids:
+            await create_student_enrollment(
+                session,
+                school_id=school_id,
+                course_id=course_id,
+                student_id=user.id,
+                status=EnrollmentStatus.ACTIVE,
+            )
+
+    # A teacher is assigned to a course subject: that assignment is what
+    # gives them access to the material of the subject. A teacher without
+    # an assignment waits with the access pending.
+    if body.course_subject_ids:
+        if body.role.value != SchoolRoleEnum.TEACHER.value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Only a teacher can be assigned to a course subject.",
+            )
+        for course_subject_id in body.course_subject_ids:
+            await create_teacher_assignment(
+                session,
+                school_id=school_id,
+                course_subject_id=course_subject_id,
+                teacher_id=user.id,
+            )
 
     return UserInvitationResponse(
         user_id=user.id,

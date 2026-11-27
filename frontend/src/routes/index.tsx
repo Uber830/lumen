@@ -8,26 +8,28 @@ import spaceGroteskWoff2 from "@fontsource/space-grotesk/files/space-grotesk-lat
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL ?? "https://lumen.co").replace(/\/$/, "");
 
+const TITLE = "Lumen — El material de su colegio, ordenado y listo para usar";
+const DESCRIPTION =
+  "Lumen resuelve la gestión del material académico en los colegios: el colegio entrega lo que ya tiene y Lumen lo deja disponible para el docente y para el estudiante.";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Lumen — El material de la editorial, indexado por colegio" },
+      { title: TITLE },
       {
         name: "description",
-        content:
-          "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
+        content: DESCRIPTION,
       },
       { name: "robots", content: "index, follow" },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Lumen" },
       {
         property: "og:title",
-        content: "Lumen — El material de la editorial, indexado por colegio",
+        content: TITLE,
       },
       {
         property: "og:description",
-        content:
-          "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
+        content: DESCRIPTION,
       },
       { property: "og:url", content: SITE_URL },
       { property: "og:image", content: `${SITE_URL}/og-lumen.png` },
@@ -36,12 +38,11 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
       {
         name: "twitter:title",
-        content: "Lumen — El material de la editorial, indexado por colegio",
+        content: TITLE,
       },
       {
         name: "twitter:description",
-        content:
-          "Lumen mantiene un solo catálogo de material y le asigna a cada colegio las piezas que le corresponden.",
+        content: DESCRIPTION,
       },
       { name: "twitter:image", content: `${SITE_URL}/og-lumen.png` },
     ],

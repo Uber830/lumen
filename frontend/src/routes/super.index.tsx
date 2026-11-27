@@ -18,7 +18,7 @@ export const Route = createFileRoute("/super/")({
       { title: "Panel de plataforma — Lumen" },
       {
         name: "description",
-        content: "Estado de la red: colegios, comunidad y catálogo editorial.",
+        content: "Estado de la red: colegios, comunidad y biblioteca de recursos.",
       },
       { property: "og:title", content: "Panel de plataforma — Lumen" },
       {
@@ -49,7 +49,7 @@ function SuperDashboard() {
       <>
         <PageHeader
           title="Panel global"
-          subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+          subtitle="Estado de la red: colegios, comunidad y biblioteca de recursos."
         />
         <SkeletonCards />
       </>
@@ -68,10 +68,10 @@ function SuperDashboard() {
     <>
       <PageHeader
         title="Panel global"
-        subtitle="Estado de la red: colegios, comunidad y catálogo editorial."
+        subtitle="Estado de la red: colegios, comunidad y biblioteca de recursos."
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Colegios en la red"
           value={String(data?.schools ?? 0)}
@@ -101,18 +101,18 @@ function SuperDashboard() {
         />
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard
           className="flex h-[39.5rem] flex-col"
-          title="Catálogo editorial"
-          description="El material por estado y por área"
+          title="Biblioteca de recursos"
+          description="Los recursos por estado y por área"
           bodyClassName="min-h-0 flex-1 overflow-hidden"
           leading={
             <Link
               to="/super/catalogo"
               className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
-              Abrir catálogo
+              Abrir biblioteca
             </Link>
           }
         >
@@ -123,28 +123,32 @@ function SuperDashboard() {
             {Object.keys(byStatus).length === 0 ? (
               <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
             ) : (
-              STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
-                <MeterRow
-                  key={status}
-                  label={MATERIAL_STATUS_LABEL[status]}
-                  value={byStatus[status] ?? 0}
-                  max={maxStatus}
-                />
-              ))
+              <div className="space-y-1">
+                {STATUS_ORDER.filter((status) => byStatus[status] !== undefined).map((status) => (
+                  <MeterRow
+                    key={status}
+                    label={MATERIAL_STATUS_LABEL[status]}
+                    value={byStatus[status] ?? 0}
+                    max={maxStatus}
+                  />
+                ))}
+              </div>
             )}
 
-            <div className="mt-4 border-t border-border pt-4">
+            <div className="mt-5 border-t border-border pt-5">
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-ink-3">
                 Por área
               </p>
               {Object.keys(byArea).length === 0 ? (
                 <p className="py-3 text-sm text-muted-foreground">Todavía no hay material.</p>
               ) : (
-                Object.entries(byArea)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([area, count]) => (
-                    <MeterRow key={area} label={area} value={count} max={maxArea} />
-                  ))
+                <div className="space-y-1">
+                  {Object.entries(byArea)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([area, count]) => (
+                      <MeterRow key={area} label={area} value={count} max={maxArea} />
+                    ))}
+                </div>
               )}
             </div>
           </div>
@@ -165,13 +169,15 @@ function SuperDashboard() {
           bodyClassName="min-h-0 flex-1 overflow-hidden p-0"
         >
           {coverage.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">Sin colegios registrados.</p>
+            <p className="px-[18px] py-4 text-sm text-muted-foreground">
+              Sin colegios registrados.
+            </p>
           ) : (
             <ul className="flex flex-col">
               {coverage.slice(0, MAX_COVERAGE).map((school) => (
                 <li
                   key={school.school_id}
-                  className="flex items-center gap-3 border-b border-border px-5 py-2.5 last:border-b-0"
+                  className="flex items-center gap-3 border-b border-border px-[18px] py-3 last:border-b-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm">{school.name}</span>
                   <StatusPill

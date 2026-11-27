@@ -17,15 +17,18 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import storage
 from app.core.admin_permissions import SchoolPermission, permissions_for, require_permission
 from app.core.context import Membership, RequestContext
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.enums import SchoolAdminRole, SchoolRole
 from app.db.session import get_db
 from app.deps import get_context
+from app.platform import catalog
+from app.platform.storage import get_storage
 from app.school import community, cycles, icfes, identity, operations, support, team
 from app.school.schemas import (
     ActivationCreatedOut,
@@ -36,12 +39,16 @@ from app.school.schemas import (
     AdminRankIn,
     AdminSchoolOut,
     AdminUserOut,
-    AssignmentOut,
+    AssignmentPageOut,
     CourseOut,
+    CoursePageOut,
     CurrentPeriodOut,
     IcfesSimulatorsOut,
     MaterialDetailOut,
+    MaterialOptionsOut,
     MaterialPage,
+    MemberEditIn,
+    MemberEditOut,
     MemberPage,
     PeriodClosedOut,
     PeriodCurrentOut,
@@ -49,16 +56,26 @@ from app.school.schemas import (
     SchoolAdminMe,
     SchoolIdentityOut,
     SchoolIdentityUpdate,
+    SchoolMaterialCreateIn,
+    SchoolMaterialUpdateIn,
     SchoolOverview,
     SimulatorResultsOut,
     SubjectOut,
+    SubjectPageOut,
+    SupportAttachmentOut,
     SupportCaseIn,
     SupportCaseOut,
-    SupportCaseSummaryOut,
+    SupportCasePage,
     SupportMessageIn,
+    TeacherAssignmentsOut,
 )
 
 router = APIRouter(prefix="/v1/school", tags=["school"])
+
+
+def _pages(total: int, per_page: int) -> int:
+    """How many pages a list of that size has."""
+    return (total + per_page - 1) // per_page if total else 0
 
 
 def _require_admin(context: RequestContext) -> Membership:
@@ -146,6 +163,9 @@ async def list_school_material(
     session: Annotated[AsyncSession, Depends(get_db)],
     q: Annotated[str | None, Query(description="Título, área o ID del material")] = None,
     area: Annotated[str | None, Query(description="El área del material")] = None,
+    audience: Annotated[
+        str | None, Query(description="A quién va dirigido: all o teachers")
+    ] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=50)] = 6,
 ) -> MaterialPage:
@@ -160,10 +180,28 @@ async def list_school_material(
         membership.school_id,
         query=q,
         area=area,
+        audience=audience,
         page=page,
         per_page=per_page,
     )
     return MaterialPage.model_validate(page_data)
+
+
+@router.get("/material/options", response_model=MaterialOptionsOut)
+async def school_material_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+) -> MaterialOptionsOut:
+    """The closed catalogs of the resources: types, areas and audiences.
+
+    The school does not invent a type or an area: it takes them from
+    here, the same way the platform does.
+    """
+    _require_admin(context)
+    return MaterialOptionsOut(
+        types=list(catalog.MATERIAL_TYPES),
+        areas=list(catalog.MATERIAL_AREAS),
+        audiences=list(catalog.VISIBLE_TO),
+    )
 
 
 @router.get("/material/{material_id}", response_model=MaterialDetailOut)
@@ -183,6 +221,201 @@ async def get_school_material(
     if material is None:
         raise NotFoundError("Material not found.")
     return MaterialDetailOut.model_validate(material)
+
+
+@router.get("/material/{material_id}/file")
+async def get_school_material_file(
+    material_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """The file of a resource of the school.
+
+    The file is served by the API and shown inside the platform: the
+    material is consulted, not downloaded.
+    """
+    membership = _require_admin(context)
+    found = await operations.get_material_file(session, membership.school_id, material_id)
+    if found is None:
+        raise NotFoundError("Material not found.")
+    stored, _material = found
+
+    try:
+        content = await get_storage().read(key=stored.storage_key)
+    except FileNotFoundError as error:
+        raise NotFoundError("The file is not in the storage.") from error
+
+    name = stored.file_name.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    return Response(
+        content=content,
+        media_type=stored.mime_type,
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
+    )
+
+
+@router.post("/material/uploads", status_code=status.HTTP_201_CREATED)
+async def upload_school_material_file(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> dict[str, object]:
+    """Upload the file of a resource of the school.
+
+    The file waits in the pending folder until the piece that carries
+    it is created.
+    """
+    _require_admin(context)
+    file_name = file.filename or "archivo"
+    mime_type = catalog.mime_type_of(file_name, file.content_type)
+    if mime_type not in catalog.ALLOWED_MIME_TYPES:
+        raise ValidationError(
+            "Ese formato no está admitido. Usa PDF, EPUB, DOCX, MP4, ZIP o una imagen.",
+            code="invalid_format",
+            extra={"file_name": file_name},
+        )
+
+    limit = catalog.size_limit_for(mime_type)
+    content = await file.read()
+    if len(content) > limit:
+        raise ValidationError(
+            f"El archivo supera el límite de {limit // (1024 * 1024)} MB de {mime_type}.",
+            code="file_too_large",
+            extra={"file_name": file_name, "limit_bytes": limit},
+        )
+
+    uploaded = await operations.upload_school_file(
+        session,
+        context.user_id,
+        file_name=file_name,
+        mime_type=mime_type,
+        content=content,
+    )
+    return {
+        "file_id": str(uploaded.id),
+        "file_name": uploaded.file_name,
+        "size_bytes": uploaded.size_bytes,
+        "size_label": catalog.format_size(uploaded.size_bytes),
+        "mime_type": uploaded.mime_type,
+    }
+
+
+@router.post("/material", response_model=MaterialDetailOut, status_code=status.HTTP_201_CREATED)
+async def create_school_material(
+    body: SchoolMaterialCreateIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetailOut:
+    """Create a resource of the school and enable it for the school.
+
+    The school decides who sees what it loads: everybody, the teachers,
+    the students or the administrators.
+    """
+    membership = _require_admin(context)
+    if body.type not in catalog.MATERIAL_TYPES:
+        raise ValidationError(
+            "Ese tipo de recurso no existe.",
+            code="invalid_material_type",
+            extra={"type": body.type},
+        )
+    if body.area not in catalog.MATERIAL_AREAS:
+        raise ValidationError(
+            "Ese área no existe.",
+            code="invalid_material_area",
+            extra={"area": body.area},
+        )
+    if body.visible_to not in catalog.VISIBLE_TO:
+        raise ValidationError(
+            "Ese destinatario no existe.",
+            code="invalid_visible_to",
+            extra={"visible_to": body.visible_to},
+        )
+
+    material_id = await operations.create_school_material(
+        session,
+        membership.school_id,
+        context.user_id,
+        title=body.title.strip(),
+        material_type=body.type,
+        area=body.area,
+        visible_to=body.visible_to,
+        description=body.description.strip() if body.description else None,
+        file_id=body.file_id,
+    )
+
+    created = await operations.get_material(session, membership.school_id, uuid.UUID(material_id))
+    if created is None:
+        raise NotFoundError("Material not found.")
+    return MaterialDetailOut.model_validate(created)
+
+
+@router.patch("/material/{material_id}", response_model=MaterialDetailOut)
+async def update_school_material(
+    material_id: uuid.UUID,
+    body: SchoolMaterialUpdateIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MaterialDetailOut:
+    """Change a resource of the school.
+
+    Only the pieces the school loaded can be changed: the ones of the
+    editorial team are not the school's to edit. The file stays the one
+    the school uploaded.
+    """
+    membership = _require_admin(context)
+
+    changes = body.model_dump(exclude_unset=True)
+    if "title" in changes and not str(changes["title"]).strip():
+        raise ValidationError(
+            "El recurso necesita un título.",
+            code="invalid_material_title",
+            extra={"field": "title"},
+        )
+    if "type" in changes and changes["type"] not in catalog.MATERIAL_TYPES:
+        raise ValidationError(
+            "Ese tipo de recurso no existe.",
+            code="invalid_material_type",
+            extra={"type": changes["type"]},
+        )
+    if "area" in changes and changes["area"] not in catalog.MATERIAL_AREAS:
+        raise ValidationError(
+            "Ese área no existe.",
+            code="invalid_material_area",
+            extra={"area": changes["area"]},
+        )
+    if "visible_to" in changes and changes["visible_to"] not in catalog.VISIBLE_TO:
+        raise ValidationError(
+            "Ese destinatario no existe.",
+            code="invalid_visible_to",
+            extra={"visible_to": changes["visible_to"]},
+        )
+
+    await operations.update_school_material(
+        session,
+        membership.school_id,
+        material_id,
+        actor_id=context.user_id,
+        changes=changes,
+    )
+
+    updated = await operations.get_material(session, membership.school_id, material_id)
+    if updated is None:
+        raise NotFoundError("Material not found.")
+    return MaterialDetailOut.model_validate(updated)
+
+
+@router.delete("/material/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_school_material(
+    material_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """Remove a resource of the school.
+
+    Only the pieces the school loaded can be removed: the ones of the
+    editorial team are not the school's to delete.
+    """
+    membership = _require_admin(context)
+    await operations.delete_school_material(session, membership.school_id, material_id)
 
 
 @router.get("/overview", response_model=SchoolOverview)
@@ -261,49 +494,142 @@ async def list_school_students(
     return MemberPage.model_validate(page_data)
 
 
-@router.get("/courses", response_model=list[CourseOut])
+@router.patch("/members/{membership_id}", response_model=MemberEditOut)
+async def update_school_member(
+    membership_id: uuid.UUID,
+    body: MemberEditIn,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MemberEditOut:
+    """Edit a teacher or a student of the school.
+
+    The form of the admin sends the name, the email and the courses (of a
+    student) or the course subjects (of a teacher). What is not sent is
+    left alone.
+    """
+    membership = _require_admin(context)
+    updated = await community.update_member(
+        session,
+        membership.school_id,
+        membership_id,
+        full_name=body.full_name,
+        email=body.email,
+        course_ids=body.course_ids,
+        course_subject_ids=body.course_subject_ids,
+    )
+    await session.commit()
+    return MemberEditOut.model_validate(updated)
+
+
+@router.get("/courses", response_model=CoursePageOut)
 async def list_school_courses(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[CourseOut]:
-    """The courses of the school, with how much structure they hold."""
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Cursos por página")] = 10,
+) -> CoursePageOut:
+    """The courses of the school, with how much structure they hold.
+
+    The page is cut in the server: the browser only asks for the page it
+    is going to show.
+    """
     membership = _require_admin(context)
-    courses = await community.list_courses(session, membership.school_id)
+    courses, total = await community.list_courses(
+        session, membership.school_id, page=page, per_page=per_page
+    )
+    return CoursePageOut(
+        items=[CourseOut.model_validate(course) for course in courses],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
+
+
+@router.get("/courses/options", response_model=list[CourseOut])
+async def list_school_course_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CourseOut]:
+    """Every course of the school, for the forms that offer a choice."""
+    membership = _require_admin(context)
+    courses, _ = await community.list_courses(session, membership.school_id)
     return [CourseOut.model_validate(course) for course in courses]
 
 
-@router.get("/subjects", response_model=list[SubjectOut])
+@router.get("/subjects", response_model=SubjectPageOut)
 async def list_school_subjects(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[SubjectOut]:
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Materias por página")] = 10,
+    offered: Annotated[
+        bool | None,
+        Query(description="Solo las que se ofrecen en un curso, o solo las que no"),
+    ] = None,
+) -> SubjectPageOut:
     """The subjects of the school, with the courses they are taught in."""
     membership = _require_admin(context)
-    subjects = await community.list_subjects(session, membership.school_id)
+    subjects, total = await community.list_subjects(
+        session,
+        membership.school_id,
+        offered=offered,
+        page=page,
+        per_page=per_page,
+    )
+    return SubjectPageOut(
+        items=[SubjectOut.model_validate(subject) for subject in subjects],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
+
+
+@router.get("/subjects/options", response_model=list[SubjectOut])
+async def list_school_subject_options(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[SubjectOut]:
+    """Every subject of the school, for the forms that offer a choice."""
+    membership = _require_admin(context)
+    subjects, _ = await community.list_subjects(session, membership.school_id)
     return [SubjectOut.model_validate(subject) for subject in subjects]
 
 
-@router.get("/assignments", response_model=list[AssignmentOut])
+@router.get("/assignments", response_model=AssignmentPageOut)
 async def list_school_assignments(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
     teacher_id: Annotated[uuid.UUID | None, Query(description="Docente del filtro")] = None,
     course_id: Annotated[uuid.UUID | None, Query(description="Curso del filtro")] = None,
-) -> list[AssignmentOut]:
+    page: Annotated[int, Query(ge=1, description="Página que se pide")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50, description="Docentes por página")] = 10,
+) -> AssignmentPageOut:
     """The assignments of the school, with the material each one sees.
 
     The count of visible material is computed in the server: it is the
     published material of the area of the subject, enabled for the
     school, that applies to the course of the assignment.
+
+    The rows are the teachers: each one carries the subjects it teaches.
     """
     membership = _require_admin(context)
-    assignments = await cycles.list_assignments(
+    rows, total = await cycles.list_assignments(
         session,
         membership.school_id,
         teacher_id=teacher_id,
         course_id=course_id,
+        page=page,
+        per_page=per_page,
     )
-    return [AssignmentOut.model_validate(assignment) for assignment in assignments]
+    return AssignmentPageOut(
+        items=[TeacherAssignmentsOut.model_validate(row) for row in rows],
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=_pages(total, per_page),
+    )
 
 
 @router.get("/periods", response_model=list[PeriodOut])
@@ -406,15 +732,15 @@ async def upload_school_logo(
     content = await file.read()
     content_type = identity.validate_logo(content, file.content_type or "")
 
-    from app.core import supabase_storage
+    from app.core import storage
 
-    logo_url = await supabase_storage.upload_school_logo(
+    logo_path = await storage.upload_school_logo(
         school_id=str(membership.school_id),
         content=content,
         content_type=content_type,
     )
 
-    await identity.set_logo(session, membership.school_id, logo_url)
+    await identity.set_logo(session, membership.school_id, logo_path)
 
     identity_data = await identity.get_identity(session, membership.school_id)
     return SchoolIdentityOut.model_validate(identity_data)
@@ -441,6 +767,10 @@ async def invite_school_admin(
 
     Only the principal does it: inviting a colleague is a decision of
     the school, not of its helper.
+
+    The school has a single principal, so the invitation always
+    creates a secondary: the rank is handed over later, from the file
+    of the team.
     """
     membership = _require_admin(context)
     require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
@@ -450,6 +780,16 @@ async def invite_school_admin(
     from app.users.operations import create_invited_user
 
     rank = SchoolAdminRole(body.admin_role)
+
+    if rank == SchoolAdminRole.PRINCIPAL:
+        principals = await team.count_principals(session, membership.school_id)
+        if principals > 0:
+            raise ConflictError(
+                "El colegio tiene un solo administrador principal. "
+                "Los administradores nuevos entran como secundarios: "
+                "cede el rango desde la ficha del equipo.",
+                code="only_one_principal",
+            )
 
     try:
         user, admin_membership = await create_invited_user(
@@ -498,6 +838,32 @@ async def update_school_admin(
 
     rank = SchoolAdminRole(body.admin_role)
     await team.set_rank(session, membership.school_id, membership_id, rank)
+
+    admins = await team.list_admins(session, membership.school_id)
+    for admin in admins:
+        if admin["membership_id"] == str(membership_id):
+            return AdminOut.model_validate(admin)
+
+    raise NotFoundError("Administrator not found.")
+
+
+@router.post("/admins/{membership_id}/transfer", response_model=AdminOut)
+async def transfer_principal_role(
+    membership_id: uuid.UUID,
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminOut:
+    """Hand the principal rank over to another administrator.
+
+    The school has a single principal: the rank moves from one person
+    to another in a single step, so the school is never left without
+    one. The administrator who gives it away stays in the team, as a
+    secondary.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.ADMINS_MANAGE)
+
+    await team.transfer_principal(session, membership.school_id, membership.id, membership_id)
 
     admins = await team.list_admins(session, membership.school_id)
     for admin in admins:
@@ -576,15 +942,38 @@ async def school_simulator_results(
     return SimulatorResultsOut.model_validate(results)
 
 
-@router.get("/support/cases", response_model=list[SupportCaseSummaryOut])
+@router.get("/support/cases", response_model=SupportCasePage)
 async def list_school_support_cases(
     context: Annotated[RequestContext, Depends(get_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[SupportCaseSummaryOut]:
-    """The requests of the school to the support team."""
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=50)] = 10,
+    q: Annotated[str | None, Query(description="Título o código de la solicitud")] = None,
+) -> SupportCasePage:
+    """The requests of the school to the support team.
+
+    The list is cut in the server, like the courses and the assignments.
+    """
     membership = _require_admin(context)
-    cases = await support.list_cases(session, membership.school_id)
-    return [SupportCaseSummaryOut.model_validate(case) for case in cases]
+    page_data = await support.list_cases(
+        session, membership.school_id, query=q, page=page, per_page=per_page
+    )
+    return SupportCasePage.model_validate(page_data)
+
+
+@router.get("/support/open-count")
+async def school_support_open_count(
+    context: Annotated[RequestContext, Depends(get_context)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, int]:
+    """How many requests of the school are still open.
+
+    The bell of the panel shows this number, and it counts every case of
+    the school: not only the ones of the first page.
+    """
+    membership = _require_admin(context)
+    count = await support.open_case_count(session, membership.school_id)
+    return {"count": count}
 
 
 @router.get("/support/cases/{case_id}", response_model=SupportCaseOut)
@@ -623,6 +1012,7 @@ async def open_school_support_case(
         title=body.title,
         category=body.category,
         body=body.body,
+        attachment_ids=body.attachment_ids,
     )
     return SupportCaseOut.model_validate(case)
 
@@ -647,8 +1037,44 @@ async def add_school_support_message(
         case_id,
         context.user_id,
         body.body,
+        attachment_ids=body.attachment_ids,
     )
     return SupportCaseOut.model_validate(case)
+
+
+@router.post("/support/attachments", response_model=SupportAttachmentOut, status_code=201)
+async def upload_support_attachment(
+    file: Annotated[UploadFile, File()],
+    context: Annotated[RequestContext, Depends(get_context)],
+) -> SupportAttachmentOut:
+    """Upload a file to attach to a support request.
+
+    The file belongs to the school: it goes to the store under the id of
+    the school and only the members of the school read it. It is up to
+    10 MB.
+    """
+    membership = _require_admin(context)
+    require_permission(membership.admin_role, SchoolPermission.SUPPORT_WRITE)
+
+    content = await file.read()
+    if len(content) > storage.MAX_SUPPORT_ATTACHMENT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="El archivo supera el límite de 10 MB.",
+        )
+
+    path = storage.upload_support_attachment(
+        school_id=str(membership.school_id),
+        filename=file.filename or "archivo",
+        content=content,
+        content_type=file.content_type,
+    )
+    return SupportAttachmentOut(
+        id=path,
+        name=file.filename or "archivo",
+        size=len(content),
+        url=storage.public_path(path),
+    )
 
 
 __all__ = ["router"]

@@ -1,15 +1,26 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { Check, Image, Info, Upload } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  GraduationCap,
+  Image,
+  Info,
+  LayoutGrid,
+  Upload,
+  Users,
+} from "lucide-react";
 import { useRef, useState } from "react";
 
 import { Button, Chip, PageHeader, SectionCard } from "@/components/ui-kit";
 import {
   COLOR_SAMPLES,
+  colorContrast,
   useSchoolIdentity,
   useUpdateSchoolIdentity,
   useUploadSchoolLogo,
 } from "@/lib/school/identity";
 import { applyPrimaryColor } from "@/lib/school/theme";
+import { fileUrl } from "@/lib/storage/files";
 
 export const Route = createFileRoute("/admin/personalizacion")({
   head: () => ({
@@ -32,6 +43,14 @@ export const Route = createFileRoute("/admin/personalizacion")({
 /** The shield: PNG, SVG or JPEG, and no more than 2 MB. */
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/png", "image/svg+xml", "image/jpeg"];
+
+/** The sections the preview shows: the top of the sidebar of the school. */
+const PREVIEW_NAV = [
+  { label: "Dashboard", icon: LayoutGrid },
+  { label: "Biblioteca", icon: BookOpen },
+  { label: "Docentes", icon: Users },
+  { label: "Estudiantes", icon: GraduationCap },
+] as const;
 
 function Personalizacion() {
   const { session } = useRouteContext({ from: "/admin" });
@@ -67,12 +86,11 @@ function Personalizacion() {
   const data = identity.data;
   const effectiveName = displayName ?? data?.display_name ?? "";
   const effectiveColor = color ?? data?.primary_color ?? COLOR_SAMPLES[0].value;
-  const currentLogo = logoPreview ?? data?.logo_url ?? null;
+  const currentLogo = logoPreview ?? fileUrl(data?.logo_url);
   const currentLogoName = logoName ?? (data?.logo_url ? "escudo actual" : null);
-  // The contrast the backend calculated for the saved colour. The
-  // colour that is being picked has no ratio until it is saved: the
-  // backend is the one that calculates it.
-  const contrast = data?.contrast ?? null;
+  // The contrast of the colour that is on screen, not of the one that
+  // was saved: the notice talks about what the admin is choosing.
+  const contrast = colorContrast(effectiveColor);
 
   async function onSave() {
     setErrorMsg(null);
@@ -154,7 +172,7 @@ function Personalizacion() {
       {errorMsg && (
         <p
           role="alert"
-          className="mb-4 rounded-xl border border-[rgba(240,93,94,.3)] bg-destructive-soft px-4 py-3 text-[13px] text-[#FF9293]"
+          className="mb-4 rounded-xl border border-[rgba(240,93,94,.3)] bg-destructive-soft px-4 py-3 text-[13px] text-destructive"
         >
           {errorMsg}
         </p>
@@ -166,7 +184,7 @@ function Personalizacion() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SectionCard title="Identidad" description="El nombre y el escudo que ve la comunidad">
+        <SectionCard title="Identidad" description="Nombre y escudo que verá la comunidad">
           <div className="space-y-5">
             <label className="block">
               <span className="text-[12.4px] font-medium text-foreground">Nombre visible</span>
@@ -177,18 +195,18 @@ function Personalizacion() {
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="Colegio Sagrado Corazón"
                 aria-describedby="display-name-help"
-                className="mt-1.5 w-full rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:opacity-60"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring disabled:opacity-60"
               />
               <p id="display-name-help" className="mt-1.5 text-[12px] text-muted-foreground">
-                Aparece en la barra lateral y los encabezados. Si lo dejas vacío se usa "Colegio
-                Demo".
+                Aparece en la barra lateral y los encabezados. Si lo dejas vacío se usa «Colegio
+                Demo».
               </p>
             </label>
 
             <div>
               <span className="text-[12.4px] font-medium text-foreground">Escudo</span>
-              <div className="mt-1.5 flex items-center gap-3.5 rounded-[12px] border border-dashed border-[rgba(150,175,220,.22)] bg-[#0B1222] px-4 py-3.5">
-                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-card">
+              <div className="mt-1.5 flex items-center gap-3.5 rounded-idx border border-dashed border-input bg-secondary px-4 py-3.5">
+                <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-idx bg-card">
                   {currentLogo ? (
                     <img
                       src={currentLogo}
@@ -206,10 +224,7 @@ function Personalizacion() {
                     {currentLogoName ?? "Sin escudo"}
                   </p>
                   <p className="text-[12px] text-muted-foreground">
-                    PNG o SVG · máximo 2 MB
-                    {currentLogoName && currentLogoName !== "escudo actual"
-                      ? ` · ${(uploadLogo.variables?.size ? uploadLogo.variables.size / 1024 : 0).toFixed(0)} KB`
-                      : ""}
+                    PNG o SVG · máximo 2 MB · se muestra en 40 px
                   </p>
                 </div>
                 <Button
@@ -242,7 +257,10 @@ function Personalizacion() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Color primario" description="El color de los botones y de los acentos">
+        <SectionCard
+          title="Color primario"
+          description="Se aplica a botones, enlaces y estados activos"
+        >
           <div className="flex flex-wrap gap-2.5">
             {COLOR_SAMPLES.map((sample) => {
               const selected = effectiveColor.toUpperCase() === sample.value.toUpperCase();
@@ -259,7 +277,7 @@ function Personalizacion() {
                   aria-pressed={selected}
                   aria-label={`${sample.name} ${sample.value}`}
                   title={`${sample.name} · ${sample.value}`}
-                  className="flex items-center gap-2 rounded-[12px] border border-border bg-[#0B1222] px-3 py-2 text-[12.4px] text-muted-foreground transition-colors hover:border-[rgba(150,175,220,.26)] disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-idx border border-border bg-secondary px-3 py-2 text-[12.4px] text-muted-foreground transition-colors hover:border-input disabled:opacity-60"
                   style={
                     selected ? { borderColor: sample.value, color: "var(--foreground)" } : undefined
                   }
@@ -277,19 +295,34 @@ function Personalizacion() {
           </div>
 
           {contrast ? (
-            <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-[rgba(43,217,138,.28)] bg-success-soft p-3 text-[12.5px] text-[#A0B2CE]">
-              <Info className="mt-px size-4 shrink-0 text-success" strokeWidth={1.9} aria-hidden />
+            <p
+              className={
+                "mt-4 flex items-start gap-2.5 rounded-xl border p-3 text-[12.5px] text-foreground " +
+                (contrast.passes
+                  ? "border-success/30 bg-success-soft"
+                  : "border-destructive/30 bg-destructive-soft")
+              }
+            >
+              <Info
+                className={
+                  "mt-px size-4 shrink-0 " + (contrast.passes ? "text-success" : "text-destructive")
+                }
+                strokeWidth={1.9}
+                aria-hidden
+              />
               <span>
-                <b className="font-semibold text-foreground">Contraste verificado.</b>
+                <b className="font-semibold text-foreground">
+                  {contrast.passes ? "Contraste verificado." : "Contraste insuficiente."}
+                </b>
                 <br />
                 Con el color seleccionado, tus textos y botones mantienen una relación de contraste
                 de <b className="font-semibold text-foreground">{contrast.min_ratio}:1</b> sobre el
-                fondo oscuro (se requieren {contrast.minimum}:1 o más).
+                fondo del panel (se requieren {contrast.minimum}:1 o más).
               </span>
             </p>
           ) : (
             <p className="mt-4 text-[12.5px] text-muted-foreground">
-              Guarda el color para ver la relación de contraste que el servidor calcula.
+              Elige un color de la lista para ver su relación de contraste.
             </p>
           )}
         </SectionCard>
@@ -300,41 +333,59 @@ function Personalizacion() {
           title="Vista previa"
           description="Así se ve la barra lateral del colegio con los cambios"
         >
-          <div
-            className="flex items-center gap-3 rounded-[12px] border border-border px-4 py-4"
-            style={{ backgroundColor: "#0B1222" }}
-          >
-            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-card">
-              {currentLogo ? (
-                <img
-                  src={currentLogo}
-                  alt="Escudo del colegio"
-                  className="size-10 object-cover"
-                  width={40}
-                  height={40}
-                />
-              ) : (
-                <Image className="size-4 text-muted-foreground" strokeWidth={1.9} aria-hidden />
-              )}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-bold text-foreground">
-                {effectiveName || "Colegio Demo"}
-              </p>
-              <p className="truncate text-[12px] text-muted-foreground">Administrador de colegio</p>
+          {/* A mock of the sidebar: the brand on top and the first
+              sections of the navigation, the way the admin finds them. */}
+          <div className="rounded-idx border border-border bg-secondary px-3 py-3.5">
+            <div className="flex items-center gap-3 px-1">
+              <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-idx bg-card">
+                {currentLogo ? (
+                  <img
+                    src={currentLogo}
+                    alt="Escudo del colegio"
+                    className="size-10 object-cover"
+                    width={40}
+                    height={40}
+                  />
+                ) : (
+                  <Image className="size-4 text-muted-foreground" strokeWidth={1.9} aria-hidden />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-bold text-foreground">
+                  {effectiveName || "Colegio Demo"}
+                </p>
+                <p className="truncate text-[12px] text-muted-foreground">
+                  Lumen · Gestión escolar
+                </p>
+              </div>
             </div>
-            <span
-              className="ml-auto rounded-full px-3 py-1 text-[11.8px] font-medium text-white"
-              style={{ backgroundColor: effectiveColor }}
-            >
-              Color primario
-            </span>
+
+            <div className="mt-3.5 flex flex-col gap-1">
+              {PREVIEW_NAV.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.label}
+                    className={
+                      "flex items-center gap-2.5 rounded-idx px-2.5 py-2 text-[13px] " +
+                      (index === 0
+                        ? "bg-card font-semibold text-foreground shadow-[0_1px_0_rgba(10,13,19,.05)]"
+                        : "text-muted-foreground")
+                    }
+                  >
+                    <Icon
+                      className="size-4 shrink-0"
+                      strokeWidth={index === 0 ? 2 : 1.75}
+                      aria-hidden
+                    />
+                    {item.label}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-            <Chip tone="muted" dot>
-              Sistema operativo
-            </Chip>
             <span>
               El escudo se sube de verdad: el archivo que eliges se guarda en el almacenamiento y
               aparece en toda la plataforma.

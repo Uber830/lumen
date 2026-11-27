@@ -1,9 +1,8 @@
 """Schema drift guard.
 
 The SQLAlchemy models in `app/db/models/` must stay in sync with the
-Postgres schema that lives in Supabase. The schema is owned by the
-SQL migrations under `supabase/migrations/`; the ORM is a mirror of
-it.
+Postgres schema of the project. The schema is owned by the SQL
+migrations under `db/migrations/`; the ORM is a mirror of it.
 
 This test parses the migrations and compares them column by column
 against the ORM metadata. When someone adds a column to a migration
@@ -28,7 +27,7 @@ from app.db.models import Base
 # The migrations are applied in order: the inherited ones first, then
 # the ones this project owns.
 MIGRATION_DIRS = (
-    Path(__file__).resolve().parents[2] / "supabase" / "migrations",
+    Path(__file__).resolve().parents[2] / "db" / "migrations",
     Path(__file__).resolve().parents[1] / "migrations",
 )
 
@@ -47,6 +46,7 @@ COLUMNS_ADDED_BY_ALTER = {
     "academic_periods": {"closed_at", "delivery_modality"},
     "material_schools": {"archived_at"},
     "icfes_simulations": {"material_id", "average_score", "status"},
+    "support_messages": {"attachment_ids"},
 }
 
 # Columns that a migration creates and another one drops.
@@ -192,7 +192,6 @@ def test_school_scoped_tables_carry_school_id(
         "password_reset_tokens",
         "email_verification_tokens",
         "refresh_tokens",
-        "wompi_events_processed",
         # Personal, like the profile: what the user wants to be told
         # about, not what a school wants to tell them.
         "notification_preferences",

@@ -8,10 +8,9 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 
 // Load every variable from .env into process.env at config-evaluation
-// time so both the build-time define below and the runtime
-// `process.env.SUPABASE_SECRET_KEY` reads in the server functions see
-// the same value. loadEnv only runs in dev/test; production reads
-// from the Cloudflare secret binding. The envDir is "." because Vite
+// time so both the build-time define below and the runtime reads in
+// the server functions see the same value. loadEnv only runs in
+// dev/test; production reads from the Cloudflare secret binding. The envDir is "." because Vite
 // already pins the config dir; resolving it via import.meta.url
 // crashes Vite's HMR re-evaluator when it re-loads the config
 // in a context where import.meta is not populated.

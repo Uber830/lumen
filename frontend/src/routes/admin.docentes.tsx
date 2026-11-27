@@ -1,6 +1,6 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { Plus, Search, Upload, UserRoundX } from "lucide-react";
-import { useRef, useState } from "react";
+import { KeyRound, Lock, Plus, Search, UserRoundX } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import {
   Button,
@@ -16,17 +16,27 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ActivationLinksCard, type ActivationLink } from "@/features/admin/activation-links";
-import { BulkImportSummary, type BulkImportFailure } from "@/features/admin/bulk-import-summary";
-import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
-import type { SchoolMember } from "@/features/academics/types";
+import { BulkBar, SelectBox } from "@/features/admin/bulk-bar";
 import {
-  activationLink,
-  parseCsvInvitations,
-  useBulkInviteUsers,
-  useInviteUser,
-  type InviteUserResult,
-} from "@/lib/users/invitations";
-import { useSchoolCourses, useSchoolTeachers, type SchoolMemberRow } from "@/lib/school/community";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
+import { CourseSubjectChips, type CourseSubjectItem } from "@/features/admin/course-subject-chips";
+import { MemberEditDialog } from "@/features/admin/member-edit-dialog";
+import { MemberManageDialog } from "@/features/admin/member-manage-dialog";
+import { Select } from "@/components/select-field";
+import { useCourseSubjects } from "@/features/academics/hooks";
+import type { SchoolMember } from "@/features/academics/types";
+import { activationLink, useInviteUser, useUpdateMembership } from "@/lib/users/invitations";
+import {
+  useSchoolCourseOptions,
+  useSchoolTeachers,
+  type SchoolMemberRow,
+} from "@/lib/school/community";
 import { formatShortDate } from "@/lib/school/material";
 
 export const Route = createFileRoute("/admin/docentes")({
@@ -35,7 +45,7 @@ export const Route = createFileRoute("/admin/docentes")({
       { title: "Docentes — Lumen" },
       {
         name: "description",
-        content: "Alta, búsqueda y gestión de docentes del colegio, con importación CSV.",
+        content: "Alta, búsqueda y gestión de docentes del colegio.",
       },
       { property: "og:title", content: "Docentes — Lumen" },
       {
@@ -59,28 +69,45 @@ function DocentesPage() {
   const [page, setPage] = useState(1);
 
   const teachers = useSchoolTeachers({ q: query, status, course_id: courseId, page });
-  const courses = useSchoolCourses();
+  const courses = useSchoolCourseOptions();
+  const courseSubjects = useCourseSubjects(schoolId);
 
   const invite = useInviteUser();
-  const bulkInvite = useBulkInviteUsers();
+  const updateMembership = useUpdateMembership();
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [csvText, setCsvText] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // The course and the subject the new teacher is assigned to.
+  const [newCourseSubjectId, setNewCourseSubjectId] = useState("");
   // Activation links for users just created, shown so the admin can
   // copy and share them (there is no email provider yet).
   const [activations, setActivations] = useState<ActivationLink[]>([]);
-  const [bulkSummary, setBulkSummary] = useState<{
-    created: number;
-    failures: BulkImportFailure[];
-  } | null>(null);
-  // The teacher whose management modal is open.
+  // The teacher whose management modal is open, and the one being edited.
   const [selectedTeacher, setSelectedTeacher] = useState<SchoolMemberRow | null>(null);
+  const [editingTeacher, setEditingTeacher] = useState<SchoolMemberRow | null>(null);
+  // The rows the administrator picked: the bar acts on all of them.
+  const [picked, setPicked] = useState<string[]>([]);
 
   const total = teachers.data?.total ?? 0;
+
+  // The name of each course subject: the row of the teacher carries the
+  // ids, the list of the school carries the names.
+  const labelOfCourseSubject = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const item of courseSubjects.data ?? []) {
+      labels.set(item.id, `${item.course_name} · ${item.subject_name}`);
+    }
+    return labels;
+  }, [courseSubjects.data]);
+
+  /** The courses and subjects of a teacher, ready to be shown. */
+  function courseSubjectsOf(teacher: SchoolMemberRow): CourseSubjectItem[] {
+    return (teacher.course_subject_ids ?? []).map((id) => ({
+      id,
+      label: labelOfCourseSubject.get(id) ?? "Materia",
+    }));
+  }
 
   // The dialog of the old view works with the member of the school. The
   // row of the new list carries everything it needs.
@@ -98,6 +125,11 @@ function DocentesPage() {
       avatar_url: null,
       revoked_at: row.revoked_at,
       account_activated: row.account_activated,
+      access: row.access,
+      access_reason: row.access_reason,
+      courses: row.courses,
+      subjects: row.subjects,
+      course_subject_ids: row.course_subject_ids,
     };
   }
 
@@ -127,6 +159,9 @@ function DocentesPage() {
       role: "teacher",
       school_id: schoolId,
       is_primary: true,
+      // The course and the subject the admin picked: the teacher is
+      // assigned to it, so it has material to see from the start.
+      ...(newCourseSubjectId ? { course_subject_ids: [newCourseSubjectId] } : {}),
     });
     if (created.activation_token) {
       setActivations((prev) => [
@@ -136,35 +171,21 @@ function DocentesPage() {
     }
     setEmail("");
     setFullName("");
+    setNewCourseSubjectId("");
     setOpen(false);
   }
 
-  async function onBulkFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    setCsvText(text);
+  /** Turn the access of the picked teachers on or off. */
+  async function onBulkAccess(revoked: boolean) {
+    for (const membershipId of picked) {
+      try {
+        await updateMembership.mutateAsync({ membershipId, revoked });
+      } catch {
+        // The error of the last one is shown below the bar.
+      }
+    }
+    setPicked([]);
   }
-
-  async function onBulkSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const rows = parseCsvInvitations(csvText);
-    if (!rows.length) return;
-    const result = await bulkInvite.mutateAsync(rows);
-    setBulkOpen(false);
-    setCsvText("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    // Collect activation links for the rows that were created, so the
-    // admin can share them. The failures are reported below the form.
-    const newLinks = result.created
-      .filter((c): c is InviteUserResult & { activation_token: string } => !!c.activation_token)
-      .map((c) => ({ email: c.email, link: activationLink(c.activation_token) }));
-    if (newLinks.length > 0) setActivations((prev) => [...newLinks, ...prev]);
-
-    setBulkSummary({ created: result.created.length, failures: result.failures });
-  }
-
-  const previewRows = csvText ? parseCsvInvitations(csvText) : [];
 
   return (
     <>
@@ -172,30 +193,11 @@ function DocentesPage() {
         title="Docentes"
         subtitle={`${teachers.isLoading ? "—" : total} docentes registrados en el colegio. Asigna cursos y revisa el acceso a la plataforma.`}
         actions={
-          <>
-            <Button variant="outline" icon={Upload} onClick={() => fileInputRef.current?.click()}>
-              Carga masiva CSV
-            </Button>
-            <Button icon={Plus} onClick={() => setOpen(true)}>
-              Nuevo docente
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                void onBulkFile(e);
-                setBulkOpen(true);
-              }}
-            />
-          </>
+          <Button icon={Plus} onClick={() => setOpen(true)}>
+            Nuevo docente
+          </Button>
         }
       />
-
-      {bulkSummary && (
-        <BulkImportSummary created={bulkSummary.created} failures={bulkSummary.failures} />
-      )}
 
       <ActivationLinksCard
         links={activations}
@@ -203,57 +205,18 @@ function DocentesPage() {
         onHide={() => setActivations([])}
       />
 
-      {bulkOpen && (
-        <SectionCard title="Carga masiva CSV" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onBulkSubmit}>
-            <p className="text-xs text-muted-foreground">
-              Encabezados requeridos: <code>email, full_name, role</code> (role: school_admin |
-              teacher | student). Una fila por docente.
-            </p>
-            <textarea
-              rows={6}
-              value={csvText}
-              onChange={(e) => setCsvText(e.target.value)}
-              placeholder={"email,full_name,role\nmaria@example.com,Maria Lopez,teacher\n"}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-primary/30"
-            />
-            <p className="text-xs text-muted-foreground">
-              {previewRows.length === 0
-                ? "Sin filas pendientes"
-                : `${previewRows.length} fila(s) detectadas`}
-            </p>
-            {bulkInvite.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {bulkInvite.error.message}
-              </p>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={bulkInvite.isPending || previewRows.length === 0}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {bulkInvite.isPending ? "Procesando..." : `Cargar ${previewRows.length} docente(s)`}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkOpen(false);
-                  setCsvText("");
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </SectionCard>
-      )}
+      {/* The form lives in a modal: the list of the teachers does not
+          move when the admin opens it. */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nuevo docente</DialogTitle>
+            <DialogDescription>
+              Entra con el acceso pendiente hasta que le asignes un curso.
+            </DialogDescription>
+          </DialogHeader>
 
-      {open && (
-        <SectionCard title="Nuevo docente" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onCreate}>
+          <form className="space-y-3" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre completo
@@ -264,7 +227,7 @@ function DocentesPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Lucia Ferreyra"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
             <label className="block">
@@ -277,33 +240,45 @@ function DocentesPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="docente@colegio.edu"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="submit"
-                disabled={invite.isPending}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {invite.isPending ? "Creando..." : "Crear docente"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-              >
-                Cancelar
-              </button>
-            </div>
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Curso y materia
+              </span>
+              <div className="mt-1.5">
+                <Select
+                  value={newCourseSubjectId}
+                  onChange={setNewCourseSubjectId}
+                  options={(courseSubjects.data ?? []).map((courseSubject) => ({
+                    value: courseSubject.id,
+                    label: `${courseSubject.course_name} · ${courseSubject.subject_name}`,
+                  }))}
+                  placeholder="7° A · Matemáticas"
+                  emptyLabel="Todavía no hay materias ofrecidas en los cursos"
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Sin asignación el docente entra con el acceso pendiente.
+              </p>
+            </label>
             {invite.error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-[13px] text-destructive">
                 {invite.error.message}
               </p>
             )}
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={invite.isPending}>
+                {invite.isPending ? "Creando..." : "Crear docente"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         <Toolbar>
@@ -319,7 +294,7 @@ function DocentesPage() {
               onChange={(event) => applyQuery(event.target.value)}
               placeholder="Buscar por nombre o correo"
               aria-label="Buscar por nombre o correo"
-              className="w-full rounded-[10px] border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
+              className="w-full rounded-idx border border-input bg-card py-2 pl-9 pr-3 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
 
@@ -327,7 +302,7 @@ function DocentesPage() {
             value={status}
             onChange={(event) => applyStatus(event.target.value)}
             aria-label="Filtrar por estado"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los estados</option>
             <option value="activo">Activos</option>
@@ -338,7 +313,7 @@ function DocentesPage() {
             value={courseId}
             onChange={(event) => applyCourse(event.target.value)}
             aria-label="Filtrar por curso"
-            className="rounded-[10px] border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
+            className="rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
           >
             <option value="all">Todos los cursos</option>
             {(courses.data ?? []).map((course) => (
@@ -353,6 +328,32 @@ function DocentesPage() {
           </div>
         </Toolbar>
 
+        <BulkBar count={picked.length} onClear={() => setPicked([])}>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={KeyRound}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(false)}
+          >
+            Activar acceso
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Lock}
+            disabled={updateMembership.isPending}
+            onClick={() => void onBulkAccess(true)}
+          >
+            Desactivar acceso
+          </Button>
+          {updateMembership.error && (
+            <span role="alert" className="text-[12.5px] text-destructive">
+              {updateMembership.error.message}
+            </span>
+          )}
+        </BulkBar>
+
         {teachers.isError ? (
           <p role="alert" className="px-[18px] py-6 text-[13px] text-destructive">
             {teachers.error.message}
@@ -361,10 +362,10 @@ function DocentesPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2, 3].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[180px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[74px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[180px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[74px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>
@@ -388,6 +389,22 @@ function DocentesPage() {
                 </caption>
                 <thead>
                   <tr>
+                    <th scope="col" className={`${tableHeadClass} w-[38px]`}>
+                      <SelectBox
+                        checked={
+                          (teachers.data?.items.length ?? 0) > 0 &&
+                          picked.length === teachers.data?.items.length
+                        }
+                        onChange={(checked) =>
+                          setPicked(
+                            checked
+                              ? (teachers.data?.items ?? []).map((row) => row.membership_id)
+                              : [],
+                          )
+                        }
+                        label="Seleccionar todos los docentes"
+                      />
+                    </th>
                     <th scope="col" className={tableHeadClass}>
                       Docente
                     </th>
@@ -410,10 +427,20 @@ function DocentesPage() {
                 </thead>
                 <tbody>
                   {(teachers.data?.items ?? []).map((teacher) => (
-                    <tr
-                      key={teacher.membership_id}
-                      className="transition-colors hover:bg-white/[0.025]"
-                    >
+                    <tr key={teacher.membership_id} className="transition-colors hover:bg-muted">
+                      <td className={tableCellClass}>
+                        <SelectBox
+                          checked={picked.includes(teacher.membership_id)}
+                          onChange={(checked) =>
+                            setPicked((current) =>
+                              checked
+                                ? [...current, teacher.membership_id]
+                                : current.filter((id) => id !== teacher.membership_id),
+                            )
+                          }
+                          label={`Seleccionar a ${teacher.full_name ?? "el docente"}`}
+                        />
+                      </td>
                       <td className={tableCellClass}>
                         <p className="font-medium text-foreground">{teacher.full_name ?? "—"}</p>
                         <p className="text-[12px] text-muted-foreground">
@@ -421,25 +448,17 @@ function DocentesPage() {
                         </p>
                       </td>
                       <td className={tableCellClass}>
-                        {teacher.courses.length > 0 ? (
-                          <>
-                            <p className="text-[13px]">{teacher.courses.join(" · ")}</p>
-                            {teacher.subjects && teacher.subjects.length > 0 && (
-                              <p className="text-[12px] text-muted-foreground">
-                                {teacher.subjects.join(" · ")}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">Sin curso</span>
-                        )}
+                        <CourseSubjectChips
+                          items={courseSubjectsOf(teacher)}
+                          who={teacher.full_name ?? "el docente"}
+                        />
                       </td>
-                      <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                      <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                         {formatShortDate(teacher.joined_at)}
                       </td>
                       <td className={tableCellClass}>
                         <Chip tone={teacher.access === "activado" ? "ok" : "warn"} dot>
-                          {teacher.access === "activado" ? "Activado" : "Pendiente"}
+                          {teacher.access === "activado" ? "Activado" : "Sin activar"}
                         </Chip>
                       </td>
                       <td className={tableCellClass}>
@@ -476,9 +495,6 @@ function DocentesPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           La búsqueda y los filtros se ejecutan en el servidor, sobre los datos del colegio.
         </span>
@@ -489,6 +505,24 @@ function DocentesPage() {
           member={asMember(selectedTeacher)}
           roleLabel="docente"
           onClose={() => setSelectedTeacher(null)}
+          onEdit={() => {
+            setEditingTeacher(selectedTeacher);
+            setSelectedTeacher(null);
+          }}
+        />
+      )}
+
+      {editingTeacher && (
+        <MemberEditDialog
+          member={{
+            membership_id: editingTeacher.membership_id,
+            full_name: editingTeacher.full_name,
+            email: editingTeacher.email,
+            course_subject_ids: editingTeacher.course_subject_ids,
+          }}
+          role="teacher"
+          onClose={() => setEditingTeacher(null)}
+          onSaved={() => setEditingTeacher(null)}
         />
       )}
     </>

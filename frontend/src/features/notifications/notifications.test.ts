@@ -30,12 +30,20 @@ const ALL_KINDS: NotificationKind[] = [
   "task_graded",
   "content_published",
   "chat_message",
+  "support_case_opened",
+  "support_case_replied",
 ];
 
 describe("the notification kinds", () => {
   it("are the ones the backend produces", () => {
     expectTypeOf<NotificationKind>().toEqualTypeOf<
-      "task_assigned" | "task_submitted" | "task_graded" | "content_published" | "chat_message"
+      | "task_assigned"
+      | "task_submitted"
+      | "task_graded"
+      | "content_published"
+      | "chat_message"
+      | "support_case_opened"
+      | "support_case_replied"
     >();
   });
 

@@ -1,7 +1,7 @@
 """Enum types mirroring the Postgres enums declared in the migrations.
 
 Each value here has a one-to-one counterpart in the `create type`
-statements under supabase/migrations/. The SQLAlchemy Enum uses the
+statements under db/migrations/. The SQLAlchemy Enum uses the
 *value* names, which are the ones stored in Postgres, and renders them
 as native Postgres enum types on create.
 
@@ -227,6 +227,8 @@ class NotificationKind(StrEnum):
     TASK_GRADED = "task_graded"
     CONTENT_PUBLISHED = "content_published"
     CHAT_MESSAGE = "chat_message"
+    SUPPORT_CASE_OPENED = "support_case_opened"
+    SUPPORT_CASE_REPLIED = "support_case_replied"
 
 
 __all__ = [

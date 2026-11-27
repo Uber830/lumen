@@ -22,16 +22,19 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.access import course_subject_course_id
-from app.db.enums import EnrollmentStatus, NotificationKind, SchoolRole
+from app.core.events import Event, queue_events
+from app.db.enums import EnrollmentStatus, NotificationKind, PlatformRoleKind, SchoolRole
 from app.db.models import (
     ChatMember,
     ChatMessage,
     ContentItem,
     Notification,
     NotificationPreference,
+    PlatformRole,
     Profile,
     SchoolMembership,
     StudentEnrollment,
+    SupportCase,
     Task,
     TaskSubmission,
     TeacherAssignment,
@@ -40,6 +43,10 @@ from app.db.models import (
 
 # How much of a chat message the notification body shows.
 _PREVIEW_LIMIT = 120
+
+# Where each side goes when a notification of the support desk arrives.
+PLATFORM_SUPPORT_LINK = "/super/soporte"
+SCHOOL_SUPPORT_LINK = "/admin/soporte"
 
 # Picks the place in the app a recipient has to go to, given the role
 # they hold in the school.
@@ -206,6 +213,82 @@ async def notify_chat_message(
     )
 
 
+async def notify_support_case_opened(
+    session: AsyncSession,
+    *,
+    case: SupportCase,
+    actor_name: str,
+) -> int:
+    """Tell the platform team that a school opened a case.
+
+    The desk is the one that answers, so the notification points at it.
+    """
+    recipients = await _platform_admin_ids(session)
+    if not recipients:
+        return 0
+
+    return await _insert_notifications(
+        session,
+        school_id=case.school_id,
+        recipients=recipients,
+        kind=NotificationKind.SUPPORT_CASE_OPENED,
+        title=f"Nuevo caso de soporte: {case.title}",
+        body=f"{actor_name} abrió el caso {case.code}.",
+        link=PLATFORM_SUPPORT_LINK,
+        payload={"case_id": str(case.id), "code": case.code},
+    )
+
+
+async def notify_support_case_answered(
+    session: AsyncSession,
+    *,
+    case: SupportCase,
+    actor_name: str,
+) -> int:
+    """Tell the platform team that the school wrote in the thread."""
+    recipients = await _platform_admin_ids(session)
+    if not recipients:
+        return 0
+
+    return await _insert_notifications(
+        session,
+        school_id=case.school_id,
+        recipients=recipients,
+        kind=NotificationKind.SUPPORT_CASE_REPLIED,
+        title=f"Respuesta en el caso {case.code}",
+        body=f"{actor_name} escribió en el hilo del caso {case.code}.",
+        link=PLATFORM_SUPPORT_LINK,
+        payload={"case_id": str(case.id), "code": case.code},
+    )
+
+
+async def notify_support_case_replied(
+    session: AsyncSession,
+    *,
+    case: SupportCase,
+    actor_name: str,
+) -> int:
+    """Tell the administrators of the school that the platform answered.
+
+    The administrators are the ones who wrote in the thread, so they are
+    the ones who have to know that there is a new answer.
+    """
+    recipients = await _school_admin_ids(session, school_id=case.school_id)
+    if not recipients:
+        return 0
+
+    return await _insert_notifications(
+        session,
+        school_id=case.school_id,
+        recipients=recipients,
+        kind=NotificationKind.SUPPORT_CASE_REPLIED,
+        title=f"El equipo de Lumen respondió tu caso {case.code}",
+        body=f"{actor_name} respondió en el hilo del caso {case.code}.",
+        link=SCHOOL_SUPPORT_LINK,
+        payload={"case_id": str(case.id), "code": case.code},
+    )
+
+
 # ---------------------------------------------------------------------------
 # The audience
 # ---------------------------------------------------------------------------
@@ -265,13 +348,16 @@ async def _insert_notifications(
     kind: NotificationKind,
     title: str,
     body: str | None,
-    link_for: LinkBuilder,
+    link_for: LinkBuilder | None = None,
+    link: str | None = None,
     payload: dict[str, object],
 ) -> int:
     """Write one notification per recipient.
 
     The link depends on the role of the recipient, so the roles are
-    resolved in one query before the rows go in.
+    resolved in one query before the rows go in. A notification that
+    goes to the same place for everybody (the desk of the cases, for
+    instance) brings its own link and skips that lookup.
     """
     unique_recipients = list(dict.fromkeys(recipients))
     if not unique_recipients:
@@ -285,6 +371,14 @@ async def _insert_notifications(
 
     roles = await _roles_in_school(session, school_id=school_id, user_ids=wanted)
 
+    def link_of(recipient_id: uuid.UUID) -> str | None:
+        """Where this recipient goes when it clicks the notification."""
+        if link is not None:
+            return link
+        if link_for is None:
+            return None
+        return link_for(roles.get(recipient_id))
+
     now = datetime.now(UTC)
     rows = [
         {
@@ -294,7 +388,7 @@ async def _insert_notifications(
             "kind": kind,
             "title": title,
             "body": body,
-            "link": link_for(roles.get(recipient_id)),
+            "link": link_of(recipient_id),
             "payload": payload,
             "read_at": None,
             "created_at": now,
@@ -304,6 +398,16 @@ async def _insert_notifications(
     ]
 
     await session.execute(insert(Notification), rows)
+
+    # The browser is told there is something new. The event says what
+    # happened, not what it is: the client asks the API for the rows.
+    # It leaves when the transaction commits.
+    queue_events(
+        session,
+        event=Event("notification", {"kind": kind.value, "count": len(rows)}),
+        user_ids=list(wanted),
+    )
+
     return len(rows)
 
 
@@ -347,6 +451,34 @@ async def _roles_in_school(
         )
     )
     return {row[0]: row[1] for row in result.all()}
+
+
+async def _platform_admin_ids(session: AsyncSession) -> list[uuid.UUID]:
+    """The members of the platform team.
+
+    They are not members of any school: the role lives outside the
+    schools, so the desk can tell them about every case.
+    """
+    result = await session.execute(
+        select(PlatformRole.user_id).where(PlatformRole.role == PlatformRoleKind.PLATFORM_ADMIN)
+    )
+    return list(result.scalars().all())
+
+
+async def _school_admin_ids(
+    session: AsyncSession,
+    *,
+    school_id: uuid.UUID,
+) -> list[uuid.UUID]:
+    """The administrators of a school that are still active."""
+    result = await session.execute(
+        select(SchoolMembership.user_id).where(
+            SchoolMembership.school_id == school_id,
+            SchoolMembership.role == SchoolRole.SCHOOL_ADMIN,
+            SchoolMembership.revoked_at.is_(None),
+        )
+    )
+    return list(result.scalars().all())
 
 
 async def _display_name(session: AsyncSession, *, user_id: uuid.UUID) -> str:
@@ -411,6 +543,9 @@ def _chat_link(role: SchoolRole | None) -> str | None:
 __all__ = [
     "notify_chat_message",
     "notify_content_published",
+    "notify_support_case_answered",
+    "notify_support_case_opened",
+    "notify_support_case_replied",
     "notify_task_assigned",
     "notify_task_graded",
     "notify_task_submitted",

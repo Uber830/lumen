@@ -1,5 +1,5 @@
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
-import { CalendarRange, Lock, Plus, X } from "lucide-react";
+import { CalendarRange, Lock, Plus } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -14,7 +14,15 @@ import {
   tableHeadClass,
 } from "@/components/ui-kit";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useCreateAcademicPeriod, useDeleteAcademicPeriod } from "@/features/academics/hooks";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/dialog";
+import { useCreateAcademicPeriod } from "@/features/academics/hooks";
 import {
   useClosePeriod,
   useSchoolPeriods,
@@ -40,12 +48,14 @@ export const Route = createFileRoute("/admin/periodos")({
   component: PeriodosPage,
 });
 
-const MODALITIES = [
-  { id: "bimestre", label: "Bimestres" },
-  { id: "trimestre", label: "Trimestres" },
-  { id: "semestre", label: "Semestres" },
-  { id: "anual", label: "Anual" },
-] as const;
+/**
+ * The modality the school works with.
+ *
+ * The admin does not pick it: the name of the period says it ("2do
+ * Trimestre 2026"). The API still asks for it, so the school goes with
+ * the cycle it uses.
+ */
+const DEFAULT_MODALITY = "trimestre";
 
 /**
  * The API answers in English; the page speaks Spanish.
@@ -78,19 +88,14 @@ function PeriodosPage() {
   const close = useClosePeriod();
   const setCurrent = useSetCurrentPeriod();
   const create = useCreateAcademicPeriod(schoolId ?? "");
-  const remove = useDeleteAcademicPeriod(schoolId ?? "");
 
   const [name, setName] = useState("");
-  const [modality, setModality] = useState<"bimestre" | "trimestre" | "semestre" | "anual">(
-    "trimestre",
-  );
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [dateError, setDateError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  // The period the admin is about to close, and the one to delete.
+  // The period the admin is about to close.
   const [toClose, setToClose] = useState<SchoolPeriod | null>(null);
-  const [toDelete, setToDelete] = useState<SchoolPeriod | null>(null);
 
   // The frontend does not decide what the rank may do: it receives the
   // list from the API. A closed action is disabled **with the reason**,
@@ -125,7 +130,7 @@ function PeriodosPage() {
     try {
       await create.mutateAsync({
         name: name.trim(),
-        modality,
+        modality: DEFAULT_MODALITY,
         start_date: start,
         end_date: end,
         is_current: false,
@@ -165,7 +170,7 @@ function PeriodosPage() {
             >
               Cerrar periodo
             </Button>
-            <Button icon={Plus} onClick={() => setFormOpen((open) => !open)}>
+            <Button icon={Plus} onClick={() => setFormOpen(true)}>
               Nuevo periodo
             </Button>
           </>
@@ -201,9 +206,24 @@ function PeriodosPage() {
         </p>
       )}
 
-      {formOpen && (
-        <SectionCard className="mb-4" title="Nuevo periodo" bodyClassName="p-0">
-          <form className="space-y-3 p-4" onSubmit={onCreate}>
+      {/* The form lives in a modal: the list of the periods does not move
+          when the admin opens it. */}
+      <Dialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setDateError(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">Nuevo periodo</DialogTitle>
+            <DialogDescription>
+              El ciclo lectivo del colegio. El material se archiva al cerrarlo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-3" onSubmit={onCreate}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Nombre
@@ -214,26 +234,8 @@ function PeriodosPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 placeholder="4to Trimestre 2026"
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-muted-foreground focus:border-ring"
               />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Modalidad
-              </span>
-              <select
-                value={modality}
-                onChange={(e) =>
-                  setModality(e.target.value as "bimestre" | "trimestre" | "semestre" | "anual")
-                }
-                className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                {MODALITIES.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
@@ -245,7 +247,7 @@ function PeriodosPage() {
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
                   required
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
                 />
               </label>
               <label className="block">
@@ -257,7 +259,7 @@ function PeriodosPage() {
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
                   required
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="mt-1.5 w-full rounded-idx border border-input bg-card px-3 py-2 text-[13px] outline-none transition-colors focus:border-ring"
                 />
               </label>
             </div>
@@ -271,13 +273,10 @@ function PeriodosPage() {
                 {periodErrorMessage(create.error)}
               </p>
             )}
-            <div className="flex items-center gap-2">
-              <Button type="submit" icon={CalendarRange} disabled={create.isPending}>
-                {create.isPending ? "Creando..." : "Crear periodo"}
-              </Button>
+            <DialogFooter>
               <Button
                 variant="ghost"
-                icon={X}
+                type="button"
                 onClick={() => {
                   setFormOpen(false);
                   setDateError(null);
@@ -285,10 +284,13 @@ function PeriodosPage() {
               >
                 Cancelar
               </Button>
-            </div>
+              <Button type="submit" icon={CalendarRange} disabled={create.isPending}>
+                {create.isPending ? "Creando..." : "Crear periodo"}
+              </Button>
+            </DialogFooter>
           </form>
-        </SectionCard>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <SectionCard className="overflow-hidden" bodyClassName="p-0">
         {periods.isError ? (
@@ -299,10 +301,10 @@ function PeriodosPage() {
           <div className="px-[18px] py-4" aria-hidden>
             {[0, 1, 2].map((row) => (
               <div key={row} className="flex items-center gap-4 py-[11px]">
-                <span className="h-[11px] w-[150px] animate-pulse rounded bg-[rgba(150,175,220,.11)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[11px] w-[90px] animate-pulse rounded bg-[rgba(150,175,220,.09)]" />
-                <span className="h-[18px] w-[70px] animate-pulse rounded-full bg-[rgba(150,175,220,.1)]" />
+                <span className="h-[11px] w-[150px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[11px] w-[90px] animate-pulse rounded bg-muted" />
+                <span className="h-[18px] w-[70px] animate-pulse rounded-idx bg-muted" />
               </div>
             ))}
           </div>
@@ -347,14 +349,14 @@ function PeriodosPage() {
               </thead>
               <tbody>
                 {(periods.data ?? []).map((period) => (
-                  <tr key={period.id} className="transition-colors hover:bg-white/[0.025]">
+                  <tr key={period.id} className="transition-colors hover:bg-muted">
                     <td className={`${tableCellClass} font-medium text-foreground`}>
                       {period.name}
                     </td>
-                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                       {shortDate(period.start_date)}
                     </td>
-                    <td className={`${tableCellClass} font-mono text-[12.4px] text-[#A0B2CE]`}>
+                    <td className={`${tableCellClass} font-mono text-[12.4px] text-foreground`}>
                       {shortDate(period.end_date)}
                     </td>
                     <td className={tableCellClass}>
@@ -406,15 +408,6 @@ function PeriodosPage() {
                         >
                           Marcar vigente
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={X}
-                          onClick={() => setToDelete(period)}
-                          disabled={remove.isPending}
-                        >
-                          Quitar
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -423,9 +416,9 @@ function PeriodosPage() {
             </PanelTable>
           </TableShell>
         )}
-        {(close.error || setCurrent.error || remove.error) && (
+        {(close.error || setCurrent.error) && (
           <p role="alert" className="px-[18px] py-4 text-[13px] text-destructive">
-            {(close.error ?? setCurrent.error ?? remove.error)?.message}
+            {(close.error ?? setCurrent.error)?.message}
           </p>
         )}
       </SectionCard>
@@ -433,9 +426,6 @@ function PeriodosPage() {
       {/* The foot of the view: the state of the system, so that a page
           is never a blank rectangle. */}
       <p className="mt-6 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
-        <Chip tone="muted" dot>
-          Sistema operativo
-        </Chip>
         <span>
           Al cerrar un periodo, el material de ese ciclo se archiva para el colegio: queda en el
           histórico y sale del material activo.
@@ -446,9 +436,13 @@ function PeriodosPage() {
         open={toClose !== null}
         title={toClose ? `Cerrar ${toClose.name}` : "Cerrar periodo"}
         description={
-          toClose
-            ? `Se cerrará el ${toClose.name}. Las tareas y notas del periodo quedarán en histórico y el material de este ciclo se archivará para el colegio.`
-            : undefined
+          toClose ? (
+            <>
+              Se cerrará <strong className="font-semibold text-foreground">{toClose.name}</strong>.
+              El material del ciclo pasa a archivado y deja de estar visible para docentes y
+              estudiantes.
+            </>
+          ) : undefined
         }
         confirmLabel="Cerrar periodo"
         pending={close.isPending}
@@ -456,23 +450,6 @@ function PeriodosPage() {
         onConfirm={() => {
           if (!toClose) return;
           close.mutate(toClose.id, { onSuccess: () => setToClose(null) });
-        }}
-      />
-
-      <ConfirmDialog
-        open={toDelete !== null}
-        title={toDelete ? `Eliminar ${toDelete.name}` : "Eliminar periodo"}
-        description={
-          toDelete
-            ? "Se borra el periodo con sus notas y tareas. Esta acción no se puede deshacer."
-            : undefined
-        }
-        confirmLabel="Eliminar periodo"
-        pending={remove.isPending}
-        onCancel={() => setToDelete(null)}
-        onConfirm={() => {
-          if (!toDelete) return;
-          remove.mutate(toDelete.id, { onSuccess: () => setToDelete(null) });
         }}
       />
     </>

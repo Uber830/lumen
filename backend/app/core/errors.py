@@ -16,7 +16,7 @@ Status code conventions:
 - 409 — the request conflicts with the current state (duplicate email,
   short code already taken).
 - 422 — the payload failed validation.
-- 502 — an upstream provider (Wompi, Supabase Storage) failed.
+- 502 — an upstream provider failed.
 - 503 — the service is unavailable: missing configuration, or the
   database is not answering. Retrying may work.
 """

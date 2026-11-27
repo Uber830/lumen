@@ -27,6 +27,8 @@ from app.core.errors import AppError, ServiceUnavailableError
 from app.db.schema_check import SchemaOutOfDateError, verify_schema
 from app.db.session import dispose_engine, get_sessionmaker
 from app.evaluations.router import router as evaluations_router
+from app.events.router import router as events_router
+from app.files.router import router as files_router
 from app.grades.router import router as grades_router
 from app.health import router as health_router
 from app.icfes.authoring_router import router as icfes_authoring_router
@@ -41,7 +43,6 @@ from app.school.router import router as school_router
 from app.schools.router import router as schools_router
 from app.site.router import router as site_router
 from app.subscriptions.router import router as subscriptions_router
-from app.subscriptions.webhooks import router as webhooks_router
 from app.tasks.router import router as tasks_router
 from app.users.router import router as users_router
 
@@ -110,9 +111,9 @@ def create_app() -> FastAPI:
         description=(
             "Backend for Lumen. Owns authentication, authorization "
             "and every business operation; the browser talks only to "
-            "this API. Postgres (hosted by Supabase) is the datastore; "
-            "Supabase Storage and Realtime remain in use for file "
-            "uploads and live chat."
+            "this API. Postgres is the datastore, the files live on "
+            "the disk of the server and the chat refreshes with "
+            "periodic queries."
         ),
         lifespan=lifespan,
     )
@@ -138,9 +139,9 @@ def create_app() -> FastAPI:
     async def handle_database_unavailable(_: Request, exc: OperationalError) -> JSONResponse:
         """Turn "Postgres is not answering" into a 503, not a 500.
 
-        A paused Supabase project, an exhausted connection pool or a
-        network hiccup is an availability problem; the client should
-        retry later instead of treating the request as a bug.
+        A paused database, an exhausted connection pool or a network
+        hiccup is an availability problem; the client should retry
+        later instead of treating the request as a bug.
         """
         logger.error("The database is unavailable", exc_info=exc)
         return JSONResponse(
@@ -166,6 +167,7 @@ def create_app() -> FastAPI:
     app.include_router(icfes_authoring_router)
     app.include_router(chat_router)
     app.include_router(notifications_router)
+    app.include_router(events_router)
     app.include_router(plans_router)
     app.include_router(school_router)
     app.include_router(schools_router)
@@ -174,7 +176,7 @@ def create_app() -> FastAPI:
     app.include_router(platform_support_router)
     app.include_router(users_router)
     app.include_router(subscriptions_router)
-    app.include_router(webhooks_router)
+    app.include_router(files_router)
     app.include_router(icfes_router)
     app.include_router(icfes_comparisons_router)
 

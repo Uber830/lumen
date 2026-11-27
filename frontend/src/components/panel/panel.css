@@ -1,102 +1,152 @@
 /* =============================================================================
- * The panel of the school administrator.
+ * The panel of the application.
  * -----------------------------------------------------------------------------
  * The scope class of the whole application panel: the school admin, the
- * teacher and the student. The public site keeps its own palette (the
- * "El Índice" scope, features/site/site.css).
+ * teacher and the student.
  *
- * The palette is the one of the product: a dark surface, one accent for
- * the school, and a colour for every state. The card separates from the
- * background with a border, not with a shadow: the shadow is only for
- * the floating things (the drawer, the dropdown, the toast).
+ * The panel is El Índice: the same palette, the same texture, the same
+ * type and the same square corners as the public site. The page carries
+ * the `idx-site` class as well, so the tokens of the site
+ * (features/site/site.css) are the ones this scope works with — there is
+ * no second palette to keep in sync.
+ *
+ * The card separates from the background with a border, not with a
+ * shadow: the shadow is only for the floating things (the drawer, the
+ * dropdown, the toast).
  *
  * The school's own primary colour replaces `--primary` in the instance of
- * that school (see lib/school/theme.ts). The default blue is the one
- * below.
+ * that school (see lib/school/theme.ts). The default blue is the one of
+ * the public site.
  * ============================================================================= */
 
 .lumen-panel {
   /* The surfaces, from the deepest to the closest to the reader. */
-  --background: #080d1a;
-  --foreground: #e9eff9;
-  --card: #101a2e;
-  --card-foreground: #e9eff9;
-  --popover: #15223b;
-  --popover-foreground: #e9eff9;
-  --secondary: #1c2c4b;
-  --secondary-foreground: #e9eff9;
-  --muted: #0b1222;
-  --muted-foreground: #a0b2ce;
-  --accent: #15223b;
-  --accent-foreground: #e9eff9;
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+  --secondary: var(--paper);
+  --secondary-foreground: var(--ink-2);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--paper);
+  --accent-foreground: var(--ink);
 
-  /* The school accent. It is replaced by the school's own colour. */
-  --primary: #2e8fff;
+  /* The accent. The school replaces it with its own colour: the
+     `--school-primary` variable is the one it writes (see
+     lib/school/theme.ts), and the blue of the site is the default. */
+  --primary: var(--school-primary, var(--accent-solid));
   --primary-foreground: #ffffff;
-  --primary-soft: rgba(46, 143, 255, 0.13);
+  --primary-soft: var(--school-primary-soft, var(--accent-soft));
 
   /* The states. Each one has a tint, for the pills and the alerts. */
-  --success: #2bd98a;
-  --success-foreground: #e9eff9;
-  --success-soft: rgba(43, 217, 138, 0.13);
-  --warning: #f5a524;
-  --warning-foreground: #e9eff9;
-  --warning-soft: rgba(245, 165, 36, 0.13);
-  --destructive: #f05d5e;
-  --destructive-foreground: #e9eff9;
-  --destructive-soft: rgba(240, 93, 94, 0.13);
-  --teal: #2dd4bf;
-  --teal-foreground: #e9eff9;
-  --teal-soft: rgba(45, 212, 191, 0.13);
+  --success: var(--ok-fg);
+  --success-foreground: var(--ok-fg);
+  --success-soft: var(--ok-bg);
+  --warning: var(--warn-fg);
+  --warning-foreground: var(--warn-fg);
+  --warning-soft: var(--warn-bg);
+  --destructive: var(--bad-fg);
+  --destructive-foreground: var(--bad-fg);
+  --destructive-soft: var(--bad-bg);
+  --teal: var(--ink);
+  --teal-foreground: var(--ink);
+  --teal-soft: var(--paper);
+
+  /* The blue of the site, under the name the theme uses. */
+  --brand: var(--accent-solid);
 
   /* The lines. There are two: the one that separates and the one that
      marks an active control. */
-  --border: rgba(150, 175, 220, 0.13);
-  --input: rgba(150, 175, 220, 0.26);
-  --ring: #2e8fff;
+  --border: var(--line);
+  --input: var(--line-2);
+  --ring: var(--school-primary, var(--accent-solid));
 
   /* The rail. */
-  --sidebar: #0b1222;
-  --sidebar-foreground: #a0b2ce;
-  --sidebar-primary: #2e8fff;
+  --sidebar: #ffffff;
+  --sidebar-foreground: var(--ink-2);
+  --sidebar-primary: var(--school-primary, var(--accent-solid));
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #15223b;
-  --sidebar-accent-foreground: #e9eff9;
-  --sidebar-border: rgba(150, 175, 220, 0.13);
-  --sidebar-ring: #2e8fff;
+  --sidebar-accent: var(--accent-soft);
+  --sidebar-accent-foreground: var(--ink);
+  /* The module that is open wears the colour of the school, so the rail
+     keeps the identity of the school whichever module is open. */
+  --sidebar-active-foreground: var(--school-primary, var(--accent-solid));
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--school-primary, var(--accent-solid));
 
   /* The type. One sans for the text and one monospaced for the codes
-     and the dates. */
-  --font-sans: "Outfit", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+     and the dates: the same faces of the public site. */
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* The radius: 16 px for the cards and the modals, 12 px for the
-     fields and the buttons, 20 px for the floating things. */
-  --radius: 0.75rem;
+  /* The radius: the corners of El Índice are square (4 px). */
+  --radius: 4px;
 
   /* The shadow is only for the floating things. */
-  --shadow-lift: 0 12px 32px -12px rgba(2, 6, 16, 0.85);
+  --shadow-card: none;
+  --shadow-lift: 0 12px 32px -12px rgba(10, 13, 19, 0.18);
 
-  /*
-   * The names of the public site.
-   *
-   * The views of the platform were written against the palette of El
-   * Índice and kept three of its names: the tertiary text, the second
-   * line and the band of the table header. They are declared here with
-   * the values of the panel, so the same class paints the same way in
-   * the two scopes.
-   */
-  --ink-3: #8fa2c0;
-  --line-2: rgba(150, 175, 220, 0.26);
-  --head-bg: #16233c;
-  --head-fg: #e9eff9;
-
-  /* The panel is dark: the text does not follow the theme of the site. */
   color: var(--foreground);
   background: var(--background);
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.55;
+}
+
+/*
+ * The dark theme of the panel is the dark theme of the site: the tokens
+ * of the site flip with the `dark` class and this scope follows them.
+ */
+.dark .lumen-panel {
+  /* The `dark` block of the site is more specific than this scope, so
+     the accent of the site (the blue) is set back to a surface here:
+     in the panel the accent is the surface of a hovered control. */
+  --accent: var(--paper);
+  --card: var(--paper);
+  --popover: var(--paper-2);
+  --sidebar: var(--paper);
+  --shadow-lift: 0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  /* On a dark surface the colour of the school is lightened: the same
+     green, the one that can be read. */
+  --sidebar-active-foreground: color-mix(
+    in oklab,
+    var(--school-primary, var(--accent-solid)) 55%,
+    white
+  );
+}
+
+/*
+ * The corners are square.
+ *
+ * The public site draws its controls with a 4 px radius and that is
+ * part of its identity, so the panel normalizes the radius scale of
+ * the utilities it uses. The circles (the avatars, the dots) keep
+ * their own shape: they are not corners.
+ */
+.lumen-panel :where(
+    .rounded-md,
+    .rounded-lg,
+    .rounded-xl,
+    .rounded-2xl,
+    .rounded-3xl,
+    .rounded-t-lg,
+    .rounded-b-lg,
+    .rounded-l-lg,
+    .rounded-r-lg,
+    .rounded-tl-lg,
+    .rounded-tr-lg,
+    .rounded-bl-lg,
+    .rounded-br-lg
+  ) {
+  border-radius: 4px;
+}
+
+/* The card of the panel: a square corner, like the one of the site. */
+.lumen-panel .surface-card {
+  border-radius: 4px;
 }
 
 /*
@@ -117,7 +167,7 @@
 .lumen-panel :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 /*
@@ -218,7 +268,7 @@
  */
 .lumen-panel * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(150, 175, 220, 0.18) transparent;
+  scrollbar-color: var(--line-2) transparent;
 }
 
 .lumen-panel *::-webkit-scrollbar {
@@ -227,7 +277,7 @@
 }
 
 .lumen-panel *::-webkit-scrollbar-thumb {
-  background: rgba(150, 175, 220, 0.18);
+  background: var(--line-2);
   border-radius: 20px;
   border: 3px solid transparent;
   background-clip: content-box;

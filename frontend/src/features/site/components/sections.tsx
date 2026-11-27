@@ -94,6 +94,12 @@ export function RolesSection({ roles }: { roles: SiteRoles }) {
 // --- The coverage ----------------------------------------------------------
 
 export function CoverageSection({ coverage }: { coverage: SiteCoverage }) {
+  // The block is published only when the copy carries it: a copy
+  // without rows leaves the page without the block.
+  if (coverage.rows.length === 0) {
+    return null;
+  }
+
   return (
     <section id="cobertura" className="border-b border-line scroll-mt-16">
       <div className={`${CONTAINER} pt-16 pb-16 sm:pt-24 sm:pb-24`}>

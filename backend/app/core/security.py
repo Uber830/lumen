@@ -10,8 +10,8 @@ an interactive login on modest hardware: roughly 50-80 ms per hash on
 a modern server core.
 
 One legacy format is accepted: bcrypt. The accounts that came from
-Supabase Auth have bcrypt hashes, and rejecting them would lock every
-existing user out. A bcrypt hash verifies and is then upgraded to
+the previous identity provider have bcrypt hashes, and rejecting them
+would lock every existing user out. A bcrypt hash verifies and is then upgraded to
 Argon2id on the same login (`needs_rehash` returns True for it), so
 the legacy path drains itself.
 
@@ -31,7 +31,7 @@ from app.config import Settings, get_settings
 # callers can treat them uniformly without importing argon2.
 PASSWORD_MISMATCH_ERRORS = (VerifyMismatchError, VerificationError, InvalidHashError)
 
-# The prefixes of a bcrypt hash, as produced by Supabase Auth.
+# The prefixes of a bcrypt hash, as produced by the previous provider.
 _BCRYPT_PREFIXES = ("$2a$", "$2b$", "$2y$")
 
 # bcrypt only looks at the first 72 bytes of a password; newer
@@ -76,7 +76,7 @@ def verify_password(
     verification error. It never raises for bad input: a caller that
     gets False should treat the credentials as invalid.
 
-    A bcrypt hash (the legacy Supabase format) is checked with bcrypt.
+    A bcrypt hash (the legacy format) is checked with bcrypt.
     Callers upgrade it on success by asking `needs_rehash`.
 
     Note: this function does not re-hash on success. If the stored
