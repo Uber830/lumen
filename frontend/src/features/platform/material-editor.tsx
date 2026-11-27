@@ -42,7 +42,12 @@ export function MaterialEditor({
 
   return (
     <Dialog open={Boolean(materialId)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[88vh] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+      {/* La X de la esquina la dibuja el editor: el diálogo no pone la
+          suya, o se verían dos encima. */}
+      <DialogContent
+        showClose={false}
+        className="max-h-[88vh] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+      >
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-[16px]">Editar el recurso</DialogTitle>
