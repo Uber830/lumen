@@ -252,13 +252,32 @@ test.describe("el panel del colegio", () => {
     await expect(visor.locator("iframe")).toHaveCount(1);
     await page.keyboard.press("Escape");
 
-    // 4. The school removes its own resource.
-    await tarjeta
+    // 4. The school changes the values of its own resource with the pencil.
+    await tarjeta.first().getByRole("button", { name: /^Editar/ }).click();
+    const editor = page.getByRole("dialog").last();
+    await expect(editor.getByRole("heading", { name: /Editar el recurso/i })).toBeVisible(READY);
+    await editor.getByLabel(/Título/i).fill("Manual de convivencia e2e editado");
+    await editor.getByRole("button", { name: /Guardar cambios/i }).click();
+    await expect(editor).toBeHidden(READY);
+    const editada = page
+      .locator("ul li article")
+      .filter({ hasText: "Manual de convivencia e2e editado" });
+    await expect(editada.first()).toBeVisible(READY);
+
+    // 5. The characteristics of the file are in the card of the piece.
+    await editada.first().getByRole("button", { name: /Características/ }).click();
+    const ficha = page.getByRole("dialog").last();
+    await expect(ficha.getByText("Características del archivo")).toBeVisible(READY);
+    await expect(ficha.getByText("manual-e2e.pdf")).toBeVisible(READY);
+    await page.keyboard.press("Escape");
+
+    // 6. The school removes its own resource.
+    await editada
       .first()
       .getByRole("button", { name: /Quitar/ })
       .click();
     const confirmacion = page.getByRole("dialog").last();
     await confirmacion.getByRole("button", { name: /Quitar el recurso/i }).click();
-    await expect(tarjeta).toHaveCount(0, { timeout: 10_000 });
+    await expect(editada).toHaveCount(0, { timeout: 10_000 });
   });
 });
