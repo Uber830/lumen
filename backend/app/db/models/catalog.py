@@ -27,6 +27,7 @@ from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -309,7 +310,16 @@ class MaterialHistory(Base):
     """One entry of the history of a material."""
 
     __tablename__ = "material_history"
-    __table_args__ = ({"schema": "public"},)
+    # The same closed list of the migration: the action of an entry is
+    # one of these five.
+    __table_args__ = (
+        CheckConstraint(
+            "action in ('created', 'status_changed', 'access_changed', "
+            "'metadata_changed', 'file_replaced')",
+            name="material_history_action_check",
+        ),
+        {"schema": "public"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
