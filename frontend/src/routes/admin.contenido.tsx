@@ -1,5 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BookOpen, CheckCircle2, Eye, Info, Search, Trash2, Upload, Users } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  Info,
+  Pencil,
+  Search,
+  Settings2,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -11,25 +22,17 @@ import {
   SectionCard,
   Toolbar,
 } from "@/components/ui-kit";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/dialog";
 import { SchoolResourceDialog } from "@/features/admin/school-resource-dialog";
+import { SchoolMaterialCard } from "@/features/admin/school-material-card";
+import { SchoolMaterialEditor } from "@/features/admin/school-material-editor";
+import { SchoolMaterialPreview } from "@/features/admin/school-material-preview";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { audienceLabel, coverOf, ResourceCard } from "@/features/resources/resource-card";
-import { ResourceViewer } from "@/features/resources/resource-viewer";
 import {
-  fetchSchoolMaterialFile,
   formatFileSize,
-  formatShortDate,
   MATERIAL_PAGE_SIZE,
   useDeleteSchoolMaterial,
   useSchoolMaterial,
-  useSchoolMaterialDetail,
   type MaterialListItem,
 } from "@/lib/school/material";
 import { cn } from "@/lib/utils";
@@ -72,7 +75,11 @@ function Contenido() {
   const [area, setArea] = useState("all");
   const [audience, setAudience] = useState("all");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<MaterialListItem | null>(null);
+  // The three controls of a resource of the school: the eye, the pencil
+  // and the characteristics.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [editorId, setEditorId] = useState<string | null>(null);
+  const [cardId, setCardId] = useState<string | null>(null);
   // The form that loads a resource of the school, and the one that
   // removes it.
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -98,7 +105,6 @@ function Contenido() {
     setPage(1);
   };
 
-  const detail = useSchoolMaterialDetail(selected?.id ?? null);
   const areas = material.data?.areas ?? [];
   const audiences = material.data?.audiences ?? [];
 
@@ -223,32 +229,60 @@ function Contenido() {
                       </>
                     }
                     actions={
-                      <>
+                      /* Los controles son solo el icono: la tarjeta no
+                         pierde el espacio con los nombres. */
+                      <div className="flex items-center gap-1.5">
+                        {/* El ojo: la pieza se ve antes de decidir
+                            nada sobre ella. */}
                         <Button
                           variant="outline"
-                          size="sm"
+                          size="xs"
                           icon={Eye}
-                          onClick={() => setSelected(item)}
+                          className="size-[26px] justify-center px-0"
+                          onClick={() => setPreviewId(item.id)}
                           aria-label={`Ver ${item.title}`}
-                        >
-                          Ver
-                        </Button>
-                        {/* Only the resources of the school are its own
-                            to remove: the ones of the editorial team
-                            are not. */}
+                          title="Ver el recurso"
+                        />
+                        {/* Los recursos del colegio son suyos: se editan
+                            y se miran. Los del equipo de Lumen se
+                            consultan, nada más. */}
                         {item.origin === "colegio" ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon={Trash2}
-                            onClick={() => setToDelete(item)}
-                            aria-label={`Quitar ${item.title}`}
-                            className="ml-1"
-                          >
-                            Quitar
-                          </Button>
+                          <>
+                            {/* El lápiz: los valores del recurso. */}
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              icon={Pencil}
+                              className="size-[26px] justify-center px-0"
+                              onClick={() => setEditorId(item.id)}
+                              aria-label={`Editar ${item.title}`}
+                              title="Editar el recurso"
+                            />
+                            {/* Las características: la ficha de la
+                                pieza y de su archivo. */}
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              icon={Settings2}
+                              className="size-[26px] justify-center px-0"
+                              onClick={() => setCardId(item.id)}
+                              aria-label={`Características de ${item.title}`}
+                              title="Ver las características del recurso"
+                            />
+                            {/* Solo los recursos del colegio son suyos
+                                para quitar: los del equipo de Lumen no. */}
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              icon={Trash2}
+                              className="size-[26px] justify-center px-0 text-destructive hover:text-destructive"
+                              onClick={() => setToDelete(item)}
+                              aria-label={`Quitar ${item.title}`}
+                              title="Quitar el recurso"
+                            />
+                          </>
                         ) : null}
-                      </>
+                      </div>
                     }
                   />
                 </li>
@@ -284,47 +318,27 @@ function Contenido() {
         </p>
       </SectionCard>
 
-      {/* The resource, as it is: it opens on top of the shelf, without
-          leaving the view. The file is shown inside the platform: the
-          material is consulted, not downloaded. */}
-      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="text-[16px]">
-              {detail.data?.title ?? selected?.title ?? "Recurso"}
-            </DialogTitle>
-            <DialogDescription className="font-mono text-[12px]">
-              {detail.data?.ref ?? selected?.ref} ·{" "}
-              {formatFileSize(detail.data?.file_size_bytes ?? selected?.file_size_bytes ?? null)}
-            </DialogDescription>
-          </DialogHeader>
+      {/* El recurso, como es: el ojo. Se abre sobre la estantería, sin
+          salir de la vista. */}
+      <SchoolMaterialPreview
+        key={previewId ?? "vista-previa-cerrada"}
+        materialId={previewId}
+        onClose={() => setPreviewId(null)}
+      />
 
-          {/* The data of the piece, in one line: what it is and who it
-              is for. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Chip tone="muted">{detail.data?.area ?? selected?.area}</Chip>
-            <Chip tone="muted">{detail.data?.type ?? selected?.type}</Chip>
-            <Chip
-              tone={(detail.data?.visible_to ?? selected?.visible_to) === "all" ? "muted" : "info"}
-            >
-              {audienceLabel(detail.data?.visible_to ?? selected?.visible_to ?? "all")}
-            </Chip>
-            {(detail.data?.origin ?? selected?.origin) === "colegio" ? (
-              <Chip tone="teal">Cargado por el colegio</Chip>
-            ) : null}
-          </div>
+      {/* El lápiz: los valores del recurso del colegio. */}
+      <SchoolMaterialEditor
+        key={editorId ?? "editor-cerrado"}
+        materialId={editorId}
+        onClose={() => setEditorId(null)}
+      />
 
-          <ResourceViewer
-            file={detail.data?.file ?? null}
-            materialId={selected?.id ?? null}
-            loadFile={fetchSchoolMaterialFile}
-          />
-
-          {detail.data?.description ? (
-            <p className="text-[13px] text-muted-foreground">{detail.data.description}</p>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      {/* Las características: la ficha de la pieza y de su archivo. */}
+      <SchoolMaterialCard
+        key={cardId ?? "ficha-cerrada"}
+        materialId={cardId}
+        onClose={() => setCardId(null)}
+      />
 
       {/* The form that loads a resource of the school. */}
       <SchoolResourceDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />

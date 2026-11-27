@@ -206,6 +206,33 @@ export function useCreateSchoolMaterial(): UseMutationResult<
   });
 }
 
+/** What the school writes when it changes a resource of its own. */
+export type UpdateSchoolMaterial = {
+  id: string;
+  input: {
+    title?: string;
+    type?: string;
+    area?: string;
+    visible_to?: string;
+    description?: string | null;
+  };
+};
+
+/** Change a resource of the school. */
+export function useUpdateSchoolMaterial(): UseMutationResult<
+  MaterialDetail,
+  Error,
+  UpdateSchoolMaterial
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }) => api.patch<MaterialDetail>(`/v1/school/material/${id}`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["school", "material"] });
+    },
+  });
+}
+
 /** Remove a resource of the school. */
 export function useDeleteSchoolMaterial(): UseMutationResult<void, Error, string> {
   const qc = useQueryClient();
