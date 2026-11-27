@@ -488,6 +488,76 @@ async def test_the_school_uploads_a_resource_of_its_own(
     assert served.headers["content-type"].startswith("application/pdf")
 
 
+async def test_the_school_edits_a_resource_of_its_own(client, engine, seeded_school, catalog):
+    """A resource of the school is its own to change.
+
+    The piece keeps its file: to replace it, the school loads the
+    resource again.
+    """
+    from tests.conftest import TEST_USER_ID
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        material = await catalog(
+            session,
+            "Manual del colegio",
+            seeded_school,
+            created_by=uuid.UUID(TEST_USER_ID),
+        )
+
+    response = client.patch(
+        f"/v1/school/material/{material.id}",
+        headers=await _auth(),
+        json={
+            "title": "Manual de convivencia",
+            "visible_to": "teachers",
+            "description": "El manual que sigue el colegio.",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["title"] == "Manual de convivencia"
+    assert body["visible_to"] == "teachers"
+    assert body["description"] == "El manual que sigue el colegio."
+
+
+async def test_the_school_does_not_edit_a_resource_of_the_editorial_team(
+    client, engine, seeded_school, catalog
+):
+    """The pieces of the editorial team are not the school's to change."""
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        material = await catalog(session, "Algebra de 7", seeded_school)
+
+    response = client.patch(
+        f"/v1/school/material/{material.id}",
+        headers=await _auth(),
+        json={"title": "Otro nombre"},
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_the_school_refuses_an_area_that_does_not_exist(
+    client, engine, seeded_school, catalog
+):
+    """The catalogs are closed: the area of the piece is one of them."""
+    from tests.conftest import TEST_USER_ID
+
+    async with AsyncSession(bind=engine, expire_on_commit=False) as session:
+        material = await catalog(
+            session,
+            "Manual del colegio",
+            seeded_school,
+            created_by=uuid.UUID(TEST_USER_ID),
+        )
+
+    response = client.patch(
+        f"/v1/school/material/{material.id}",
+        headers=await _auth(),
+        json={"area": "Física"},
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "invalid_material_area"
+
+
 async def test_the_school_removes_a_resource_of_its_own(
     client, engine, seeded_school, school_storage, catalog
 ):
