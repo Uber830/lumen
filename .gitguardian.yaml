@@ -17,3 +17,9 @@ ignore:
   - path: frontend/tests/e2e/site.spec.ts
     detectors:
       - name: Generic Password
+  - path: frontend/tests/e2e/colegio.spec.ts
+    detectors:
+      - name: Generic Password
+  - path: frontend/tests/e2e/plataforma.spec.ts
+    detectors:
+      - name: Generic Password
