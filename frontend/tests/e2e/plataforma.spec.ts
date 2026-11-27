@@ -57,7 +57,10 @@ test.describe("el panel de la plataforma", () => {
     await page.keyboard.press("Escape");
 
     // Y el equipo puede empezar la conversación con un colegio.
-    await page.getByRole("button", { name: /Enviar solicitud/i }).first().click();
+    await page
+      .getByRole("button", { name: /Enviar solicitud/i })
+      .first()
+      .click();
     const modal = page.getByRole("dialog").last();
     await expect(modal.getByRole("heading", { name: /Enviar solicitud/i })).toBeVisible(READY);
     await expect(modal.getByLabel(/Colegio/i)).toBeVisible();
@@ -113,7 +116,10 @@ test.describe("el panel de la plataforma", () => {
     await login(page);
     await openPanel(page, "/super/catalogo");
 
-    await page.getByRole("button", { name: /Cargar recurso/i }).first().click();
+    await page
+      .getByRole("button", { name: /Cargar recurso/i })
+      .first()
+      .click();
     const asistente = page.getByRole("dialog").last();
     await expect(asistente.getByRole("heading", { name: /Cargar contenido/i })).toBeVisible(READY);
 
@@ -127,7 +133,9 @@ test.describe("el panel de la plataforma", () => {
     await expect(asistente.getByRole("button", { name: /Ciertos colegios/i })).toBeVisible(READY);
 
     // Con «todos» la lista de colegios no se muestra.
-    await expect(asistente.getByRole("button", { name: /Colegio Sagrado Corazón/i })).toHaveCount(0);
+    await expect(asistente.getByRole("button", { name: /Colegio Sagrado Corazón/i })).toHaveCount(
+      0,
+    );
 
     // Con «ciertos» aparece.
     await asistente.getByRole("button", { name: /Ciertos colegios/i }).click();

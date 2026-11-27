@@ -136,7 +136,10 @@ test.describe("el panel del colegio", () => {
 
     // 2. The edit form has two fields and nothing else: the name and the
     // email. The subjects are changed in Asignaciones.
-    await page.getByRole("button", { name: /^Editar$/i }).first().click();
+    await page
+      .getByRole("button", { name: /^Editar$/i })
+      .first()
+      .click();
     const formulario = page.getByRole("dialog").last();
     await expect(formulario.getByRole("heading", { name: "Editar docente" })).toBeVisible(READY);
     await expect(formulario.getByLabel(/Nombre completo/i)).toBeVisible();
@@ -253,7 +256,10 @@ test.describe("el panel del colegio", () => {
     await page.keyboard.press("Escape");
 
     // 4. The school changes the values of its own resource with the pencil.
-    await tarjeta.first().getByRole("button", { name: /^Editar/ }).click();
+    await tarjeta
+      .first()
+      .getByRole("button", { name: /^Editar/ })
+      .click();
     const editor = page.getByRole("dialog").last();
     await expect(editor.getByRole("heading", { name: /Editar el recurso/i })).toBeVisible(READY);
     await editor.getByLabel(/Título/i).fill("Manual de convivencia e2e editado");
@@ -265,7 +271,10 @@ test.describe("el panel del colegio", () => {
     await expect(editada.first()).toBeVisible(READY);
 
     // 5. The characteristics of the file are in the card of the piece.
-    await editada.first().getByRole("button", { name: /Características/ }).click();
+    await editada
+      .first()
+      .getByRole("button", { name: /Características/ })
+      .click();
     const ficha = page.getByRole("dialog").last();
     await expect(ficha.getByText("Características del archivo")).toBeVisible(READY);
     await expect(ficha.getByText("manual-e2e.pdf")).toBeVisible(READY);
