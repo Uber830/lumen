@@ -20,6 +20,7 @@ De ahí sale la regla que atraviesa todo el panel:
 | Cargar material propio del colegio | Sí | **Sí** |
 | Definir qué colegios ven cada material del catálogo | Sí | **No** |
 | Decidir a quién va dirigido cada material propio | **No** | **Sí** |
+| Cambiar los valores de cada material propio | **No** | **Sí** |
 | Publicar, archivar o despublicar el material editorial | Sí | **No** |
 | Ver el material habilitado para su colegio | Sí | Sí |
 | Administrar docentes, estudiantes y cursos | Sí | **Sí** |
@@ -129,6 +130,22 @@ Los filtros son los del diseño y corren en el servidor: la búsqueda, el
 La acción depende del rol: el colegio **ve** el recurso (y quita los que él
 mismo cargó); la plataforma lo **gestiona**.
 
+### Los controles de la tarjeta
+
+En la biblioteca del colegio, cada recurso tiene **el ojo**: el archivo se ve
+en un modal sobre la vista, sin salir de la página. Los recursos **propios del
+colegio** tienen además dos controles más, con la misma forma que en la
+plataforma:
+
+| Icono | Qué hace |
+| --- | --- |
+| 👁️ **Ver** | Muestra la pieza como es (la imagen, el PDF, el video) |
+| ✏️ **Editar** | Abre el formulario: título, tipo, área, visible para y descripción |
+| ⚙️ **Características** | Abre la ficha de la pieza: sus metadatos y las características de su archivo |
+
+Los recursos del equipo de Lumen se consultan, nada más: no son del colegio
+para editarlos ni para quitarlos.
+
 ### El colegio también carga recursos
 
 El colegio tiene recursos propios: un manual de la escuela, una guía para
@@ -138,13 +155,17 @@ va dirigido** — esa decisión es del colegio.
 
 El recurso nace publicado y habilitado para su colegio, y su tarjeta lo
 distingue con la etiqueta **Cargado por el colegio**. El colegio también
-puede quitar los recursos que cargó (los del equipo de plataforma no son
-suyos).
+puede **cambiar los valores** de los recursos que cargó (con el lápiz) y
+**quitarlos** (los del equipo de plataforma no son suyos).
+
+El archivo no se cambia: para reemplazarlo, el colegio carga el recurso de
+nuevo.
 
 | Endpoint | Qué hace |
 | --- | --- |
 | `POST /v1/school/material/uploads` | Sube el archivo y devuelve su `file_id` |
 | `POST /v1/school/material` | Crea el recurso y lo habilita para el colegio |
+| `PATCH /v1/school/material/{id}` | Cambia los valores de un recurso del colegio |
 | `DELETE /v1/school/material/{id}` | Quita un recurso del colegio |
 | `GET /v1/school/material/{id}/file` | Sirve el archivo, para verlo en la plataforma |
 
