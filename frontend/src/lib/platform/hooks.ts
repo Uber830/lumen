@@ -223,13 +223,14 @@ export function useChangeMaterialStatus(): UseMutationResult<
 export function useSetMaterialSchools(): UseMutationResult<
   MaterialDetail,
   ApiError,
-  { id: string; school_ids: string[]; confirm?: boolean }
+  { id: string; school_ids: string[]; all_schools?: boolean; confirm?: boolean }
 > {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, school_ids, confirm }) =>
+    mutationFn: ({ id, school_ids, all_schools, confirm }) =>
       api.put<MaterialDetail>(`/v1/platform/catalog/${id}/schools`, {
         school_ids,
+        ...(all_schools ? { all_schools: true } : {}),
         confirm: confirm ?? false,
       }),
     onSuccess: (material) => {

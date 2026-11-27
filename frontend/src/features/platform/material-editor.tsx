@@ -2,8 +2,8 @@
 // The form that edits a resource.
 // -----------------------------------------------------------------------------
 // The pencil of the library: the values of a piece are changed here —
-// the title, the type, the area, the grades, who it is for and the
-// description.
+// the title, the type, the area, the grades, who it is for, the
+// description and the schools that can see it.
 //
 // The piece is its own component so the form starts again from the
 // values of the piece that is open: the parent gives it a key.
@@ -13,13 +13,20 @@
 // read at once.
 // =============================================================================
 
-import { Pencil, Save } from "lucide-react";
+import { Save, X } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
 import { Button } from "@/components/ui-kit";
 import { audienceLabel } from "@/features/resources/resource-card";
-import { useCatalogOptions, useMaterial, useUpdateMaterial } from "@/lib/platform/hooks";
+import { ApiError } from "@/lib/api/client";
+import {
+  useCatalogOptions,
+  useMaterial,
+  usePlatformSchools,
+  useSetMaterialSchools,
+  useUpdateMaterial,
+} from "@/lib/platform/hooks";
 import type { MaterialDetail } from "@/lib/platform/types";
 import { cn } from "@/lib/utils";
 
@@ -35,11 +42,7 @@ export function MaterialEditor({
 
   return (
     <Dialog open={Boolean(materialId)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className={cn(
-          "max-h-[88vh] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
-        )}
-      >
+      <DialogContent className="max-h-[88vh] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
         <div className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-[16px]">Editar el recurso</DialogTitle>
@@ -53,19 +56,12 @@ export function MaterialEditor({
             aria-label="Cerrar"
             className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Pencil className="size-4" strokeWidth={1.9} />
+            <X className="size-4" strokeWidth={1.9} />
           </button>
         </div>
 
         <div className="min-h-0 space-y-4 overflow-y-auto px-5 py-5">
-          {detail && (
-            <MaterialMetaForm
-              key={detail.id}
-              detail={detail}
-              onSaved={onClose}
-              onProblem={onClose}
-            />
-          )}
+          {detail && <MaterialMetaForm key={detail.id} detail={detail} onSaved={onClose} />}
         </div>
       </DialogContent>
     </Dialog>
@@ -82,16 +78,15 @@ export function MaterialEditor({
 function MaterialMetaForm({
   detail,
   onSaved,
-  onProblem,
 }: {
   detail: MaterialDetail;
   /** Called when the piece is already saved. */
   onSaved: (message: string) => void;
-  /** Called when the save did not go through. */
-  onProblem: (message: string) => void;
 }) {
   const options = useCatalogOptions();
+  const schools = usePlatformSchools({ per_page: 50 });
   const update = useUpdateMaterial();
+  const setSchools = useSetMaterialSchools();
 
   const [title, setTitle] = useState(detail.title);
   const [type, setType] = useState(detail.type);
@@ -101,11 +96,42 @@ function MaterialMetaForm({
   const [description, setDescription] = useState(detail.description ?? "");
   const [problem, setProblem] = useState<string | null>(null);
 
+  // The schools that see the piece now.
+  const currentSchools = detail.schools.map((school) => school.id);
+  const [schoolIds, setSchoolIds] = useState<string[]>(currentSchools);
+  // The decision comes first: the whole network or the schools that are
+  // picked. The piece is for everyone when it reaches every school of
+  // the network, so the decision is read from the data until the user
+  // picks one.
+  const [chosenScope, setChosenScope] = useState<"all" | "some" | null>(null);
+  const networkSize = schools.data?.total ?? null;
+  const scope: "all" | "some" =
+    chosenScope ?? (networkSize !== null && currentSchools.length >= networkSize ? "all" : "some");
+  // A published piece that loses a school asks for a confirmation: the
+  // server says which schools are affected.
+  const [pending, setPending] = useState<{ id: string; name: string }[] | null>(null);
+
   function toggleGrade(grade: string) {
     setGrades((current) =>
       current.includes(grade) ? current.filter((value) => value !== grade) : [...current, grade],
     );
   }
+
+  function toggleSchool(schoolId: string) {
+    setSchoolIds((current) =>
+      current.includes(schoolId)
+        ? current.filter((value) => value !== schoolId)
+        : [...current, schoolId],
+    );
+  }
+
+  // The access is the same when the piece reaches the same schools: the
+  // network is unknown while the list loads, so the decision always
+  // counts as a change until it is known.
+  const sameSchools =
+    scope === "all"
+      ? networkSize !== null && currentSchools.length >= networkSize
+      : [...schoolIds].sort().join("|") === [...currentSchools].sort().join("|");
 
   const dirty =
     title !== detail.title ||
@@ -113,9 +139,21 @@ function MaterialMetaForm({
     area !== detail.area ||
     visibleTo !== detail.visible_to ||
     description !== (detail.description ?? "") ||
-    grades.join("|") !== detail.grades.join("|");
+    grades.join("|") !== detail.grades.join("|") ||
+    !sameSchools;
+
+  /** The access of the piece: the schools that can see it. */
+  async function saveSchools(confirm: boolean) {
+    await setSchools.mutateAsync({
+      id: detail.id,
+      school_ids: scope === "all" ? [] : schoolIds,
+      all_schools: scope === "all",
+      confirm,
+    });
+  }
 
   async function onSave() {
+    setProblem(null);
     try {
       await update.mutateAsync({
         id: detail.id,
@@ -128,12 +166,38 @@ function MaterialMetaForm({
           description: description.trim() || null,
         },
       });
+
+      // The access of the piece, when it changed.
+      if (!sameSchools) {
+        try {
+          await saveSchools(false);
+        } catch (error) {
+          // A published piece that loses a school asks for a
+          // confirmation: the server says which schools are affected.
+          if (error instanceof ApiError && error.status === 409) {
+            const affected = (error.body as { affected?: { id: string; name: string }[] })
+              ?.affected;
+            setPending(affected ?? []);
+            return;
+          }
+          throw error;
+        }
+      }
+
       onSaved("Los datos del recurso quedaron guardados.");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "No se pudieron guardar los cambios.";
-      setProblem(message);
-      onProblem(message);
+      setProblem(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
+    }
+  }
+
+  async function onConfirmSchools() {
+    setProblem(null);
+    try {
+      await saveSchools(true);
+      setPending(null);
+      onSaved("Los datos del recurso quedaron guardados.");
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : "No se pudo cambiar el acceso.");
     }
   }
 
@@ -146,6 +210,24 @@ function MaterialMetaForm({
         >
           {problem}
         </p>
+      )}
+
+      {pending && (
+        <div className="rounded-idx border border-warning/40 bg-warning-soft px-3 py-2.5">
+          <p className="text-[13px] font-semibold text-warning">
+            Esta pieza va a dejar de verse en {pending.length}{" "}
+            {pending.length === 1 ? "colegio" : "colegios"}:
+          </p>
+          <p className="mt-1 text-xs text-warning">{pending.map((s) => s.name).join(", ")}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <Button size="sm" onClick={() => void onConfirmSchools()}>
+              Sí, cambiar el acceso
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setPending(null)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
       )}
 
       <label className="block">
@@ -240,6 +322,104 @@ function MaterialMetaForm({
         </select>
       </label>
 
+      {/* The decision comes before the list of schools: the piece goes
+          to the whole network or to the schools that are picked. */}
+      <div>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Colegios que pueden verlo
+        </span>
+        <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+          {(
+            [
+              {
+                value: "all" as const,
+                label: "Todos los colegios",
+                hint: "La pieza queda disponible para toda la red.",
+              },
+              {
+                value: "some" as const,
+                label: "Ciertos colegios",
+                hint: "Solo ven la pieza los que se elijan.",
+              },
+            ] as const
+          ).map((choice) => {
+            const on = scope === choice.value;
+            return (
+              <button
+                key={choice.value}
+                type="button"
+                onClick={() => setChosenScope(choice.value)}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-idx border px-3 py-2 text-left transition-colors",
+                  on ? "border-primary bg-primary-soft" : "border-border hover:border-line-2",
+                )}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid size-4 shrink-0 place-items-center rounded border text-[10px] text-primary-foreground",
+                      on ? "border-primary bg-primary" : "border-line-2",
+                    )}
+                  >
+                    {on ? "✓" : ""}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium">{choice.label}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {choice.hint}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {scope === "some" && (
+          <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {(schools.data?.items ?? []).map((school) => {
+              const on = schoolIds.includes(school.id);
+              return (
+                <button
+                  key={school.id}
+                  type="button"
+                  onClick={() => toggleSchool(school.id)}
+                  aria-pressed={on}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-idx border px-3 py-2 text-left transition-colors",
+                    on ? "border-primary bg-primary-soft" : "border-border hover:border-line-2",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid size-4 shrink-0 place-items-center rounded border text-[10px] text-primary-foreground",
+                      on ? "border-primary bg-primary" : "border-line-2",
+                    )}
+                  >
+                    {on ? "✓" : ""}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-medium">{school.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {school.short_code} · {school.students} estudiantes
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <span className="mt-1.5 block text-xs text-muted-foreground">
+          {scope === "all"
+            ? "El recurso queda para todos los colegios de la red."
+            : "Solo estos colegios verán el recurso."}
+        </span>
+      </div>
+
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Descripción
@@ -256,12 +436,12 @@ function MaterialMetaForm({
         <Button
           size="sm"
           icon={Save}
-          disabled={!dirty || update.isPending}
+          disabled={(!dirty && !pending) || update.isPending}
           onClick={() => void onSave()}
         >
           {update.isPending ? "Guardando..." : "Guardar cambios"}
         </Button>
-        {!dirty && (
+        {!dirty && !pending && (
           <span className="text-xs text-muted-foreground">No hay cambios que guardar.</span>
         )}
       </div>
