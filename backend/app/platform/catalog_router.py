@@ -612,6 +612,7 @@ async def set_material_schools(
         session,
         material=material,
         wanted=body.school_ids,
+        all_schools=body.all_schools,
         confirm=body.confirm,
         actor_id=context.user_id,
     )
@@ -624,10 +625,16 @@ async def _replace_schools(
     *,
     material: Material,
     wanted: list[uuid.UUID],
+    all_schools: bool = False,
     confirm: bool,
     actor_id: uuid.UUID | None,
 ) -> None:
     """Write the access of a material: the schools that change, and only those."""
+    if all_schools:
+        # The decision of the platform team: the piece goes to every
+        # school of the network.
+        result = await session.execute(select(School).order_by(School.name))
+        wanted = [school.id for school in result.scalars().all()]
     wanted = list(dict.fromkeys(wanted))
     known_schools: list[School] = []
     if wanted:

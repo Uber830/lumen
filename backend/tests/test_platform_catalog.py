@@ -854,3 +854,34 @@ async def test_the_upload_refuses_a_format_that_is_not_admitted(client, platform
     )
     assert response.status_code == 422
     assert response.json()["file_name"] == "nota.txt"
+
+
+async def test_the_access_can_go_to_every_school(
+    client, platform_admin, engine, created_materials, catalog_school, three_schools
+) -> None:
+    """The piece can be handed to the whole network after the fact.
+
+    It is the same decision as when it is created, and the list of
+    schools stays empty on purpose.
+    """
+    material = await _make_material(
+        engine,
+        created_materials,
+        status="draft",
+        school_ids=[catalog_school],
+    )
+
+    response = client.put(
+        f"/v1/platform/catalog/{material.id}/schools",
+        headers=platform_admin,
+        json={"school_ids": [], "all_schools": True},
+    )
+    assert response.status_code == 200, response.text
+
+    body = response.json()
+    enabled = {school["id"] for school in body["schools"]}
+    # The school of the test and the three of the listing are part of
+    # the network: the piece reaches all of them.
+    assert str(catalog_school) in enabled
+    for school_id in three_schools:
+        assert str(school_id) in enabled

@@ -239,6 +239,9 @@ class SetSchoolsRequest(BaseModel):
 
     # The complete set of schools that will have access.
     school_ids: list[UUID] = Field(default_factory=list)
+    # When it is true, the piece goes to every school of the network:
+    # the list of schools stays empty on purpose.
+    all_schools: bool = False
     # The client sets it when the user confirmed that a published
     # material loses the access of a school.
     confirm: bool = False
